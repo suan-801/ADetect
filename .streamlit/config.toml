@@ -1,10 +1,25 @@
 [theme]
 base = "dark"
-primaryColor = "#D4AF37"
-backgroundColor = "#0B0C10"
-secondaryBackgroundColor = "#141419"
-textColor = "#F5F5F0"
-font = "sans serif"
+backgroundColor = "#070707"
+secondaryBackgroundColor = "#111113"
+textColor = "#F2F2F0"
+borderColor = "#232326"
+font = "Pretendard:https://cdn.jsdelivr.net/gh/orioncactus/pretendard@1.3.9/dist/web/static/pretendard.css"
+headingFont = "Pretendard:https://cdn.jsdelivr.net/gh/orioncactus/pretendard@1.3.9/dist/web/static/pretendard.css"
+baseFontWeight = 350
+baseRadius = "0.9rem"
+buttonRadius = "0.6rem"
+showWidgetBorder = false
+showSidebarBorder = false
+primaryColor = "#F2F2F0"
+linkColor = "#C9A227"
+# 헤딩이 기본값보다 무겁고 커 보이지 않도록 전체적으로 한 단계씩 축소 (PRD 피드백 §5 Typography)
+headingFontSizes = ["2.4rem", "1.6rem", "1.15rem", "1.0rem", "0.95rem", "0.9rem"]
+headingFontWeights = ["600", "550", "500", "500", "500", "500"]
+
+[theme.sidebar]
+backgroundColor = "#070707"
+borderColor = "#1C1C1F"
 
 [server]
 headless = true

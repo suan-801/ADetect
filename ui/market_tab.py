@@ -10,20 +10,19 @@ import pandas as pd
 import streamlit as st
 
 from core.scrapers.naver_api import get_news, get_search_volume_trend
-from ui.components import feature_card, sample_data_notice, status_icon
+from ui.components import feature_intro, sample_data_notice, status_icon, tab_header
 
 
 def render(session: dict):
     status = session.get("market_status", "미실행")
-    st.subheader(f"{status_icon(status)} 시장분석")
+    tab_header("MARKET", "시장분석", status_icon(status))
 
     if status == "미실행":
-        feature_card(
-            "📊", "이 기능은 다음을 분석합니다",
-            "· 검색량 추이(최근 12/3/1개월) 및 계절성\n"
-            "· 카테고리 주요 뉴스 (최근 1년/3개월/1개월)\n"
-            "· 전문 통계·리포트 참고자료 출처",
-        )
+        feature_intro([
+            "검색량 추이(최근 12/3/1개월) 및 계절성",
+            "카테고리 주요 뉴스 — 최근 1년/3개월/1개월",
+            "전문 통계·리포트 참고자료 출처",
+        ])
         with st.expander("선택 수집 옵션"):
             st.checkbox("뉴스", value=True, key="market_opt_news")
         if st.button("시장분석 시작하기", type="primary", key="btn_start_market"):
@@ -51,12 +50,12 @@ def render(session: dict):
             df["date"] = pd.to_datetime(df["date"])
             st.line_chart(df.set_index("date")["search_index"])
         else:
-            st.info("데이터가 없습니다.")
+            st.caption("데이터가 없습니다.")
 
     with tabs[2]:
         news = result.get("news", [])
         if not news:
-            st.info("뉴스 수집 옵션이 꺼져 있거나 뉴스가 없습니다.")
+            st.caption("뉴스 수집 옵션이 꺼져 있거나 뉴스가 없습니다.")
         for n in news:
             st.markdown(f"**[{n['title']}]({n['url']})**  \n{n['summary']}  \n`{n['published_at']}`")
 

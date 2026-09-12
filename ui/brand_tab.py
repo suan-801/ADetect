@@ -12,20 +12,19 @@ import pandas as pd
 import streamlit as st
 
 from core.analyzers.brand_analyzer import run_brand_analysis
-from ui.components import feature_card, render_insight_card, sample_data_notice, status_icon
+from ui.components import feature_intro, render_insight_card, sample_data_notice, status_icon, tab_header
 
 
 def render(session: dict):
     status = session.get("brand_status", "미실행")
-    st.subheader(f"{status_icon(status)} 브랜드분석")
+    tab_header("BRAND", "브랜드분석", status_icon(status))
 
     if status == "미실행":
-        feature_card(
-            "🧭", "이 기능은 다음을 분석합니다",
-            "· 브랜드 검색량 (자사+경쟁사)   · 홈페이지 분석\n"
-            "· 브랜드 뉴스                  · SNS 프로필\n"
-            "· 네이버 SA/브랜드검색          · 매체 운영 현황",
-        )
+        feature_intro([
+            "브랜드 검색량 (자사+경쟁사) · 홈페이지 분석",
+            "브랜드 뉴스 · SNS 프로필",
+            "네이버 SA/브랜드검색 · 매체 운영 현황",
+        ])
         with st.expander("선택 수집 옵션"):
             st.checkbox("Instagram", value=True, key="brand_opt_ig")
             st.checkbox("YouTube", value=False, key="brand_opt_yt")

@@ -10,8 +10,8 @@
 | 영역 | 상태 | 위치 |
 |---|---|---|
 | 저장소 뼈대 (폴더 구조, .env, requirements) | ✅ 완료 | 루트 |
-| 다크+골드 테마, Pretendard 폰트(CDN) | ✅ 완료 | `config/theme.py` |
-| 홈 화면 (ref.png 참고) | ✅ 완료 | `pages/1_home.py` |
+| 디자인 시스템 — Black Monochrome / Minimal Glassmorphism, Pretendard | ✅ 완료 (2차 리디자인 반영, §5) | `config/theme.py`, `.streamlit/config.toml` |
+| 홈 화면 | ✅ 완료 | `pages/1_home.py` |
 | STEP 1 브랜드 설정 (타겟 입력 없음) + AI 추천 확인 화면 | ✅ 완료 | `pages/2_analyze.py` |
 | STEP 2 Workspace 5개 탭 골격 + 상태 스트립 | ✅ 완료 | `pages/2_analyze.py` |
 | 시장분석 탭 | 🟡 목업 데이터로 동작 (담당자 확장 필요) | `ui/market_tab.py` |
@@ -63,6 +63,8 @@ database/db.py    — analysis_session / function_run (PRD §6-1·§13)
 | **종합분석** (미배정) | `ui/synthesis_tab.py` (신규 작성 필요) | §7-4 SOV/포지셔닝맵/White Space |
 
 각자 자기 파일만 건드리면 되도록 나눠놨기 때문에 **브랜치를 나눠도 병합 충돌이 거의 안 납니다.**
+단, `ui/components.py`·`config/theme.py`·`app.py`·`pages/1_home.py`·`pages/2_analyze.py`는
+디자인 시스템을 공유하는 파일이라 여러 명이 동시에 건드리면 충돌하기 쉽습니다 — 바꿀 일이 있으면 먼저 알리세요.
 
 ### Git 브랜치 전략 (제안)
 
@@ -93,20 +95,109 @@ main                        — 항상 동작하는 상태만 유지 (지금 이
 
 ---
 
-## 5. 디자인 관련 — 확인이 필요한 항목 (ref.png 재현 한계)
+## 5. 디자인 리디자인 — "Premium AI Intelligence / Black Monochrome / Minimal Glassmorphism"
 
-ref.png를 최대한 참고했지만, Streamlit 위젯의 구조적 한계로 아래 항목은 단순화했습니다.
-**실제로 이 정도 차이가 괜찮은지, 아니면 더 정교하게(예: 커스텀 HTML 컴포넌트) 맞춰야 하는지 확인 부탁드립니다.**
+1차 프로토타입(다크+골드, 카드 나열형)이 "전형적인 SaaS 관리자 대시보드"처럼 보인다는 피드백을 받아
+전면 리디자인했습니다. 기능/데이터 구조는 전혀 건드리지 않았고 Layout·Typography·Color·Glassmorphism·
+Navigation·Cards·Input·Buttons·Iconography만 수정했습니다.
 
-1. **홈 히어로 우측의 3D 캡슐 오브젝트 그래픽** — 생략했습니다. 정적 이미지(PNG/WebP)를 만들어
-   `templates/assets/`에 넣어주시면 배경 이미지로 넣는 정도는 쉽게 추가할 수 있습니다.
-2. **사이드바 커스텀 아이콘 네비게이션** — Streamlit의 기본 `st.navigation` 위에 최소 CSS만
-   입혔습니다. ref.png처럼 완전히 커스텀된 아이콘/hover 애니메이션까지는 기본 위젯으로는 한계가
-   있어, 필요하시면 순수 HTML/CSS 사이드바(스트림릿 컴포넌트)로 바꾸는 방안을 검토하겠습니다.
-3. **상단 우측 "History"/사용자 아바타 드롭다운 바** — 이번 스켈레톤에는 없고, 대신 좌측
-   사이드바의 "이력 관리" 페이지로 대체했습니다. 상단 고정 바가 꼭 필요하면 알려주세요.
-4. **"분석 시작하기" 버튼 색상** — ref.png는 밝은 화이트 계열 버튼인데, 지금 테마도 동일하게
-   화이트 버튼 + 호버 시 골드로 맞췄습니다(하나만 확인 부탁드려요: 이 정도 톤이면 괜찮은지).
+### 5-1. 피드백 대비 적용 요약
+
+| 피드백 항목 | 적용 내용 |
+|---|---|
+| 1. 전체 컨셉 (Black monochrome / Premium / Editorial) | 배경 `#070707` 고정, 색상 팔레트를 black/white/gray로 통일 |
+| 2. 카드로 감싸지 않기 | `st.container(border=True)` 전면 제거. 얇은 상단 구분선(hairline) + 여백으로 위계 표현 (`ui/components.py`의 `module_row`/`render_insight_card`) |
+| 3. Background — 순수 CSS, 은은한 depth | 이미지 없이 아주 옅은(4~4.5% 불투명도) radial-gradient 2겹만 사용 (`config/theme.py`) |
+| 4. Glassmorphism 스펙 | bg `rgba(255,255,255,0.035)` / border `rgba(255,255,255,0.07)` / `backdrop-filter: blur(20px)` — 요청 범위 그대로 적용, 브랜드 입력 커맨드바 등 실제 위젯이 필요한 곳에만 한정 적용 |
+| 5. Typography — 가볍고 정제 | `.streamlit/config.toml`의 `headingFontSizes`/`headingFontWeights`/`baseFontWeight`로 앱 전체 헤딩·본문 폰트를 한 단계씩 축소 |
+| 6. Iconography — 이모지 제거 | 📊🎯🧭🖼️🏁🏠🔍🕘⚙ 전부 제거. 사이드바는 Streamlit 내장 Material Symbols 선(line) 아이콘(`:material/home:` 등), 나머지는 텍스트만 사용. (단, PRD §16-2가 정의한 상태 기호 ○●✓△✕🔒은 기능 표기이므로 유지) |
+| 7. Hero — eyebrow + headline | "ADetect · Brand Intelligence" eyebrow + "AI insight, in minutes." 헤드라인 + 짧은 설명 1줄로 축소 |
+| 8. Brand Input — Command Interface | 카테고리/경쟁사를 접이식(`st.expander`)으로 감추고 브랜드명 입력 + "Analyze →" 중심의 glass surface 하나로 재구성 |
+| 9. 주요 분석 기능 — 4개 모듈 | 홈 화면의 기능 소개를 5개 카드 → MARKET/BRAND/CREATIVE/AUDIENCE 4개 에디토리얼 리스트로 변경, 종합분석은 "4개 분석이 쌓이면 자동 제공"이라는 안내 문구로 대체 (Workspace의 실제 5탭 구조·기능은 유지) |
+| 10. Layout — 여백 확대 | 본문 최대 폭 1080px 중앙 정렬 + 좌우 2rem 패딩, 섹션 간 여백 확대 |
+| 11. Color — neutral | `primaryColor`를 골드에서 오프화이트(`#F2F2F0`)로 변경, 버튼을 white/black 기반으로 재설계. accent color(`#C9A227`)는 FACT/AI/REC 배지처럼 PRD가 요구하는 최소 지점에만 남김 |
+| 12. Sidebar — 조용한 내비게이션 | 폭 축소(15rem), active 상태를 회색 박스 대신 얇은 좌측 라인으로 표현 |
+| 13-14. 전체 인상 / 기능 변경 금지 | 기능·데이터 구조 변경 없음. `tests/test_smoke.py` 전체 통과 확인 |
+
+### 5-2. 알려진 한계 (브라우저로 직접 확인 필요)
+
+이번 세션에서는 브라우저 자동화 도구를 사용할 수 없어 **실제 렌더링을 시각적으로 캡처해 대조하지
+못했습니다.** 대신 Streamlit 컴파일된 프론트엔드 번들에서 실제 DOM 속성(data-testid)을 확인해
+CSS를 작성했고, `.streamlit/config.toml`의 테마 값이 정상 로드되는지, 전체 클릭 플로우가 예외 없이
+동작하는지는 확인했습니다. `streamlit run app.py` 실행 후 아래를 직접 봐주세요:
+
+- 브랜드 입력 영역의 glass 효과(`backdrop-filter: blur`)가 기대한 만큼 보이는지 (CSS `:has()` 선택자 기반이라 브라우저 호환성에 좌우될 수 있음)
+- 사이드바 active 상태의 얇은 라인 표시가 의도대로 보이는지
+- 전체적으로 "SaaS 대시보드" 느낌이 충분히 빠졌는지
+
+추가로 다듬을 부분이 있으면 알려주시면 바로 반영하겠습니다.
+
+<details>
+<summary>원본 피드백 전문 (참고용, 접힘)</summary>
+
+```
+현재 구현된 ADetect의 기능과 데이터 구조는 최대한 유지하고, UI/UX 디자인을 전면적으로 리디자인해줘.
+
+현재 결과물은 기능적으로는 괜찮지만, 전형적인 SaaS 관리자 대시보드처럼 보이고 내가 의도한
+프리미엄 AI Intelligence Tool의 느낌이 부족하다.
+
+이번 작업의 최우선 목표는 "기능 추가"가 아니라 "비주얼 퀄리티 개선"이다.
+
+1. 전체 디자인 컨셉: "Premium AI Intelligence / Black Monochrome / Minimal Glassmorphism"
+   Apple, Linear, Perplexity 참고. 흔한 SaaS Dashboard처럼 보이면 안 됨.
+   키워드: Black monochrome / Minimal / Premium / Sophisticated / Quiet luxury /
+   AI Intelligence / Glassmorphism / Editorial / Spacious / Subtle depth / High-end technology
+
+2. 가장 중요한 디자인 원칙: 모든 요소를 카드로 감싸지 않는다.
+   피할 것: 모든 영역 1px border, 동일한 카드 형태 반복, 강한 그림자/glow, 과도한 gradient,
+   네온, 컬러풀한 UI, 이모지 아이콘, 큰 노란색 버튼, 너무 두꺼운 폰트, 일반적인 Admin Dashboard.
+   대신: 여백, 얇고 거의 안 보이는 경계, 반투명 glass surface, subtle blur, 아주 약한 빛과
+   깊이감, 흰/회색 중심 monochrome, 필요한 곳에만 accent color.
+
+3. Background: 이미지 사용 안 함. 순수 CSS 기반 매우 어두운 black(#050505~#0A0A0A) +
+   아주 미세한 radial gradient depth. 빛 효과가 장식이 되면 안 됨.
+
+4. Glassmorphism: background rgba(255,255,255,0.025~0.05), border rgba(255,255,255,0.08 이하),
+   backdrop-filter blur(16~24px), shadow 매우 약하게. "반짝이는 유리판"이 아니라 살짝 뜬 반투명 surface.
+
+5. Typography: 큰 제목을 무조건 굵고 크게 만들지 않음. eyebrow/label → headline → description
+   → (필요시) 큰 숫자 순의 위계. font-weight 전체적으로 한 단계 낮춤. 특히 "주요 분석 기능",
+   "시장분석", "타겟분석"이 너무 크고 무거움.
+
+6. Iconography: 이모지(📊 🎯 🧭 🖼️ 🏁 등) 전부 제거. Lucide/SVG/아주 얇은 line icon 또는
+   아이콘 없이 typography만 사용. 아이콘은 보조 요소일 뿐 주인공이 아님.
+
+7. Main Hero: 상단을 훨씬 여유 있게. "AI insight, in minutes."를 작은 eyebrow + elegant
+   headline 구조로. 설명은 짧고 정제되게, 텍스트 과다 노출 금지.
+
+8. Brand Input 영역: 큰 사각 박스 대신 "AI 분석을 시작하는 Command Interface"처럼. Brand/
+   Category/Competitors가 하나의 elegant glass surface 안에 자연스럽게 연결.
+
+9. 주요 분석 기능: 5개 동일 카드 가로 나열 지양. 핵심 4개(시장/브랜드/소재/타겟)를 category
+   label + 큰 제목 + 짧은 설명의 Intelligence Module 형태로. 종합분석은 메인 카드에서 빼거나
+   분석 완료 후 결과 영역으로.
+
+10. Layout: 카드로 화면을 꽉 채우지 않음. 좌우 padding/섹션 간 여백/카드 간 간격 확대, 콘텐츠
+    폭 제한, 빈 공간 적극 활용. "여백이 많은 premium intelligence workspace"처럼.
+
+11. Color: black/white/gray 중심. Primary #050505~#0A0A0A, Surface #101010~#161616,
+    Text #F5F5F5, Secondary #8A8A8A, Border white 5~8% opacity. Accent 최소화, 강한 yellow
+    버튼 제거, 버튼도 white/black 기반 neutral.
+
+12. Sidebar: 더 얇고 미니멀하게. 이모지(🏠🔍🕘⚙) 대신 Lucide line icon 또는 텍스트. 화면의
+    주인공이 아니라 조용한 navigation. width 축소, active state는 subtle highlight로.
+
+13. 전체적인 시각적 인상: "일반적인 대시보드가 아니다", "고급 Intelligence Platform이다",
+    "화려하지 않은데 비싸 보인다", "정보가 많지 않아도 공간과 typography로 완성도가 느껴진다",
+    "검은색+카드+노란 버튼 SaaS 화면처럼 보이면 안 된다."
+
+14. 중요: 기능을 새로 추가하지 않는다. 현재 구현된 기능과 데이터 구조는 유지한다. Layout/
+    Typography/Spacing/Color/Glassmorphism/Navigation/Cards/Input/Buttons/Iconography만 수정.
+    reference image의 넓은 여백/black monochrome/subtle glass/restrained lighting/minimal
+    typography/premium technology aesthetic/low visual noise를 가장 중요하게 반영.
+```
+
+</details>
 
 ---
 
