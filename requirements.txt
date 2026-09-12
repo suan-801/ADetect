@@ -1,0 +1,10 @@
+# Phase 0~1(뼈대/프로토타입) 최소 의존성.
+# 실제 수집기(Playwright/Apify/Gemini)는 각 모듈 담당자가 실제 연동을 붙일 때 추가합니다.
+# (PRD §15 기술스택 / §22 로드맵 참고)
+streamlit>=1.38
+python-dotenv>=1.0.1
+pandas>=2.2
+requests>=2.32
+
+# 개발용 (배포 시 불필요)
+pytest>=8.0

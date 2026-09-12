@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+env/
+.env
+*.db
+storage/temp/*
+storage/exports/*
+!storage/temp/.gitkeep
+!storage/exports/.gitkeep
+.streamlit/secrets.toml
+.DS_Store
+*.log

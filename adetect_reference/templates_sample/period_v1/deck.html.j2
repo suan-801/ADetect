@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ brand_display }} 주간 운영 결과 · {{ period_start }}~{{ period_end }}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,800;9..144,900&family=IBM+Plex+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --lum-purple: #8B6BCF;
+  --deep-violet: #4A3A7D;
+  --ice-lavender: #EFE9FB;
+  --ink: #1A1410;
+  --paper: #FAF8F4;
+  --paper-warm: #FFFCF4;
+  --line: #E5DCEF;
+  --line-soft: #ECE6F4;
+  --mute: #6B6573;
+  --good: #4A8A6E;
+  --warn: #C68A22;
+  --bad: #B23A48;
+  --gold: #C9A875;
+  --font-display: 'Fraunces', 'Pretendard', serif;
+  --font-body: 'Pretendard', 'IBM Plex Sans KR', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Sans KR', 'Pretendard', sans-serif;
+  --title-size: clamp(1.5rem, 5vw, 4rem);
+  --slide-padding: clamp(1.5rem, 4.5vw, 4.5rem);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --duration-normal: 0.65s;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; overflow-x: hidden; }
+html { scroll-snap-type: y mandatory; scroll-behavior: smooth; }
+body { font-family: var(--font-body); color: var(--ink); line-height: 1.55; background: var(--paper); -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+.slide { width: 100vw; height: 100vh; height: 100dvh; overflow: hidden; scroll-snap-align: start; display: flex; flex-direction: column; position: relative; padding: var(--slide-padding); }
+.slide-content { flex: 1; display: flex; flex-direction: column; justify-content: center; max-height: 100%; overflow: hidden; }
+.reveal { opacity: 0; transform: translateY(28px); transition: opacity var(--duration-normal) var(--ease-out-expo), transform var(--duration-normal) var(--ease-out-expo); }
+.slide.visible .reveal { opacity: 1; transform: translateY(0); }
+.reveal:nth-child(1) { transition-delay: 0.05s; } .reveal:nth-child(2) { transition-delay: 0.14s; }
+.reveal:nth-child(3) { transition-delay: 0.23s; } .reveal:nth-child(4) { transition-delay: 0.32s; }
+.reveal:nth-child(5) { transition-delay: 0.41s; } .reveal:nth-child(6) { transition-delay: 0.50s; }
+.reveal:nth-child(7) { transition-delay: 0.59s; } .reveal:nth-child(8) { transition-delay: 0.68s; }
+.progress-bar { position: fixed; top: 0; left: 0; height: 3px; background: var(--lum-purple); z-index: 1000; transition: width 0.25s var(--ease-out-expo); box-shadow: 0 0 12px rgba(139, 107, 207, 0.5); }
+.page-meta { position: fixed; bottom: 18px; right: 22px; font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.14em; color: var(--mute); z-index: 999; background: rgba(255,255,255,0.9); padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); text-transform: uppercase; }
+body.is-dark .page-meta { color: rgba(255,255,255,0.75); background: rgba(0,0,0,0.32); border-color: rgba(255,255,255,0.18); }
+
+.slide-cover { background: radial-gradient(ellipse at 18% 78%, rgba(139,107,207,0.32) 0%, transparent 55%), radial-gradient(ellipse at 82% 22%, rgba(232,180,184,0.18) 0%, transparent 50%), linear-gradient(135deg, #1B1326 0%, #2D2244 55%, #1A1322 100%); color: #fff; justify-content: space-between; padding: clamp(2rem, 5vw, 4.5rem); }
+.cover-stamp { font-family: var(--font-mono); font-size: clamp(0.7rem, 1vw, 0.85rem); letter-spacing: 0.32em; text-transform: uppercase; color: rgba(232, 222, 248, 0.7); display: flex; align-items: center; gap: 1ch; }
+.cover-stamp .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--lum-purple); box-shadow: 0 0 14px var(--lum-purple); }
+.cover-body { display: flex; flex-direction: column; gap: clamp(0.8rem, 2vw, 1.6rem); }
+.cover-eyebrow { font-family: var(--font-mono); font-size: clamp(0.78rem, 1.1vw, 0.95rem); letter-spacing: 0.42em; text-transform: uppercase; color: rgba(232, 222, 248, 0.62); }
+.cover-title { font-family: var(--font-display); font-weight: 900; font-size: clamp(2.4rem, 8vw, 6.2rem); line-height: 0.96; letter-spacing: -0.025em; font-feature-settings: "ss01", "ss02"; }
+.cover-title em { font-style: italic; color: #E8B4B8; font-weight: 600; }
+.cover-sub { font-family: var(--font-body); font-size: clamp(0.95rem, 1.6vw, 1.25rem); font-weight: 500; color: rgba(255,255,255,0.85); max-width: 65ch; line-height: 1.6; }
+.cover-foot { display: flex; justify-content: space-between; align-items: flex-end; gap: 2rem; flex-wrap: wrap; font-family: var(--font-mono); font-size: clamp(0.7rem, 0.95vw, 0.85rem); letter-spacing: 0.16em; color: rgba(232, 222, 248, 0.55); text-transform: uppercase; }
+.cover-foot .key { color: rgba(255,255,255,0.85); display: block; font-size: 1.4em; letter-spacing: 0.06em; text-transform: none; margin-bottom: 0.2em; font-weight: 600; }
+
+.slide-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: clamp(1rem, 2.2vw, 1.8rem); padding-bottom: clamp(0.5rem, 1.2vw, 0.9rem); border-bottom: 1px solid var(--line); gap: 1rem; flex-wrap: wrap; }
+.slide-eyebrow { font-family: var(--font-mono); font-size: clamp(0.66rem, 0.85vw, 0.78rem); letter-spacing: 0.36em; text-transform: uppercase; color: var(--lum-purple); font-weight: 700; margin-bottom: 0.4em; }
+.slide-title { font-family: var(--font-display); font-weight: 800; font-size: clamp(1.6rem, 3.4vw, 2.6rem); line-height: 1.05; letter-spacing: -0.018em; color: var(--ink); }
+.slide-title em { font-style: italic; color: var(--deep-violet); font-weight: 600; }
+.slide-aside { font-family: var(--font-mono); font-size: clamp(0.7rem, 0.95vw, 0.85rem); color: var(--mute); letter-spacing: 0.08em; text-align: right; }
+.footer-note { position: absolute; bottom: clamp(0.8rem, 1.6vw, 1.2rem); left: var(--slide-padding); right: var(--slide-padding); font-family: var(--font-mono); font-size: clamp(0.6rem, 0.78vw, 0.72rem); color: var(--mute); letter-spacing: 0.1em; border-top: 1px solid var(--line-soft); padding-top: 0.5em; display: flex; justify-content: space-between; gap: 1ch; }
+.footer-note strong { color: var(--deep-violet); font-weight: 700; }
+
+.slide-divider { background: linear-gradient(160deg, #221735 0%, #3B2A5F 55%, #1B1326 100%); color: #fff; justify-content: center; align-items: flex-start; }
+.slide-divider .slide-content { gap: clamp(0.6rem, 1.5vw, 1.2rem); }
+.divider-num { font-family: var(--font-display); font-style: italic; font-weight: 600; font-size: clamp(4rem, 16vw, 14rem); color: rgba(232,180,184,0.18); line-height: 1; letter-spacing: -0.04em; }
+.divider-eyebrow { font-family: var(--font-mono); font-size: clamp(0.78rem, 1vw, 0.92rem); letter-spacing: 0.4em; text-transform: uppercase; color: var(--lum-purple); margin-bottom: -0.6em; }
+.divider-title { font-family: var(--font-display); font-weight: 800; font-size: clamp(2rem, 5.5vw, 4.4rem); line-height: 1.05; letter-spacing: -0.02em; max-width: 16ch; }
+.divider-title em { font-style: italic; color: #E8B4B8; font-weight: 600; }
+
+.kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: clamp(0.5rem, 1.2vw, 1rem); margin-top: clamp(0.5rem, 1.5vw, 1rem); }
+.kpi-tile { background: var(--paper-warm); border: 1px solid var(--line); border-radius: 14px; padding: clamp(0.85rem, 1.8vw, 1.4rem); display: flex; flex-direction: column; gap: 0.35em; position: relative; overflow: hidden; transition: transform 0.3s var(--ease-out-expo), box-shadow 0.3s; }
+.kpi-tile:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(74, 58, 125, 0.08); }
+.kpi-tile::before { content: ''; position: absolute; top: 0; left: 0; width: 3px; height: 100%; background: var(--lum-purple); }
+.kpi-tile.good::before { background: var(--good); }
+.kpi-tile.warn::before { background: var(--warn); }
+.kpi-tile.bad::before { background: var(--bad); }
+.kpi-lbl { font-family: var(--font-mono); font-size: clamp(0.66rem, 0.9vw, 0.78rem); letter-spacing: 0.18em; text-transform: uppercase; color: var(--mute); font-weight: 500; }
+.kpi-val { font-family: var(--font-display); font-weight: 800; font-size: clamp(1.5rem, 3vw, 2.4rem); line-height: 1; letter-spacing: -0.025em; color: var(--ink); font-feature-settings: "tnum"; }
+.kpi-delta { font-family: var(--font-mono); font-size: clamp(0.65rem, 0.85vw, 0.78rem); font-weight: 600; display: inline-flex; align-items: center; gap: 0.35ch; }
+.kpi-delta.up { color: var(--good); } .kpi-delta.down { color: var(--bad); } .kpi-delta.flat { color: var(--mute); }
+
+.headline { font-family: var(--font-display); font-weight: 700; font-size: clamp(1.4rem, 3vw, 2.4rem); line-height: 1.2; letter-spacing: -0.015em; color: var(--ink); max-width: 22ch; }
+.headline strong { font-weight: 900; font-style: italic; background: linear-gradient(180deg, transparent 65%, rgba(139,107,207,0.32) 65%); padding: 0 0.1em; }
+.headline .badge { font-style: normal; font-weight: 700; color: var(--lum-purple); }
+.lead { font-family: var(--font-body); font-size: clamp(0.95rem, 1.3vw, 1.1rem); color: var(--mute); line-height: 1.7; max-width: 60ch; margin-top: clamp(0.6rem, 1.2vw, 1rem); }
+
+.big-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: clamp(0.8rem, 2vw, 1.6rem); margin-top: clamp(0.8rem, 2vw, 1.6rem); }
+.big-num { display: flex; flex-direction: column; gap: 0.25em; padding-left: clamp(0.8rem, 1.5vw, 1.2rem); border-left: 2px solid var(--line); }
+.big-num .v { font-family: var(--font-display); font-weight: 800; font-size: clamp(2rem, 4vw, 3.4rem); line-height: 0.96; letter-spacing: -0.025em; color: var(--ink); font-feature-settings: "tnum"; }
+.big-num .v.purple { color: var(--deep-violet); }
+.big-num .l { font-family: var(--font-mono); font-size: clamp(0.7rem, 0.9vw, 0.78rem); letter-spacing: 0.2em; text-transform: uppercase; color: var(--mute); }
+.big-num .h { font-size: clamp(0.78rem, 1vw, 0.92rem); color: var(--ink); line-height: 1.5; margin-top: 0.4em; }
+
+.table-wrap { background: var(--paper-warm); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; margin-top: clamp(0.6rem, 1.5vw, 1.2rem); }
+table.creative-tbl { width: 100%; border-collapse: collapse; font-size: clamp(0.74rem, 1.05vw, 0.92rem); font-feature-settings: "tnum"; }
+.creative-tbl thead th { font-family: var(--font-mono); font-size: clamp(0.62rem, 0.82vw, 0.72rem); letter-spacing: 0.16em; text-transform: uppercase; font-weight: 700; color: var(--deep-violet); background: var(--ice-lavender); padding: 0.85em 1em; text-align: left; border-bottom: 1px solid var(--line); }
+.creative-tbl thead th.num { text-align: right; }
+.creative-tbl tbody td { padding: 0.7em 1em; border-bottom: 1px solid var(--line-soft); vertical-align: middle; }
+.creative-tbl tbody tr:last-child td { border-bottom: none; }
+.creative-tbl tbody tr.win { background: rgba(74,138,110,0.04); }
+.creative-tbl tbody tr.lose { background: rgba(178,58,72,0.04); }
+.creative-tbl td.num { text-align: right; font-family: var(--font-mono); }
+.creative-tbl td.name { font-weight: 600; color: var(--ink); }
+.creative-tbl td.rank { color: var(--mute); font-family: var(--font-mono); width: 2.5em; }
+
+.badge { display: inline-block; padding: 0.18em 0.55em; border-radius: 6px; font-family: var(--font-mono); font-weight: 700; font-size: 0.92em; letter-spacing: 0.02em; }
+.badge.green { background: rgba(74,138,110,0.14); color: var(--good); }
+.badge.yellow { background: rgba(198,138,34,0.14); color: var(--warn); }
+.badge.red { background: rgba(178,58,72,0.14); color: var(--bad); }
+
+.hero-creative { display: grid; grid-template-columns: minmax(280px, 0.95fr) 1.2fr; gap: clamp(1.2rem, 3vw, 2.4rem); align-items: stretch; margin-top: clamp(0.5rem, 1.2vw, 1rem); }
+.hero-thumb { position: relative; aspect-ratio: 1 / 1; max-height: min(58vh, 520px); border-radius: 16px; overflow: hidden; background: var(--ice-lavender); box-shadow: 0 12px 40px rgba(74,58,125,0.18); }
+.hero-thumb img { width: 100%; height: 100%; object-fit: cover; object-position: center; display: block; }
+.hero-thumb .medal { position: absolute; top: 14px; left: 14px; background: rgba(255,255,255,0.95); border-radius: 999px; padding: 6px 14px 6px 10px; font-family: var(--font-mono); font-weight: 700; font-size: 0.78rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--deep-violet); display: flex; align-items: center; gap: 0.5ch; backdrop-filter: blur(6px); }
+.hero-thumb .medal .emoji { font-size: 1.2em; }
+.hero-thumb.warning .medal { color: var(--bad); }
+.hero-thumb.warning { box-shadow: 0 12px 40px rgba(178,58,72,0.22); }
+.hero-info { display: flex; flex-direction: column; justify-content: center; gap: clamp(0.5rem, 1.2vw, 1rem); }
+.hero-name { font-family: var(--font-mono); font-size: clamp(0.85rem, 1.1vw, 1rem); font-weight: 600; color: var(--deep-violet); letter-spacing: 0.04em; }
+.hero-headline { font-family: var(--font-display); font-weight: 800; font-size: clamp(1.4rem, 2.8vw, 2.2rem); line-height: 1.15; letter-spacing: -0.018em; color: var(--ink); }
+.hero-stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: clamp(0.4rem, 1vw, 0.8rem); margin-top: clamp(0.4rem, 1vw, 0.6rem); }
+.hero-stat { background: var(--paper-warm); border: 1px solid var(--line); border-radius: 10px; padding: clamp(0.6rem, 1.2vw, 0.9rem); }
+.hero-stat .l { font-family: var(--font-mono); font-size: clamp(0.62rem, 0.82vw, 0.72rem); letter-spacing: 0.16em; text-transform: uppercase; color: var(--mute); margin-bottom: 0.3em; }
+.hero-stat .v { font-family: var(--font-display); font-weight: 800; font-size: clamp(1.1rem, 2vw, 1.6rem); line-height: 1; letter-spacing: -0.02em; color: var(--ink); font-feature-settings: "tnum"; }
+.hero-stat.good .v { color: var(--good); }
+.hero-stat.bad .v { color: var(--bad); }
+.hero-takeaway { background: rgba(139,107,207,0.06); border-left: 3px solid var(--lum-purple); padding: clamp(0.7rem, 1.4vw, 1rem) clamp(0.9rem, 1.6vw, 1.2rem); border-radius: 0 8px 8px 0; font-size: clamp(0.85rem, 1.15vw, 1rem); line-height: 1.6; color: var(--ink); }
+.hero-takeaway.warning { background: rgba(178,58,72,0.06); border-left-color: var(--bad); }
+.hero-takeaway strong { font-weight: 700; color: var(--deep-violet); }
+.hero-takeaway.warning strong { color: var(--bad); }
+
+.creative-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: clamp(0.8rem, 1.8vw, 1.4rem); margin-top: clamp(0.5rem, 1.2vw, 0.9rem); }
+.creative-grid.cols-2x2 { grid-template-rows: repeat(2, 1fr); }
+.creative-card { display: grid; grid-template-columns: minmax(110px, 0.65fr) 1fr; gap: clamp(0.6rem, 1.2vw, 0.9rem); padding: clamp(0.6rem, 1.2vw, 0.9rem); background: var(--paper-warm); border: 1px solid var(--line); border-radius: 12px; }
+.creative-card .thumb { aspect-ratio: 1 / 1; border-radius: 8px; overflow: hidden; background: var(--ice-lavender); position: relative; }
+.creative-card .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.creative-card .thumb .rank-chip { position: absolute; top: 6px; left: 6px; background: rgba(255,255,255,0.95); border-radius: 50%; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; font-family: var(--font-mono); font-weight: 800; font-size: 0.72rem; color: var(--deep-violet); }
+.creative-card .info { display: flex; flex-direction: column; gap: 0.4em; justify-content: center; }
+.creative-card .nm { font-family: var(--font-mono); font-size: clamp(0.7rem, 0.95vw, 0.82rem); font-weight: 600; color: var(--deep-violet); letter-spacing: 0.02em; }
+.creative-card .row { display: flex; gap: clamp(0.4rem, 1vw, 0.8rem); align-items: baseline; flex-wrap: wrap; }
+.creative-card .row .m { display: flex; flex-direction: column; }
+.creative-card .row .m .l { font-family: var(--font-mono); font-size: clamp(0.56rem, 0.72vw, 0.66rem); letter-spacing: 0.14em; text-transform: uppercase; color: var(--mute); }
+.creative-card .row .m .v { font-family: var(--font-display); font-weight: 800; font-size: clamp(0.95rem, 1.4vw, 1.15rem); letter-spacing: -0.015em; color: var(--ink); font-feature-settings: "tnum"; }
+.creative-card .row .m .v.good { color: var(--good); }
+.creative-card .row .m .v.bad { color: var(--bad); }
+.creative-card .note { font-size: clamp(0.7rem, 0.95vw, 0.85rem); color: var(--mute); line-height: 1.5; }
+
+.pattern-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: clamp(0.8rem, 1.8vw, 1.4rem); margin-top: clamp(0.5rem, 1.5vw, 1.2rem); }
+.pattern { background: var(--paper-warm); border: 1px solid var(--line); border-radius: 14px; padding: clamp(0.9rem, 1.8vw, 1.4rem); position: relative; display: flex; flex-direction: column; gap: 0.7em; }
+.pattern.win::before, .pattern.lose::before { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 3px; border-radius: 14px 14px 0 0; }
+.pattern.win::before { background: var(--good); } .pattern.lose::before { background: var(--bad); }
+.pattern .num { font-family: var(--font-display); font-style: italic; font-weight: 700; font-size: clamp(1.8rem, 3.2vw, 2.6rem); color: var(--lum-purple); line-height: 1; letter-spacing: -0.02em; }
+.pattern.lose .num { color: var(--bad); }
+.pattern h4 { font-family: var(--font-display); font-weight: 800; font-size: clamp(1.05rem, 1.7vw, 1.35rem); line-height: 1.2; letter-spacing: -0.012em; color: var(--ink); }
+.pattern p { font-size: clamp(0.78rem, 1.05vw, 0.92rem); color: var(--mute); line-height: 1.65; }
+.pattern .examples { font-family: var(--font-mono); font-size: clamp(0.65rem, 0.82vw, 0.72rem); letter-spacing: 0.04em; color: var(--deep-violet); background: var(--ice-lavender); padding: 0.4em 0.7em; border-radius: 6px; align-self: flex-start; }
+
+.cx-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: clamp(0.7rem, 1.5vw, 1.2rem); margin-top: clamp(0.6rem, 1.5vw, 1rem); }
+.cx-tile { background: var(--paper-warm); border: 1px solid var(--line); border-radius: 14px; padding: clamp(0.9rem, 1.8vw, 1.3rem); display: flex; flex-direction: column; gap: 0.5em; position: relative; overflow: hidden; }
+.cx-tile::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 3px; }
+.cx-tile.bad::after { background: var(--bad); } .cx-tile.warn::after { background: var(--warn); } .cx-tile.good::after { background: var(--good); }
+.cx-tile .l { font-family: var(--font-mono); font-size: clamp(0.66rem, 0.85vw, 0.74rem); letter-spacing: 0.18em; text-transform: uppercase; color: var(--mute); font-weight: 600; }
+.cx-tile .v { font-family: var(--font-display); font-weight: 800; font-size: clamp(2rem, 3.6vw, 3rem); line-height: 1; letter-spacing: -0.025em; color: var(--ink); font-feature-settings: "tnum"; }
+.cx-tile .sig { font-size: clamp(0.74rem, 1vw, 0.88rem); color: var(--mute); line-height: 1.5; font-weight: 500; }
+.cx-tile.bad .sig { color: var(--bad); font-weight: 600; }
+.cx-tile.warn .sig { color: var(--warn); font-weight: 600; }
+.cx-tile.good .sig { color: var(--good); font-weight: 600; }
+
+.action-list { display: flex; flex-direction: column; gap: clamp(0.5rem, 1.1vw, 0.85rem); margin-top: clamp(0.6rem, 1.5vw, 1.2rem); }
+.action { display: grid; grid-template-columns: 56px 1fr auto; gap: clamp(0.6rem, 1.5vw, 1.1rem); align-items: center; padding: clamp(0.7rem, 1.4vw, 1rem) clamp(0.9rem, 1.8vw, 1.3rem); background: var(--paper-warm); border: 1px solid var(--line); border-radius: 12px; transition: transform 0.25s var(--ease-out-expo); }
+.action:hover { transform: translateX(4px); }
+.action .pri { font-family: var(--font-display); font-style: italic; font-weight: 800; font-size: clamp(1.6rem, 2.8vw, 2.2rem); color: var(--lum-purple); text-align: center; line-height: 1; }
+.action .body { display: flex; flex-direction: column; gap: 0.2em; }
+.action .body .t { font-family: var(--font-display); font-weight: 800; font-size: clamp(1rem, 1.6vw, 1.2rem); letter-spacing: -0.01em; color: var(--ink); }
+.action .body .d { font-size: clamp(0.75rem, 1vw, 0.88rem); color: var(--mute); line-height: 1.5; }
+.action .pill { font-family: var(--font-mono); font-size: clamp(0.62rem, 0.82vw, 0.72rem); letter-spacing: 0.14em; text-transform: uppercase; font-weight: 700; padding: 0.35em 0.85em; border-radius: 999px; white-space: nowrap; }
+.action .pill.critical { background: rgba(178,58,72,0.14); color: var(--bad); }
+.action .pill.high { background: rgba(198,138,34,0.14); color: var(--warn); }
+.action .pill.med { background: rgba(74,138,110,0.14); color: var(--good); }
+
+.toc-list { display: grid; grid-template-columns: repeat(2, 1fr); gap: clamp(0.6rem, 1.4vw, 1.1rem) clamp(1.5rem, 3vw, 3rem); margin-top: clamp(0.6rem, 1.5vw, 1.2rem); }
+.toc-item { display: flex; align-items: baseline; gap: 1rem; padding: clamp(0.5rem, 1vw, 0.7rem) 0; border-bottom: 1px dashed var(--line); }
+.toc-item .num { font-family: var(--font-mono); font-size: clamp(0.8rem, 1.1vw, 0.95rem); font-weight: 700; color: var(--lum-purple); letter-spacing: 0.06em; min-width: 2.5ch; }
+.toc-item .t { flex: 1; font-family: var(--font-display); font-weight: 600; font-size: clamp(0.95rem, 1.3vw, 1.15rem); color: var(--ink); }
+.toc-item .p { font-family: var(--font-mono); font-size: clamp(0.72rem, 0.95vw, 0.82rem); color: var(--mute); }
+
+.slide-closing { background: radial-gradient(ellipse at 50% 50%, rgba(139,107,207,0.18) 0%, transparent 60%), linear-gradient(180deg, #1B1326 0%, #2D2244 100%); color: #fff; justify-content: center; align-items: center; text-align: center; }
+.closing-mark { font-family: var(--font-display); font-style: italic; font-weight: 600; font-size: clamp(0.95rem, 1.3vw, 1.2rem); color: rgba(232, 222, 248, 0.6); letter-spacing: 0.12em; margin-bottom: 1.5em; }
+.closing-title { font-family: var(--font-display); font-weight: 800; font-size: clamp(2rem, 5.5vw, 4.4rem); line-height: 1.1; letter-spacing: -0.022em; max-width: 18ch; margin: 0 auto; }
+.closing-title em { font-style: italic; color: #E8B4B8; font-weight: 600; }
+.closing-foot { font-family: var(--font-mono); font-size: clamp(0.7rem, 0.9vw, 0.8rem); letter-spacing: 0.18em; text-transform: uppercase; color: rgba(232,222,248,0.5); margin-top: 2em; }
+
+@media (max-height: 700px) {
+  :root { --slide-padding: clamp(0.8rem, 3vw, 2.2rem); }
+  .kpi-tile { padding: 0.7rem; } .hero-thumb { max-height: 50vh; }
+}
+@media (max-height: 600px) { .footer-note { display: none; } }
+@media (max-width: 900px) {
+  .kpi-grid, .cx-grid { grid-template-columns: repeat(2, 1fr); }
+  .pattern-grid { grid-template-columns: 1fr; }
+  .hero-creative { grid-template-columns: 1fr; }
+  .creative-grid { grid-template-columns: 1fr; }
+  .big-row { grid-template-columns: repeat(2, 1fr); }
+  .toc-list { grid-template-columns: 1fr; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.2s !important; }
+  html { scroll-behavior: auto; }
+}
+</style>
+</head>
+<body>
+
+<div class="progress-bar" id="progressBar"></div>
+<div class="page-meta" id="pageMeta">01 / 16</div>
+
+{% macro footer() -%}
+<div class="footer-note"><strong>Attribution</strong> · Meta 7d-click+1d-view 기준<span>GA4 utm·트래픽용 · freshness {{ tier }}</span></div>
+{%- endmacro %}
+
+<!-- 01 · COVER -->
+<section class="slide slide-cover" data-dark="true">
+  <div class="cover-stamp reveal"><span class="dot"></span>{{ brand_display }} · WEEKLY OPS</div>
+  <div class="cover-body">
+    <div class="cover-eyebrow reveal">{{ year }} · WEEK {{ week_num }}</div>
+    <h1 class="cover-title reveal">주간 운영<br>결과 <em>리포트</em></h1>
+    <p class="cover-sub reveal">{{ cover_sub|default("한 주 동안 어떤 소재가 우리를 도왔고, 어떤 소재가 예산을 새게 했는지 — 숫자로 그리고 썸네일로 정리했습니다.") }}</p>
+  </div>
+  <div class="cover-foot reveal">
+    <div><span class="key">{{ period_start }} → {{ period_end[5:] }}</span>{{ days }} days · KST</div>
+    <div><span class="key">{{ brand_display_kr|default(brand_display) }} · {{ brand }}</span>Brand</div>
+    <div><span class="key">Meta · GA4 · Clarity</span>Sources</div>
+  </div>
+</section>
+
+<!-- 02 · TOC -->
+<section class="slide">
+  <div class="slide-header">
+    <div>
+      <div class="slide-eyebrow">CONTENTS</div>
+      <h2 class="slide-title">이번 주 <em>리포트</em>는 이렇게 흘러가요</h2>
+    </div>
+    <div class="slide-aside">14 SLIDES</div>
+  </div>
+  <div class="slide-content">
+    <div class="toc-list reveal">
+      <div class="toc-item"><span class="num">01</span><span class="t">한 주 한 줄 요약</span><span class="p">04</span></div>
+      <div class="toc-item"><span class="num">02</span><span class="t">8대 KPI 한눈에</span><span class="p">05</span></div>
+      <div class="toc-item"><span class="num">03</span><span class="t">캠페인 점유</span><span class="p">06</span></div>
+      <div class="toc-item"><span class="num">04</span><span class="t">소재별 효율 한눈에</span><span class="p">07</span></div>
+      <div class="toc-item"><span class="num">05</span><span class="t">베스트 소재 #1</span><span class="p">08</span></div>
+      <div class="toc-item"><span class="num">06</span><span class="t">다음 베스트 4종</span><span class="p">09</span></div>
+      <div class="toc-item"><span class="num">07</span><span class="t">워스트 소재 #1</span><span class="p">10</span></div>
+      <div class="toc-item"><span class="num">08</span><span class="t">OFF 권장 4종</span><span class="p">11</span></div>
+      <div class="toc-item"><span class="num">09</span><span class="t">이긴 앵글 분석</span><span class="p">12</span></div>
+      <div class="toc-item"><span class="num">10</span><span class="t">진 앵글 분석</span><span class="p">13</span></div>
+      <div class="toc-item"><span class="num">11</span><span class="t">CX · Clarity</span><span class="p">14</span></div>
+      <div class="toc-item"><span class="num">12</span><span class="t">다음 주 액션</span><span class="p">15</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- 03 · DIVIDER -->
+<section class="slide slide-divider" data-dark="true">
+  <div class="slide-content">
+    <div class="divider-num reveal">01</div>
+    <div class="divider-eyebrow reveal">CHAPTER ONE</div>
+    <h2 class="divider-title reveal">이 주의 <em>숫자</em>들</h2>
+  </div>
+</section>
+
+<!-- 04 · 한 줄 요약 -->
+<section class="slide">
+  <div class="slide-header">
+    <div>
+      <div class="slide-eyebrow">EXECUTIVE SUMMARY</div>
+      <h2 class="slide-title">한 주를 <em>한 줄</em>로 요약하면</h2>
+    </div>
+    <div class="slide-aside">{{ period_start }} → {{ period_end[5:] }}</div>
+  </div>
+  <div class="slide-content">
+    <p class="headline reveal">{{ summary_headline|safe }}</p>
+    <p class="lead reveal">{{ summary_lead|safe }}</p>
+    <div class="big-row">
+      <div class="big-num reveal">
+        <span class="l">SPEND</span>
+        <span class="v">{{ summary.spend_disp }}</span>
+        <span class="h">{{ summary.spend_delta_text|default("전주 비교 데이터 없음") }}</span>
+      </div>
+      <div class="big-num reveal">
+        <span class="l">REVENUE</span>
+        <span class="v purple">{{ summary.revenue_disp }}</span>
+        <span class="h">{{ summary.revenue_delta_text|default("전주 비교 데이터 없음") }}</span>
+      </div>
+      <div class="big-num reveal">
+        <span class="l">ROAS</span>
+        <span class="v">{{ "%.2f"|format(summary.roas) }}</span>
+        <span class="h">목표 {{ "%.2f"|format(target_roas) }} · 달성 {{ "%.0f"|format(summary.roas / target_roas * 100) }}%</span>
+      </div>
+      <div class="big-num reveal">
+        <span class="l">구매 PURCHASES</span>
+        <span class="v">{{ summary.purchases }}건</span>
+        <span class="h">{{ summary.purchase_pace_text|default("월 목표 데이터 없음") }}</span>
+      </div>
+    </div>
+  </div>
+  {{ footer() }}
+</section>
+
+<!-- 05 · 8대 KPI -->
+<section class="slide">
+  <div class="slide-header">
+    <div>
+      <div class="slide-eyebrow">KPI GRID</div>
+      <h2 class="slide-title">8대 KPI <em>한눈에</em></h2>
+    </div>
+    <div class="slide-aside">신호등 · 🟢 양호 / 🟡 관찰 / 🔴 액션</div>
+  </div>
+  <div class="slide-content">
+    <div class="kpi-grid">
+      {% for k in kpis %}
+      <div class="kpi-tile reveal {{ k.cls }}">
+        <div class="kpi-lbl">{{ k.label }}</div>
+        <div class="kpi-val">{{ k.value }}</div>
+        <div class="kpi-delta {{ k.delta_cls }}">{{ k.delta }}</div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {{ footer() }}
+</section>
+
+<!-- 06 · 캠페인 점유 -->
+<section class="slide">
+  <div class="slide-header">
+    <div>
+      <div class="slide-eyebrow">CAMPAIGN MIX</div>
+      <h2 class="slide-title">캠페인 <em>점유</em></h2>
+    </div>
+    <div class="slide-aside">{{ campaign_mix|length }} ACTIVE</div>
+  </div>
+  <div class="slide-content">
+    <p class="headline reveal">{{ campaign_headline|safe|default("이번 주 캠페인별 효율 현황을 점검합니다. 예산 분배 조정이 필요한 시점입니다.") }}</p>
+    <div class="big-row reveal" style="margin-top: clamp(1.2rem, 3vw, 2.4rem);">
+      {% for c in campaign_mix[:4] %}
+      <div class="big-num">
+        <span class="l">{{ c.label }}</span>
+        <span class="v {% if c.highlight %}purple{% endif %}">{{ c.value }}</span>
+        <span class="h">{{ c.sub }}</span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {{ footer() }}
+</section>
+
+<!-- 07 · 소재별 효율 한눈에 -->
+<section class="slide">
+  <div class="slide-header">
+    <div>
+      <div class="slide-eyebrow">CREATIVE EFFICIENCY</div>
+      <h2 class="slide-title">소재별 효율 <em>한눈에</em></h2>
+    </div>
+    <div class="slide-aside">지출 ≥ {{ spend_min_disp }} · ROAS 정렬</div>
+  </div>
+  <div class="slide-content">
+    <div class="table-wrap reveal">
+      <table class="creative-tbl">
+        <thead>
+          <tr>
+            <th>#</th><th>소재명</th>
+            <th class="num">ROAS</th><th class="num">매출</th><th class="num">지출</th>
+            <th class="num">구매</th><th class="num">CTR</th><th>상태</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in creative_table %}
+          <tr class="{{ row.row_cls }}">
+            <td class="rank">{{ row.rank }}</td>
+            <td class="name">{{ row.name }}</td>
+            <td class="num"><span class="badge {{ row.roas_badge }}">{{ "%.2f"|format(row.roas) }}</span></td>
+            <td class="num">{{ row.revenue_disp }}</td>
+            <td class="num">{{ row.spend_disp }}</td>
+            <td class="num">{{ row.purchases }}</td>
+            <td class="num">{{ "%.2f"|format(row.ctr) }}%</td>
+            <td>{{ row.status }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {{ footer() }}
+</section>
+
+<!-- 08 · 베스트 소재 #1 -->
+{% if best %}
+<section class="slide">
+  <div class="slide-header">
+    <div>
+      <div class="slide-eyebrow">WINNING CREATIVE · #1</div>
+      <h2 class="slide-title">이번 주 <em>베스트</em></h2>
+    </div>
+    <div class="slide-aside">ROAS {{ "%.2f"|format(best.roas) }} · 효율 1위</div>
+  </div>
+  <div class="slide-content">
+    <div class="hero-creative">
+      <div class="hero-thumb reveal">
+        <div class="medal"><span class="emoji">🥇</span><span>BEST · ROAS {{ "%.2f"|format(best.roas) }}</span></div>
+        {% if best.thumb %}<img src="{{ best.thumb }}" alt="{{ best.name }} — 1위 소재">{% endif %}
+      </div>
+      <div class="hero-info">
+        <div class="hero-name reveal">{{ best.name }}</div>
+        <h3 class="hero-headline reveal">{{ best_headline|safe|default("이번 주 효율이 가장 높았던 소재예요. 패턴을 복제할 후보입니다.") }}</h3>
+        <div class="hero-stats reveal">
+          <div class="hero-stat good"><div class="l">ROAS</div><div class="v">{{ "%.2f"|format(best.roas) }}</div></div>
+          <div class="hero-stat"><div class="l">CTR</div><div class="v">{{ "%.2f"|format(best.ctr) }}%</div></div>
+          <div class="hero-stat"><div class="l">매출</div><div class="v">{{ best.revenue_disp }}</div></div>
+          <div class="hero-stat"><div class="l">지출</div><div class="v">{{ best.spend_disp }}</div></div>
+        </div>
+        <div class="hero-takeaway reveal">
+          <strong>핵심 인사이트</strong> · {{ best_takeaway|safe|default("효율 상위 소재 — 일예산 +20% 스케일업 검토 + 유사 앵글 변주 신규 5개 제작 권장.") }}
+        </div>
+      </div>
+    </div>
+  </div>
+  {{ footer() }}
+</section>
+{% endif %}
+
+<!-- 09 · 다음 베스트 4종 -->
+{% if runners_up %}
+<section class="slide">
+  <div class="slide-header">
+    <div>
+      <div class="slide-eyebrow">WINNERS · 2~5</div>
+      <h2 class="slide-title">다음 <em>{{ runners_up|length }}종</em>도 유지 가치 있어요</h2>
+    </div>
+    <div class="slide-aside">ROAS 1.00 이상 유지</div>
+  </div>
+  <div class="slide-content">
+    <div class="creative-grid cols-2x2">
+      {% for r in runners_up[:4] %}
+      <div class="creative-card reveal">
+        <div class="thumb"><span class="rank-chip">{{ r.rank }}</span>{% if r.thumb %}<img src="{{ r.thumb }}" alt="{{ r.name }}">{% endif %}</div>
+        <div class="info">
+          <div class="nm">{{ r.name }}</div>
+          <div class="row">
+            <div class="m"><span class="l">ROAS</span><span class="v {{ 'good' if r.roas >= 1.5 else '' }}">{{ "%.2f"|format(r.roas) }}</span></div>
+            <div class="m"><span class="l">매출</span><span class="v">{{ r.revenue_disp }}</span></div>
+            <div class="m"><span class="l">구매</span><span class="v">{{ r.purchases }}</span></div>
+          </div>
+          <p class="note">{{ r.note|default("효율 양호 — 유지 또는 변주 후보.") }}</p>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {{ footer() }}
+</section>
+{% endif %}
+
+<!-- 10 · 워스트 소재 #1 -->
+{% if worst %}
+<section class="slide">
+  <div class="slide-header">
+    <div>
+      <div class="slide-eyebrow">LOSING CREATIVE · #1</div>
+      <h2 class="slide-title">이번 주 <em>워스트</em></h2>
+    </div>
+    <div class="slide-aside">지출 {{ worst.spend_disp }} · ROAS {{ "%.2f"|format(worst.roas) }}</div>
+  </div>
+  <div class="slide-content">
+    <div class="hero-creative">
+      <div class="hero-thumb warning reveal">
+        <div class="medal"><span class="emoji">🚨</span><span>WORST · 지출 최다</span></div>
+        {% if worst.thumb %}<img src="{{ worst.thumb }}" alt="{{ worst.name }} — 꼴찌 소재">{% endif %}
+      </div>
+      <div class="hero-info">
+        <div class="hero-name reveal" style="color: var(--bad);">{{ worst.name }}</div>
+        <h3 class="hero-headline reveal">{{ worst_headline|safe|default("이번 주 효율이 가장 낮았던 소재예요. 즉시 OFF 검토 대상입니다.") }}</h3>
+        <div class="hero-stats reveal">
+          <div class="hero-stat bad"><div class="l">ROAS</div><div class="v">{{ "%.2f"|format(worst.roas) }}</div></div>
+          <div class="hero-stat"><div class="l">CTR</div><div class="v">{{ "%.2f"|format(worst.ctr) }}%</div></div>
+          <div class="hero-stat"><div class="l">지출</div><div class="v">{{ worst.spend_disp }}</div></div>
+          <div class="hero-stat"><div class="l">구매</div><div class="v">{{ worst.purchases }}건</div></div>
+        </div>
+        <div class="hero-takeaway warning reveal">
+          <strong>왜 안 됐는지</strong> · {{ worst_takeaway|safe|default("ROAS 가드레일 미달 + CTR 빨강선 미만 — 1순위 OFF, 예산은 효율 검증된 소재에 재분배 권장.") }}
+        </div>
+      </div>
+    </div>
+  </div>
+  {{ footer() }}
+</section>
+{% endif %}
+
+<!-- 11 · OFF 권장 4종 -->
+{% if losers_more %}
+<section class="slide">
+  <div class="slide-header">
+    <div>
+      <div class="slide-eyebrow">LOSERS · OFF 권장</div>
+      <h2 class="slide-title">다음 <em>{{ losers_more|length }}종</em>도 즉시 OFF</h2>
+    </div>
+    <div class="slide-aside">누적 지출 {{ losers_more_spend_disp }}</div>
+  </div>
+  <div class="slide-content">
+    <div class="creative-grid cols-2x2">
+      {% for l in losers_more[:4] %}
+      <div class="creative-card reveal">
+        <div class="thumb"><span class="rank-chip">⚠</span>{% if l.thumb %}<img src="{{ l.thumb }}" alt="{{ l.name }}">{% endif %}</div>
+        <div class="info">
+          <div class="nm">{{ l.name }}</div>
+          <div class="row">
+            <div class="m"><span class="l">ROAS</span><span class="v bad">{{ "%.2f"|format(l.roas) }}</span></div>
+            <div class="m"><span class="l">지출</span><span class="v">{{ l.spend_disp }}</span></div>
+            <div class="m"><span class="l">구매</span><span class="v">{{ l.purchases }}</span></div>
+          </div>
+          <p class="note">{{ l.note|default("효율 미달 — OFF 후 후보 패턴 재검토.") }}</p>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {{ footer() }}
+</section>
+{% endif %}
+
+<!-- 12 · 이긴 앵글 분석 -->
+{% if winning_patterns %}
+<section class="slide">
+  <div class="slide-header">
+    <div>
+      <div class="slide-eyebrow">ANALYSIS · WINNING ANGLES</div>
+      <h2 class="slide-title">이긴 소재의 <em>공통점</em></h2>
+    </div>
+    <div class="slide-aside">{{ winning_patterns|length }} PATTERNS</div>
+  </div>
+  <div class="slide-content">
+    <p class="headline reveal">{{ winning_headline|safe|default("상위 소재의 공통 패턴을 추출했어요. 다음 주 신규 소재 제작의 골격입니다.") }}</p>
+    <div class="pattern-grid">
+      {% for p in winning_patterns[:3] %}
+      <div class="pattern win reveal">
+        <div class="num">{{ "%02d"|format(loop.index) }}</div>
+        <h4>{{ p.title }}</h4>
+        <p>{{ p.body }}</p>
+        <div class="examples">{{ p.examples }}</div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {{ footer() }}
+</section>
+{% endif %}
+
+<!-- 13 · 진 앵글 분석 -->
+{% if losing_patterns %}
+<section class="slide">
+  <div class="slide-header">
+    <div>
+      <div class="slide-eyebrow">ANALYSIS · LOSING ANGLES</div>
+      <h2 class="slide-title">진 소재의 <em>공통점</em></h2>
+    </div>
+    <div class="slide-aside">{{ losing_patterns|length }} PATTERNS</div>
+  </div>
+  <div class="slide-content">
+    <p class="headline reveal">{{ losing_headline|safe|default("진 소재의 공통 원인을 추출했어요. 다음 주 폐기 또는 v2 변주의 가이드입니다.") }}</p>
+    <div class="pattern-grid">
+      {% for p in losing_patterns[:3] %}
+      <div class="pattern lose reveal">
+        <div class="num">{{ "%02d"|format(loop.index) }}</div>
+        <h4>{{ p.title }}</h4>
+        <p>{{ p.body }}</p>
+        <div class="examples">{{ p.examples }}</div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {{ footer() }}
+</section>
+{% endif %}
+
+<!-- 14 · Clarity CX -->
+{% if cx_tiles %}
+<section class="slide">
+  <div class="slide-header">
+    <div>
+      <div class="slide-eyebrow">CX · CLARITY</div>
+      <h2 class="slide-title">LP에서 <em>무슨 일</em>이 일어나고 있나요</h2>
+    </div>
+    <div class="slide-aside">{{ days }}일 · 세션 {{ summary.sessions_disp|default("-") }}</div>
+  </div>
+  <div class="slide-content">
+    <p class="headline reveal">{{ cx_headline|safe|default("LP 첫인상에서 누수가 가장 큽니다. quick_back 비율과 rage click 추세를 점검하세요.") }}</p>
+    <div class="cx-grid">
+      {% for t in cx_tiles %}
+      <div class="cx-tile {{ t.cls }} reveal">
+        <div class="l">{{ t.label }}</div>
+        <div class="v">{{ t.value }}</div>
+        <div class="sig">{{ t.signal }}</div>
+      </div>
+      {% endfor %}
+    </div>
+    {% if cx_note %}<p class="lead reveal" style="margin-top: clamp(0.8rem, 1.8vw, 1.4rem);">{{ cx_note|safe }}</p>{% endif %}
+  </div>
+  {{ footer() }}
+</section>
+{% endif %}
+
+<!-- 15 · 다음 주 액션 -->
+<section class="slide">
+  <div class="slide-header">
+    <div>
+      <div class="slide-eyebrow">NEXT WEEK · ACTIONS</div>
+      <h2 class="slide-title">다음 주 <em>{{ next_actions|length }}가지</em>만 하면 돼요</h2>
+    </div>
+    <div class="slide-aside">우선순위 · CRITICAL → MED</div>
+  </div>
+  <div class="slide-content">
+    <div class="action-list">
+      {% for a in next_actions[:5] %}
+      <div class="action reveal">
+        <div class="pri">{{ "%02d"|format(loop.index) }}</div>
+        <div class="body">
+          <div class="t">{{ a.title }}</div>
+          <div class="d">{{ a.detail }}</div>
+        </div>
+        <div class="pill {{ a.pill|default('med') }}">{{ a.pill_label|default('MED') }}</div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {{ footer() }}
+</section>
+
+<!-- 16 · CLOSING -->
+<section class="slide slide-closing" data-dark="true">
+  <div class="closing-mark reveal">— END OF REPORT —</div>
+  <h2 class="closing-title reveal">{{ closing_title|safe|default("다음 주는 검증된 <em>이긴 앵글</em><br>중심으로 다시 출발합니다") }}</h2>
+  <div class="closing-foot reveal">{{ brand_display }} · {{ generated_at }}</div>
+</section>
+
+<script>
+class SlideDeck {
+  constructor() {
+    this.slides = Array.from(document.querySelectorAll('.slide'));
+    this.progressBar = document.getElementById('progressBar');
+    this.pageMeta = document.getElementById('pageMeta');
+    this.current = 0;
+    this.setupObserver();
+    this.setupKeyboard();
+    this.setupScroll();
+    this.updateMeta(0);
+  }
+  setupObserver() {
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach((e) => {
+        if (e.intersectionRatio > 0.5) {
+          e.target.classList.add('visible');
+          const idx = this.slides.indexOf(e.target);
+          if (idx !== this.current) {
+            this.current = idx;
+            this.updateMeta(idx);
+            const isDark = e.target.dataset.dark === 'true';
+            document.body.classList.toggle('is-dark', isDark);
+          }
+        }
+      });
+    }, { threshold: [0.5, 0.7] });
+    this.slides.forEach((s) => io.observe(s));
+  }
+  setupKeyboard() {
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowDown' || e.key === 'PageDown' || e.key === ' ') {
+        e.preventDefault(); this.goto(Math.min(this.current + 1, this.slides.length - 1));
+      } else if (e.key === 'ArrowUp' || e.key === 'PageUp') {
+        e.preventDefault(); this.goto(Math.max(this.current - 1, 0));
+      } else if (e.key === 'Home') { e.preventDefault(); this.goto(0); }
+      else if (e.key === 'End') { e.preventDefault(); this.goto(this.slides.length - 1); }
+    });
+  }
+  setupScroll() {
+    document.addEventListener('scroll', () => {
+      const pct = (window.scrollY / (document.body.scrollHeight - window.innerHeight)) * 100;
+      this.progressBar.style.width = pct + '%';
+    }, { passive: true });
+  }
+  goto(idx) { this.slides[idx].scrollIntoView({ behavior: 'smooth' }); }
+  updateMeta(idx) {
+    const n = String(idx + 1).padStart(2, '0');
+    const t = String(this.slides.length).padStart(2, '0');
+    this.pageMeta.textContent = `${n} / ${t}`;
+  }
+}
+new SlideDeck();
+</script>
+</body>
+</html>

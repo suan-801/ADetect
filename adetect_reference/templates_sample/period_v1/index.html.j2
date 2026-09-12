@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>{{ brand|upper }} {{ period_label }} 집행 리포트</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>{{ inline_css }}</style>
+</head>
+<body>
+
+{# 슬라이드 1 — 표지 #}
+<section class="slide slide-cover">
+  <div class="cover-logo">PERFORMANCE MARKETING REPORT</div>
+  <h1 class="cover-title">{{ brand_display }}<br>{{ period_label }} 집행 리포트</h1>
+  <div class="cover-subtitle">Meta Ads · GA4 · Clarity 통합 분석</div>
+  <div class="cover-period">{{ since }} ~ {{ until }} ({{ days }}일)</div>
+  <div class="cover-kpi-grid">
+    <div class="cover-kpi"><div class="cover-kpi-label">총 지출</div><div class="cover-kpi-value">{{ fmt_won(total.spend) }}</div></div>
+    <div class="cover-kpi"><div class="cover-kpi-label">총 매출</div><div class="cover-kpi-value">{{ fmt_won(total.purchase_value) }}</div></div>
+    <div class="cover-kpi"><div class="cover-kpi-label">평균 ROAS</div><div class="cover-kpi-value">{{ "%.2f"|format(total.roas) }}</div></div>
+    <div class="cover-kpi"><div class="cover-kpi-label">구매 건수</div><div class="cover-kpi-value">{{ "%.0f"|format(total.purchases) }}건</div></div>
+  </div>
+  <div class="cover-meta">freshness: {{ tier }} · 생성: {{ generated_at }}</div>
+</section>
+
+{# 슬라이드 2 — KPI 카드 + 일별 추이 #}
+<section class="slide">
+  <div class="slide-header">
+    <div><div class="slide-num">01 · KPI SUMMARY</div><h2 class="slide-title">기간 KPI 요약</h2></div>
+    <div class="slide-subtitle">Meta Ads 어트리뷰션 기준</div>
+  </div>
+  <div class="kpi-grid">
+    <div class="kpi-card"><div class="kpi-label">지출 합계</div><div class="kpi-value">{{ fmt_won(total.spend) }}</div><div class="kpi-trend">{{ days }}일 평균 일 {{ fmt_won(total.spend / days) }}</div></div>
+    <div class="kpi-card"><div class="kpi-label">매출 합계</div><div class="kpi-value">{{ fmt_won(total.purchase_value) }}</div><div class="kpi-trend">{{ days }}일 평균 일 {{ fmt_won(total.purchase_value / days) }}</div></div>
+    <div class="kpi-card"><div class="kpi-label">평균 ROAS</div><div class="kpi-value">{{ "%.2f"|format(total.roas) }}</div><div class="kpi-trend {{ 'up' if total.roas >= 2 else 'down' }}">경계 {{ thresholds.roas_red }} / 목표 {{ thresholds.roas_green }}</div></div>
+    <div class="kpi-card"><div class="kpi-label">CPA</div><div class="kpi-value">{{ fmt_won(total.cpa) }}</div><div class="kpi-trend">구매 {{ "%.0f"|format(total.purchases) }}건</div></div>
+    <div class="kpi-card"><div class="kpi-label">CTR</div><div class="kpi-value">{{ "%.2f"|format(total.ctr) }}%</div><div class="kpi-trend">{{ fmt_num(total.clicks) }} 클릭</div></div>
+    <div class="kpi-card"><div class="kpi-label">CPM</div><div class="kpi-value">{{ fmt_won(total.cpm) }}</div><div class="kpi-trend">{{ fmt_num(total.impressions) }} 노출</div></div>
+    <div class="kpi-card"><div class="kpi-label">CPC</div><div class="kpi-value">{{ fmt_won(total.cpc) }}</div><div class="kpi-trend">랜딩뷰 {{ fmt_num(total.landing_views) }}</div></div>
+    <div class="kpi-card"><div class="kpi-label">장바구니</div><div class="kpi-value">{{ "%.0f"|format(total.add_to_carts) }}</div><div class="kpi-trend">결제시작 {{ "%.0f"|format(total.checkouts) }}</div></div>
+  </div>
+  <div class="chart-wrap">
+    <canvas id="dailyChart" height="100"></canvas>
+  </div>
+  <div class="footer-note">{{ footer_note }}</div>
+</section>
+
+{# 슬라이드 3 — 캠페인 TOP #}
+<section class="slide">
+  <div class="slide-header">
+    <div><div class="slide-num">02 · CAMPAIGN</div><h2 class="slide-title">캠페인 TOP {{ top_campaigns|length }}</h2></div>
+    <div class="slide-subtitle">지출 내림차순 · 기간 합계</div>
+  </div>
+  <table class="ranking">
+    <thead><tr><th>#</th><th>캠페인</th><th class="num">지출</th><th class="num">매출</th><th class="num">ROAS</th><th class="num">구매</th><th class="num">CPA</th></tr></thead>
+    <tbody>
+    {% for c in top_campaigns %}
+      <tr>
+        <td>{{ loop.index }}</td>
+        <td>{{ c.campaign_name }}</td>
+        <td class="num">{{ fmt_won(c.spend) }}</td>
+        <td class="num">{{ fmt_won(c.purchase_value) }}</td>
+        <td class="num"><span class="badge {{ roas_badge(c.roas) }}">{{ "%.2f"|format(c.roas) }}</span></td>
+        <td class="num">{{ "%.0f"|format(c.purchases) }}</td>
+        <td class="num">{{ fmt_won(c.cpa) }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  <div class="footer-note">{{ footer_note }}</div>
+</section>
+
+{# 슬라이드 4 — 소재 TOP #}
+<section class="slide">
+  <div class="slide-header">
+    <div><div class="slide-num">03 · CREATIVE</div><h2 class="slide-title">고성과 소재 TOP {{ top_ads|length }}</h2></div>
+    <div class="slide-subtitle">구매 ≥ 1, 지출 ≥ {{ fmt_won(thresholds.spend_min) }}</div>
+  </div>
+  <table class="ranking">
+    <thead><tr><th>#</th><th>소재명</th><th class="num">ROAS</th><th class="num">매출</th><th class="num">지출</th><th class="num">구매</th><th class="num">CTR</th></tr></thead>
+    <tbody>
+    {% for a in top_ads %}
+      <tr>
+        <td>{{ loop.index }}</td>
+        <td>{{ a.ad_name }}</td>
+        <td class="num"><span class="badge {{ roas_badge(a.roas) }}">{{ "%.2f"|format(a.roas) }}</span></td>
+        <td class="num">{{ fmt_won(a.purchase_value) }}</td>
+        <td class="num">{{ fmt_won(a.spend) }}</td>
+        <td class="num">{{ "%.0f"|format(a.purchases) }}</td>
+        <td class="num">{{ "%.2f"|format(a.ctr) }}%</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% if bottom_ads %}
+  <h3 style="margin-top: 28px; font-size: 18px; color: var(--danger);">⚠️ 저성과 소재 (재집행 권장 ❌)</h3>
+  <table class="ranking">
+    <thead><tr><th>#</th><th>소재명</th><th class="num">ROAS</th><th class="num">지출</th><th class="num">구매</th></tr></thead>
+    <tbody>
+    {% for a in bottom_ads %}
+      <tr>
+        <td>{{ loop.index }}</td><td>{{ a.ad_name }}</td>
+        <td class="num">{{ "%.2f"|format(a.roas) }}</td>
+        <td class="num">{{ fmt_won(a.spend) }}</td>
+        <td class="num">{{ "%.0f"|format(a.purchases) }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+  <div class="footer-note">{{ footer_note }}</div>
+</section>
+
+{# 슬라이드 5 — GA4 #}
+<section class="slide">
+  <div class="slide-header">
+    <div><div class="slide-num">04 · GA4 TRAFFIC</div><h2 class="slide-title">GA4 유입 · 신규 vs 재방문</h2></div>
+    <div class="slide-subtitle">utm 트래픽 검증용 — ROAS 표기 ❌</div>
+  </div>
+  {% if ga4_data %}
+    <div class="kpi-grid">
+      <div class="kpi-card"><div class="kpi-label">세션</div><div class="kpi-value">{{ fmt_num(ga4_data.sessions) }}</div></div>
+      <div class="kpi-card"><div class="kpi-label">사용자</div><div class="kpi-value">{{ fmt_num(ga4_data.users) }}</div></div>
+      <div class="kpi-card"><div class="kpi-label">신규</div><div class="kpi-value">{{ fmt_num(ga4_data.new_users) }}</div></div>
+      <div class="kpi-card"><div class="kpi-label">전환율</div><div class="kpi-value">{{ "%.2f"|format(ga4_data.conv_rate) }}%</div></div>
+    </div>
+  {% else %}
+    <div class="placeholder">
+      <strong>GA4 데이터 미연결</strong><br>
+      `GA4_PROPERTY_ID` + `GA4_SERVICE_ACCOUNT_JSON` 등록 후 재실행하면 이 슬라이드가 채워집니다.<br>
+      (Phase 2 ETL 의 ga4_daily 탭이 채워지면 자동 흡수)
+    </div>
+  {% endif %}
+  <div class="footer-note">{{ footer_note }}</div>
+</section>
+
+{# 슬라이드 6 — Clarity #}
+<section class="slide">
+  <div class="slide-header">
+    <div><div class="slide-num">05 · CX INSIGHT</div><h2 class="slide-title">Clarity 사용자 행동</h2></div>
+    <div class="slide-subtitle">rage / dead / scroll / quickback</div>
+  </div>
+  {% if cro_markdown %}
+    <div style="font-size: 14px; line-height: 1.7;">{{ cro_markdown|safe }}</div>
+  {% else %}
+    <div class="placeholder">
+      <strong>Clarity CRO 리포트 미생성</strong><br>
+      `python3 cro_report.py --period 7d` 로 생성하면 이 슬라이드가 마크다운으로 흡수됩니다.<br>
+      (현재는 데이터 미연결 — 트랙 B 에서 Clarity 토큰 등록 필요)
+    </div>
+  {% endif %}
+  <div class="footer-note">{{ footer_note }}</div>
+</section>
+
+{# 슬라이드 7 — 어트리뷰션 비교 #}
+<section class="slide">
+  <div class="slide-header">
+    <div><div class="slide-num">06 · ATTRIBUTION</div><h2 class="slide-title">Meta vs GA4 어트리뷰션 차이</h2></div>
+    <div class="slide-subtitle">출처별 구매 수 비교</div>
+  </div>
+  <table class="diff-table">
+    <thead><tr><th>지표</th><th>Meta Ads</th><th>GA4 (paid_social)</th><th class="pct">차이</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>구매 건수</td>
+        <td>{{ "%.0f"|format(total.purchases) }}건</td>
+        <td>{{ ga4_data.conversions if ga4_data else '데이터 미연결' }}</td>
+        <td class="pct warn">{{ attribution_diff }}</td>
+      </tr>
+      <tr>
+        <td>매출</td>
+        <td>{{ fmt_won(total.purchase_value) }}</td>
+        <td>GA4 ❌ (메모리 룰)</td>
+        <td>—</td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="callout">
+    <strong>차이 발생 정상</strong> — Meta 는 7d-click + 1d-view 어트리뷰션으로 광고 클릭/뷰 기여를 모두 집계.
+    GA4 는 utm 매개변수로 마지막 클릭(last-touch) 트래픽만 집계 → 자연스럽게 Meta 수치가 더 큼.<br>
+    <strong>의사결정 룰</strong> — ROAS·매출 판단은 Meta 만. GA4 는 utm 잘 박혔는지·LP 트래픽 분석에만 사용.
+  </div>
+  <div class="footer-note">{{ footer_note }}</div>
+</section>
+
+{# 슬라이드 8 — 다음 액션 #}
+<section class="slide">
+  <div class="slide-header">
+    <div><div class="slide-num">07 · NEXT</div><h2 class="slide-title">다음 액션</h2></div>
+    <div class="slide-subtitle">우선순위 정렬</div>
+  </div>
+  <ul class="action-list">
+  {% for a in next_actions %}
+    <li class="{{ 'priority' if a.priority else '' }}"><strong>{{ a.title }}</strong><br>{{ a.detail }}</li>
+  {% endfor %}
+  </ul>
+  <div class="footer-note">
+    {{ footer_note }}<br>
+    생성: {{ generated_at }} · 데이터 freshness: {{ tier }}
+  </div>
+</section>
+
+<script>
+const dailyData = {{ daily_chart_json|safe }};
+const ctx = document.getElementById('dailyChart');
+if (ctx && dailyData.labels.length) {
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: dailyData.labels,
+      datasets: [
+        { label: '지출(원)', data: dailyData.spend, backgroundColor: 'rgba(30,58,95,0.85)', yAxisID: 'y' },
+        { label: '매출(원)', data: dailyData.purchase_value, backgroundColor: 'rgba(184,115,51,0.85)', yAxisID: 'y' },
+        { label: 'ROAS', data: dailyData.roas, type: 'line', borderColor: '#10B981', backgroundColor: '#10B981', yAxisID: 'y1', tension: 0.3 },
+      ],
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { position: 'top' } },
+      scales: {
+        y: { type: 'linear', position: 'left', title: { display: true, text: '금액(원)' } },
+        y1: { type: 'linear', position: 'right', title: { display: true, text: 'ROAS' }, grid: { drawOnChartArea: false } },
+      },
+    },
+  });
+}
+</script>
+</body>
+</html>

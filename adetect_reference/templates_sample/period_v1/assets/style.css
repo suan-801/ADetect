@@ -1,0 +1,197 @@
+/* [브랜드명] 1차 캠페인 집행리포트 디자인 토큰 흡수 + reveal-style 슬라이드 */
+:root {
+  --pearl: #FAF5F0;
+  --navy: #1E3A5F;
+  --navy-soft: #2d5a8f;
+  --copper: #B87333;
+  --success: #10B981;
+  --danger: #EF4444;
+  --warning: #F59E0B;
+  --slate: #1E293B;
+  --slate-soft: #475569;
+  --border: #E8E0D8;
+  --blue: #3B82F6;
+  --purple: #8B5CF6;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: #f1f5f9;
+  color: var(--slate);
+  line-height: 1.65;
+}
+
+.slide {
+  width: 100%;
+  max-width: 1200px;
+  min-height: 100vh;
+  margin: 0 auto;
+  padding: 56px 64px;
+  background: white;
+  display: flex;
+  flex-direction: column;
+  page-break-after: always;
+  break-after: page;
+}
+.slide + .slide { border-top: 8px solid var(--pearl); }
+
+/* 표지 */
+.slide-cover {
+  background: linear-gradient(135deg, var(--navy) 0%, var(--navy-soft) 100%);
+  color: white;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+.slide-cover::before, .slide-cover::after {
+  content: '';
+  position: absolute;
+  border-radius: 50%;
+  background: var(--copper);
+  opacity: 0.12;
+}
+.slide-cover::before { top: -100px; right: -100px; width: 400px; height: 400px; }
+.slide-cover::after { bottom: -150px; left: -150px; width: 500px; height: 500px; }
+.cover-logo { font-size: 16px; letter-spacing: 4px; opacity: 0.7; margin-bottom: 28px; }
+.cover-title { font-size: 48px; font-weight: 900; line-height: 1.2; margin-bottom: 16px; }
+.cover-subtitle { font-size: 20px; opacity: 0.9; margin-bottom: 36px; }
+.cover-period {
+  background: rgba(255,255,255,0.18);
+  padding: 12px 36px;
+  border-radius: 30px;
+  font-size: 15px;
+  margin-bottom: 48px;
+}
+.cover-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 24px;
+  margin-top: 24px;
+  width: 100%;
+  max-width: 900px;
+}
+.cover-kpi {
+  background: rgba(255,255,255,0.10);
+  border: 1px solid rgba(255,255,255,0.25);
+  border-radius: 12px;
+  padding: 20px;
+}
+.cover-kpi-label { font-size: 13px; opacity: 0.75; margin-bottom: 6px; }
+.cover-kpi-value { font-size: 28px; font-weight: 700; }
+.cover-meta {
+  position: absolute;
+  bottom: 32px;
+  font-size: 13px;
+  opacity: 0.6;
+}
+
+/* 본문 슬라이드 */
+.slide-header {
+  border-bottom: 2px solid var(--border);
+  padding-bottom: 16px;
+  margin-bottom: 32px;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+.slide-num {
+  font-size: 13px;
+  color: var(--copper);
+  font-weight: 700;
+  letter-spacing: 2px;
+}
+.slide-title { font-size: 30px; font-weight: 900; color: var(--navy); }
+.slide-subtitle { font-size: 14px; color: var(--slate-soft); }
+
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 32px;
+}
+.kpi-card {
+  background: var(--pearl);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 20px;
+}
+.kpi-label { font-size: 12px; color: var(--slate-soft); margin-bottom: 6px; }
+.kpi-value { font-size: 26px; font-weight: 800; color: var(--navy); }
+.kpi-trend { font-size: 12px; margin-top: 4px; }
+.kpi-trend.up { color: var(--success); }
+.kpi-trend.down { color: var(--danger); }
+
+.chart-wrap { background: white; border: 1px solid var(--border); border-radius: 10px; padding: 24px; margin-bottom: 20px; }
+
+table.ranking {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+table.ranking thead { background: var(--navy); color: white; }
+table.ranking th, table.ranking td {
+  padding: 10px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+table.ranking td.num { text-align: right; font-variant-numeric: tabular-nums; }
+table.ranking tbody tr:hover { background: var(--pearl); }
+
+.badge { display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 12px; font-weight: 600; }
+.badge.green { background: rgba(16,185,129,0.12); color: var(--success); }
+.badge.red { background: rgba(239,68,68,0.12); color: var(--danger); }
+.badge.yellow { background: rgba(245,158,11,0.15); color: var(--warning); }
+
+.callout {
+  background: var(--pearl);
+  border-left: 4px solid var(--copper);
+  padding: 16px 20px;
+  margin: 20px 0;
+  border-radius: 4px;
+  font-size: 14px;
+}
+.callout strong { color: var(--navy); }
+
+.placeholder {
+  background: #f8fafc;
+  border: 2px dashed #cbd5e1;
+  border-radius: 10px;
+  padding: 40px;
+  text-align: center;
+  color: var(--slate-soft);
+  font-size: 14px;
+}
+
+.footer-note {
+  margin-top: auto;
+  padding-top: 24px;
+  border-top: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--slate-soft);
+  line-height: 1.5;
+}
+
+.action-list { list-style: none; padding: 0; }
+.action-list li {
+  padding: 14px 18px;
+  margin-bottom: 10px;
+  background: var(--pearl);
+  border-left: 4px solid var(--navy);
+  border-radius: 4px;
+}
+.action-list li.priority { border-left-color: var(--danger); }
+.action-list li strong { color: var(--navy); }
+
+.diff-table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+.diff-table th, .diff-table td { padding: 12px; text-align: left; border-bottom: 1px solid var(--border); font-size: 14px; }
+.diff-table thead { background: var(--navy); color: white; }
+.diff-table .pct { font-weight: 700; }
+.diff-table .pct.warn { color: var(--warning); }
+
+@media print {
+  body { background: white; }
+  .slide { margin: 0; box-shadow: none; min-height: 100vh; }
+}
