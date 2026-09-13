@@ -54,22 +54,25 @@ html, body, [class*="css"] {{
     padding-right: 2rem;
 }}
 
-/* ── 사이드바: 조용한 내비게이션 (강한 박스 대신 얇은 좌측 accent) ────────── */
+/* ── 사이드바: opacity로만 위계를 표현 (border/box 강조 없음) ──────────────── */
 section[data-testid="stSidebar"] {{ width: 15rem !important; }}
 section[data-testid="stSidebar"] [data-testid="stSidebarNavLink"] {{
     border-radius: 8px;
-    color: {COLORS['text_dim']} !important;
+    color: rgba(242, 242, 240, 0.48) !important;
     font-weight: 400;
+    background: transparent !important;
+    box-shadow: none !important;
     transition: color 0.15s ease;
 }}
 section[data-testid="stSidebar"] [data-testid="stSidebarNavLink"]:hover {{
-    background: rgba(255,255,255,0.035) !important;
-    color: {COLORS['text']} !important;
+    background: transparent !important;
+    color: rgba(242, 242, 240, 0.78) !important;
 }}
 section[data-testid="stSidebar"] [data-testid="stSidebarNavLink"][aria-current="page"] {{
     background: transparent !important;
     color: {COLORS['text']} !important;
-    box-shadow: inset 2px 0 0 0 rgba(255,255,255,0.5);
+    font-weight: 600;
+    box-shadow: none !important;
 }}
 section[data-testid="stSidebar"] h1, section[data-testid="stSidebar"] h2 {{
     font-weight: 500;
@@ -107,9 +110,10 @@ section[data-testid="stSidebar"] h1, section[data-testid="stSidebar"] h2 {{
     margin-bottom: 1.1rem;
 }}
 .adetect-hero-title {{
-    font-size: 2.6rem;
-    font-weight: 500;
-    line-height: 1.28;
+    font-size: 3.4rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    line-height: 1.08;
     margin: 0;
     color: {COLORS['text']};
 }}
@@ -119,7 +123,29 @@ section[data-testid="stSidebar"] h1, section[data-testid="stSidebar"] h2 {{
     font-weight: 350;
     line-height: 1.7;
     margin-top: 1.4rem;
-    max-width: 30rem;
+    max-width: 26rem;
+}}
+@media (max-width: 900px) {{
+    .adetect-hero-title {{ font-size: 2.4rem; }}
+}}
+
+/* ── Hero Object: hero_object.png 전용 wrapper (독립 컴포넌트, ui/hero.py) ── */
+.adetect-hero-object {{
+    width: 100%;
+    max-width: 460px;
+    margin-left: auto;
+    margin-top: -0.5rem;
+    transform: scale(1.1);
+    transform-origin: top right;
+    pointer-events: none;
+}}
+.adetect-hero-object img {{
+    display: block;
+    width: 100%;
+    height: auto;
+}}
+@media (max-width: 900px) {{
+    .adetect-hero-object {{ display: none; }}
 }}
 
 /* 모듈(=기능) 리스트 — 카드 대신 얇은 구분선 + 좌우 여백으로 위계 표현 */
@@ -221,6 +247,121 @@ div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .
     backdrop-filter: blur(20px);
     padding: 1.6rem 1.8rem 1.2rem 1.8rem;
 }}
+
+/* ── Input: page 배경보다 살짝 밝은 surface + 명확한 hover/focus state ────── */
+[data-testid="stTextInput"] input,
+[data-testid="stTextArea"] textarea,
+[data-testid="stNumberInput"] input {{
+    background: rgba(255,255,255,0.045) !important;
+    border: 1px solid {COLORS['border']} !important;
+    border-radius: 0.6rem !important;
+    color: {COLORS['text']} !important;
+    padding: 0.6rem 0.85rem !important;
+    font-weight: 350 !important;
+    transition: border-color 0.15s ease, background-color 0.15s ease;
+}}
+[data-testid="stTextInput"] input::placeholder,
+[data-testid="stTextArea"] textarea::placeholder {{
+    color: {COLORS['text_faint']} !important;
+    opacity: 1 !important;
+}}
+[data-testid="stTextInput"] input:hover,
+[data-testid="stTextArea"] textarea:hover,
+[data-testid="stNumberInput"] input:hover {{
+    border-color: rgba(255,255,255,0.18) !important;
+}}
+[data-testid="stTextInput"] input:focus,
+[data-testid="stTextArea"] textarea:focus,
+[data-testid="stNumberInput"] input:focus {{
+    border-color: rgba(255,255,255,0.4) !important;
+    background: rgba(255,255,255,0.065) !important;
+    box-shadow: none !important;
+}}
+[data-testid="stWidgetLabel"] p {{
+    color: {COLORS['text_dim']} !important;
+    font-size: 0.82rem !important;
+    font-weight: 450 !important;
+}}
+
+/* Streamlit ":gray[]" 마크다운 색상(rgba(250,250,250,0.6))이 검정 배경 위에서 생각보다
+   눈에 띄어서, 경쟁사 유형 태그(예: "· 직접 경쟁")를 디자인 시스템의 text_faint 톤으로 더 옅게 */
+[data-testid="stWidgetLabel"] span[style*="rgba(250, 250, 250, 0.6)"] {{
+    color: {COLORS['text_faint']} !important;
+}}
+
+/* ── CTA row: 마지막 위젯을 Card 오른쪽 padding에 정확히 맞춰 정렬 ────────── */
+.adetect-cta-row-marker {{ position: absolute; }}
+div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .adetect-cta-row-marker) {{
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+}}
+div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .adetect-cta-row-marker) [data-testid="stElementContainer"] {{
+    width: auto;
+}}
+
+/* ── 소재 테이블 + 소재 ID 마우스오버 썸네일(§7-11-4, PRD "소재 미리보기") ────── */
+.adetect-ad-table-wrap {{ overflow-x: auto; }}
+.adetect-ad-table {{
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+}}
+.adetect-ad-table th {{
+    text-align: left;
+    color: {COLORS['text_faint']};
+    font-weight: 500;
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0.5rem 0.7rem;
+    border-bottom: 1px solid {COLORS['border']};
+    white-space: nowrap;
+}}
+.adetect-ad-table td {{
+    color: {COLORS['text_dim']};
+    padding: 0.55rem 0.7rem;
+    border-bottom: 1px solid {COLORS['border']};
+    vertical-align: top;
+}}
+.adetect-ad-thumb-hover {{
+    position: relative;
+    display: inline-block;
+    color: {COLORS['text']};
+    border-bottom: 1px dotted rgba(255,255,255,0.35);
+    cursor: help;
+}}
+.adetect-ad-thumb-hover .adetect-ad-thumb-popup {{
+    display: none;
+    position: absolute;
+    z-index: 60;
+    left: 0;
+    top: 1.5em;
+    background: #111113;
+    border: 1px solid rgba(255,255,255,0.14);
+    border-radius: 0.6rem;
+    padding: 0.4rem;
+    box-shadow: 0 12px 32px rgba(0,0,0,0.55);
+}}
+.adetect-ad-thumb-hover .adetect-ad-thumb-popup img {{
+    display: block;
+    width: 148px;
+    height: 148px;
+    object-fit: cover;
+    border-radius: 0.4rem;
+    background: rgba(255,255,255,0.05);
+}}
+.adetect-ad-thumb-hover:hover .adetect-ad-thumb-popup {{ display: block; }}
+
+/* ── 체크박스: 체크 시 흰 배경 위에 흰색 체크마크가 그려져 선택 여부가 안 보이던 문제 ──
+   (예: STEP1 확인 화면의 경쟁사 체크박스). 체크마크만 어두운 색으로 바꿔 대비를 확보한다.
+   unchecked 상태에는 이 svg 자체가 렌더링되지 않으므로 checked 상태에만 영향을 준다. */
+[data-testid="stCheckbox"] svg,
+[data-testid="stCheckbox"] svg * {{
+    stroke: #0B0C10 !important;
+}}
 </style>
 """
 
@@ -232,6 +373,13 @@ def inject_global_css():
 def glass_marker():
     """이 함수를 st.container() 블록의 첫 줄에서 호출하면 그 컨테이너가 은은한 glass surface가 됩니다."""
     st.markdown('<div class="adetect-glass-marker"></div>', unsafe_allow_html=True)
+
+
+def cta_row_marker():
+    """이 함수를 호출한 뒤 이어지는 위젯들(caption/button 등)을 한 줄에 배치하고
+    마지막 위젯을 컨테이너 오른쪽 끝(Card의 오른쪽 padding)에 정확히 맞춥니다.
+    Home의 '분석하기 →'와 Analyze의 CTA가 동일한 위치·정렬을 갖도록 공통으로 사용합니다."""
+    st.markdown('<div class="adetect-cta-row-marker"></div>', unsafe_allow_html=True)
 
 
 def badge(kind: str, label: str | None = None) -> str:

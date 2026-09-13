@@ -9,7 +9,9 @@ from __future__ import annotations
 
 import streamlit as st
 
+from config import settings
 from core.analyzers.target_recommender import analyze_confirmed_target, recommend_target
+from core.scrapers.naver_api import NaverApiError
 from ui.components import feature_intro, render_insight_card, sample_data_notice, status_icon, tab_header
 
 
@@ -26,7 +28,6 @@ def render(session: dict):
         feature_intro(["시장분석과 브랜드분석 결과를 근거로 핵심 타겟을 추천합니다."])
         st.caption(f"{'✓' if market_ok else '·'} 시장분석 완료 필요")
         st.caption(f"{'✓' if brand_ok else '·'} 브랜드분석 완료 필요")
-        st.caption("두 기능이 각각 완료(또는 부분 실패)되면 이 탭이 자동으로 열립니다.")
         return
 
     # 게이트 통과 — 추천 단계 (자동, 무료)
@@ -60,17 +61,24 @@ def render(session: dict):
 
     if session.get("target_result") is None:
         if st.button("타겟분석 시작하기", type="primary", key="btn_start_target_analysis"):
-            with st.spinner("확정된 타겟을 기준으로 분석하는 중..."):
-                session["target_result"] = analyze_confirmed_target(
-                    session["confirmed_target"], session.get("category")
-                )
+            try:
+                with st.spinner("확정된 타겟을 기준으로 분석하는 중..."):
+                    session["target_result"] = analyze_confirmed_target(
+                        session["confirmed_target"], session.get("category")
+                    )
+            except NaverApiError as exc:
+                st.error(f"관심 키워드 수집 실패: {exc}")
+                return
             st.rerun()
         return
 
     result = session["target_result"]
     tabs = st.tabs(["개요", "관심 키워드", "AI Persona"])
     with tabs[0]:
-        sample_data_notice()
+        if settings.NAVER_AD_MOCK:
+            sample_data_notice()
+        else:
+            st.caption("관심 키워드는 실데이터이며, AI Persona(성향/선호상황/전환 트리거)는 아직 목업 해석입니다.")
         st.write(f"확정 타겟 **{result['confirmed_target']}** 기준 분석 결과입니다.")
     with tabs[1]:
         for kw in result["interest_keywords"]:

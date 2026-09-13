@@ -24,4 +24,4 @@ def render(session: dict):
         "한 줄 총평 (AI Recommendation)",
     ])
     st.button("종합분석 시작하기 (준비 중)", disabled=True, key="btn_start_synthesis")
-    st.caption("시장·타겟·브랜드·소재 결과가 쌓이면 별도 수집 없이 조합만으로 산출합니다 (§7-4).")
+    st.caption("시장·타겟·브랜드·소재 결과가 쌓이면 별도 수집 없이 조합만으로 산출합니다.")

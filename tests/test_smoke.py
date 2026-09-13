@@ -40,6 +40,11 @@ def test_full_flow_up_to_target_analysis():
     assert not at.exception
     assert at.session_state["session"]["brand_status"] == "완료"
 
+    at.button(key="btn_start_creative").click().run()
+    assert not at.exception
+    assert at.session_state["session"]["creative_status"] == "완료"
+    assert at.session_state["session"]["creative_result"]["own"]["ad_count"] >= 0
+
     # 게이트 통과 직후 자동 추천되어 있어야 함 (PRD §7-2·§9-2)
     assert at.session_state["session"]["target_status"] == "recommended"
 

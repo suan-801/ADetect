@@ -11,7 +11,10 @@ from __future__ import annotations
 import pandas as pd
 import streamlit as st
 
+from config import settings
 from core.analyzers.brand_analyzer import run_brand_analysis
+from core.scrapers.ad_library import ApifyFetchError
+from core.scrapers.naver_api import NaverApiError
 from ui.components import feature_intro, render_insight_card, sample_data_notice, status_icon, tab_header
 
 
@@ -19,12 +22,14 @@ def render(session: dict):
     status = session.get("brand_status", "미실행")
     tab_header("BRAND", "브랜드분석", status_icon(status))
 
-    if status == "미실행":
+    if status in ("미실행", "전체 실패"):
         feature_intro([
             "브랜드 검색량 (자사+경쟁사) · 홈페이지 분석",
             "브랜드 뉴스 · SNS 프로필",
             "네이버 SA/브랜드검색 · 매체 운영 현황",
         ])
+        if status == "전체 실패":
+            st.error("브랜드 데이터 수집에 실패했습니다. 네이버 API 키/권한을 확인한 뒤 다시 시도해주세요.")
         with st.expander("선택 수집 옵션"):
             st.checkbox("Instagram", value=True, key="brand_opt_ig")
             st.checkbox("YouTube", value=False, key="brand_opt_yt")
@@ -32,10 +37,24 @@ def render(session: dict):
             st.checkbox("뉴스", value=True, key="brand_opt_news")
 
         if st.button("브랜드분석 시작하기", type="primary", key="btn_start_brand"):
-            with st.spinner("자사 및 경쟁사 브랜드 데이터를 수집·분석하는 중..."):
-                result = run_brand_analysis(session["brand_name"], session.get("competitors", []))
+            try:
+                with st.spinner("자사 및 경쟁사 브랜드 데이터를 수집·분석하는 중..."):
+                    # 체크박스 상태를 실제 수집 로직에 전달 — 이전에는 이 값들이 화면에만 있고
+                    # run_brand_analysis()에 전달되지 않아, 체크 여부와 무관하게 항상 전체 수집됐다.
+                    result = run_brand_analysis(
+                        session["brand_name"],
+                        session.get("competitors", []),
+                        collect_instagram=st.session_state.get("brand_opt_ig", True),
+                        collect_youtube=st.session_state.get("brand_opt_yt", False),
+                        collect_naver_sa=st.session_state.get("brand_opt_naver_sa", True),
+                        collect_news=st.session_state.get("brand_opt_news", True),
+                    )
                 session["brand_result"] = result
                 session["brand_status"] = result["status"]
+            except (NaverApiError, ApifyFetchError) as exc:
+                # 자사 brand_search_volume/meta_ads 자체가 실패 — §6 브랜드분석 전체 실패 조건
+                session["brand_status"] = "전체 실패"
+                st.error(f"브랜드 데이터 수집 실패: {exc}")
             st.rerun()
         return
 
@@ -47,7 +66,10 @@ def render(session: dict):
     tabs = st.tabs(["개요", "브랜드 검색량", "홈페이지 분석", "광고 운영", "SNS 분석", "AI 인사이트"])
 
     with tabs[0]:
-        sample_data_notice()
+        if settings.NAVER_DATALAB_MOCK and settings.APIFY_MOCK:
+            sample_data_notice()
+        elif settings.BRAND_SITE_MOCK:
+            st.caption("브랜드 검색량·광고 소재는 실데이터, 홈페이지 분석·Instagram은 아직 목업입니다.")
         st.write(
             f"**{own['brand']}** vs 경쟁사 {len(competitors)}개 브랜드를 동일한 기준으로 비교했습니다."
         )
@@ -101,8 +123,11 @@ def render(session: dict):
         for b in [own, *competitors]:
             ig = b["instagram"]
             label = f"{b['brand']}" + (" (자사)" if b["is_own"] else "")
+            if ig.get("not_collected"):
+                st.write(f"**{label}**: Instagram 수집이 선택 해제되어 있습니다 (not_collected)")
+                continue
             if not ig.get("profile_found"):
-                st.write(f"**{label}**: 공식 Instagram 프로필을 찾지 못함 (정상 처리, §6)")
+                st.write(f"**{label}**: 공식 Instagram 프로필을 찾지 못함")
                 continue
             st.write(f"**{label}**: 팔로워 {ig['followers']:,} · 게시물 {ig['posts']:,}")
             st.caption(ig["recent_caption_sample"])

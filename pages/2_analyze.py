@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import streamlit as st
 
-from config.theme import glass_marker
+from config.theme import cta_row_marker, glass_marker
 from core.analyzers.recommender import recommend_category, recommend_competitors
 from database.db import create_session
 from ui import brand_tab, creative_tab, market_tab, synthesis_tab, target_tab
@@ -38,7 +38,7 @@ if st.session_state.step == "input":
             value=st.session_state.pop("prefill_competitors", ""),
             key="input_competitors",
         )
-        st.caption("타겟은 여기서 입력하지 않습니다 — 시장분석·브랜드분석 결과를 근거로 이후 타겟분석 탭에서 추천됩니다.")
+        st.write("")
         if st.button("다음", type="primary", disabled=not brand_name.strip(), key="btn_step1_next"):
             st.session_state.draft = {
                 "brand_name": brand_name.strip(),
@@ -52,33 +52,43 @@ if st.session_state.step == "input":
 elif st.session_state.step == "confirm":
     draft = st.session_state.draft
     st.markdown(
-        "<span class='adetect-eyebrow'>Step 1 · Confirm</span>"
-        "<p class='adetect-hero-title' style='font-size:1.7rem;'>브랜드명을 기반으로 추천했습니다</p>",
+        "<span class='adetect-eyebrow'>Step 1 · Information</span>"
+        "<p class='adetect-hero-title' style='font-size:1.7rem;'>브랜드명을 기반으로 추천합니다</p>",
         unsafe_allow_html=True,
     )
     st.write("")
 
-    category = draft["category"] or recommend_category(draft["brand_name"])
-    user_competitors = [c.strip() for c in draft["competitors_raw"].split(",") if c.strip()]
-    ai_competitors = recommend_competitors(draft["brand_name"], category)
+    with st.spinner("브랜드명을 기반으로 카테고리·경쟁사를 추천하는 중..."):
+        category = draft["category"] or recommend_category(draft["brand_name"])
+        user_competitors = [c.strip() for c in draft["competitors_raw"].split(",") if c.strip()]
+        ai_competitors = recommend_competitors(draft["brand_name"], category)
     # 사용자 입력 경쟁사 우선 (§7-10) — 입력이 있으면 그 값 우선, 부족한 슬롯만 AI가 보완
-    candidates = user_competitors + [c for c in ai_competitors if c not in user_competitors]
+    user_names = {c["name"] if isinstance(c, dict) else c for c in user_competitors}
+    candidates = (
+        [{"name": c, "type": None} for c in user_competitors]
+        + [c for c in ai_competitors if c["name"] not in user_names]
+    )
 
     with st.container():
         glass_marker()
         category = st.text_input("카테고리", value=category, key="confirm_category")
-        st.caption("경쟁사 — 사용자가 직접 입력했다면 그 값이 우선 반영됩니다 (§7-10)")
+        st.caption("경쟁사 — 직접 입력한 값이 있다면 그 값을 우선 반영합니다.")
         selected = []
         for c in candidates:
-            checked = st.checkbox(c, value=True, key=f"competitor_{c}")
+            name, ctype = c["name"], c.get("type")
+            # 브랜드명은 굵게(primary), 유형 태그는 muted gray로 시각적으로 구분
+            label = f"**{name}**  :gray[· {ctype}]" if ctype else f"**{name}**"
+            checked = st.checkbox(label, value=False, key=f"competitor_{name}")
             if checked:
-                selected.append(c)
+                selected.append(name)
         extra = st.text_input("경쟁사 추가 (쉼표로 구분)", key="confirm_extra_competitors")
         selected += [c.strip() for c in extra.split(",") if c.strip()]
 
-        col1, col2 = st.columns([1, 3])
-        back = col1.button("이전", key="btn_confirm_back")
-        go = col2.button("확정하고 Workspace로 이동", type="primary", key="btn_confirm_go")
+        st.write("")
+        with st.container():
+            cta_row_marker()
+            back = st.button("이전", key="btn_confirm_back")
+            go = st.button("분석하기 →", type="primary", key="btn_confirm_go")
 
     if back:
         st.session_state.step = "input"
@@ -122,9 +132,9 @@ elif st.session_state.step == "workspace":
         f"<span>{session['category']}</span>"
         f"<span>{target_display}</span>"
         f"<span class='adetect-status-item'>시장 {status_icon(session['market_status'])}</span>"
-        f"<span class='adetect-status-item'>타겟 {target_icon}</span>"
         f"<span class='adetect-status-item'>브랜드 {status_icon(session['brand_status'])}</span>"
         f"<span class='adetect-status-item'>소재 {status_icon(session['creative_status'])}</span>"
+        f"<span class='adetect-status-item'>타겟 {target_icon}</span>"
         f"<span class='adetect-status-item'>종합 {synthesis_icon}</span>"
         f"</div>"
     )
@@ -135,16 +145,17 @@ elif st.session_state.step == "workspace":
         st.session_state.step = "input"
         st.rerun()
 
-    tab_market, tab_target, tab_brand, tab_creative, tab_synth = st.tabs(
-        ["시장분석", "타겟분석", "브랜드분석", "소재분석", "종합분석"]
+    # 분석 순서: 시장 → 브랜드 → 소재 → 타겟 → 종합 (타겟·종합은 게이트형, §6-1)
+    tab_market, tab_brand, tab_creative, tab_target, tab_synth = st.tabs(
+        ["시장분석", "브랜드분석", "소재분석", "타겟분석", "종합분석"]
     )
     with tab_market:
         market_tab.render(session)
-    with tab_target:
-        target_tab.render(session)
     with tab_brand:
         brand_tab.render(session)
     with tab_creative:
         creative_tab.render(session)
+    with tab_target:
+        target_tab.render(session)
     with tab_synth:
         synthesis_tab.render(session)

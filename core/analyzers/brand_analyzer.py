@@ -44,13 +44,29 @@ def infer_brand_context(brand_name: str) -> dict:
     return {**preset, "analysis_scope": "brand", "confidence": "medium"}
 
 
-def _analyze_single_brand(brand_name: str, is_own: bool, brand_context: dict) -> dict:
-    """§7-3 필드셋 — 자사/경쟁사 동일 스키마로 브랜드 1건을 채웁니다."""
+def _analyze_single_brand(
+    brand_name: str,
+    is_own: bool,
+    brand_context: dict,
+    collect_instagram: bool = True,
+    collect_youtube: bool = False,
+    collect_naver_sa: bool = True,
+    collect_news: bool = True,
+) -> dict:
+    """§7-3 필드셋 — 자사/경쟁사 동일 스키마로 브랜드 1건을 채웁니다.
+
+    collect_* 는 §16-2 "선택 수집 옵션" 체크박스 상태 그대로입니다. 체크 해제된 소스는
+    수집을 시도하지 않고 §7-0 "선택 미체크 = not_collected(실패 아님)" 규칙대로 빈 값으로 채웁니다.
+    """
     search_volume = get_brand_search_volume(brand_name)
     website = crawl_brand_website(brand_name)
-    news = get_news(brand_name, scope="brand", limit=5)
+    news = get_news(brand_name, scope="brand", limit=5) if collect_news else []
     meta_ads = fetch_meta_ads(brand_name)
-    instagram = fetch_instagram_profile(brand_name)
+    instagram = (
+        fetch_instagram_profile(brand_name)
+        if collect_instagram
+        else {"profile_found": False, "not_collected": True}
+    )
 
     website_target_message = build_insight(
         insight=f"{brand_name}은(는) 홈페이지 카피 상 '{website['usp_summary']}'를 중심으로 "
@@ -78,11 +94,11 @@ def _analyze_single_brand(brand_name: str, is_own: bool, brand_context: dict) ->
         "ad_count": meta_ads["ad_count"],
         "format_mix": meta_ads["format_mix"],
         "media_operation_matrix_row": {
-            "naver_sa": rng_bool(brand_name, "sa"),
-            "naver_brand_search": rng_bool(brand_name, "brand_search"),
+            "naver_sa": collect_naver_sa and rng_bool(brand_name, "sa"),
+            "naver_brand_search": collect_naver_sa and rng_bool(brand_name, "brand_search"),
             "meta_ads": meta_ads["ad_count"] > 0,
             "instagram_profile": instagram.get("profile_found", False),
-            "youtube_channel": rng_bool(brand_name, "youtube"),
+            "youtube_channel": collect_youtube and rng_bool(brand_name, "youtube"),
         },
     }
 
@@ -91,17 +107,34 @@ def rng_bool(brand_name: str, salt: str) -> bool:
     return seeded_random(f"{brand_name}:{salt}").random() > 0.4
 
 
-def run_brand_analysis(brand_name: str, competitors: list[str]) -> dict:
+def run_brand_analysis(
+    brand_name: str,
+    competitors: list[str],
+    *,
+    collect_instagram: bool = True,
+    collect_youtube: bool = False,
+    collect_naver_sa: bool = True,
+    collect_news: bool = True,
+) -> dict:
     """§6-1 function_run(브랜드분석) 실행 결과 — 자사 1건 + 경쟁사 N건.
+
+    completed_instagram/youtube/naver_sa/news는 §16-2 "선택 수집 옵션" 체크박스 상태이며,
+    자사·경쟁사 전원에게 동일하게 적용됩니다(§7-0 핵심 vs 선택 구분).
 
     완료/부분실패 판정은 §6 "기능별 상태 판정" 표를 따르되, 이 스켈레톤에서는
     목업 데이터가 항상 성공하므로 status는 항상 '완료'로 반환합니다.
     """
     brand_context = infer_brand_context(brand_name)
+    options = dict(
+        collect_instagram=collect_instagram,
+        collect_youtube=collect_youtube,
+        collect_naver_sa=collect_naver_sa,
+        collect_news=collect_news,
+    )
 
-    own_profile = _analyze_single_brand(brand_name, is_own=True, brand_context=brand_context)
+    own_profile = _analyze_single_brand(brand_name, is_own=True, brand_context=brand_context, **options)
     competitor_profiles = [
-        _analyze_single_brand(c, is_own=False, brand_context=brand_context) for c in competitors
+        _analyze_single_brand(c, is_own=False, brand_context=brand_context, **options) for c in competitors
     ]
 
     comparison_insight = build_insight(

@@ -9,16 +9,15 @@ from __future__ import annotations
 
 import streamlit as st
 
-from config.theme import glass_marker
+from config.theme import cta_row_marker, glass_marker
 from ui.components import module_row
+from ui.hero import render_hero_copy, render_hero_object
 
-st.markdown(
-    "<span class='adetect-eyebrow'>ADetect · Brand Intelligence</span>"
-    "<p class='adetect-hero-title'>AI insight,<br>in minutes.</p>"
-    "<p class='adetect-hero-sub'>브랜드명만 입력하면 시장부터 소재까지, "
-    "AI가 분석해 경쟁사 인사이트와 실행 가능한 전략을 제안합니다.</p>",
-    unsafe_allow_html=True,
-)
+copy_col, object_col = st.columns([1.3, 1], gap="large")
+with copy_col:
+    render_hero_copy()
+with object_col:
+    render_hero_object()
 
 st.write("")
 st.write("")
@@ -36,9 +35,10 @@ with st.container():
             "경쟁사", placeholder="쉼표로 구분, 비워두면 AI가 추천", key="home_competitors_input"
         )
 
-    left, right = st.columns([3, 1])
-    left.caption("브랜드명만 입력해도 AI가 카테고리와 경쟁사를 추천합니다. 타겟은 분석 이후 추천됩니다.")
-    start = right.button("Analyze →", type="primary")
+    with st.container():
+        cta_row_marker()
+        st.caption("브랜드명만 입력해도 AI가 카테고리와 경쟁사를 추천합니다. 타겟은 분석 이후 추천됩니다.")
+        start = st.button("분석하기 →", type="primary", key="home_start_btn")
 
     if start:
         if not brand_name.strip():
