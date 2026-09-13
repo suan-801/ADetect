@@ -7,7 +7,6 @@ STEP 1 확인 화면 자체가 깨지지 않도록 합니다 — "추천 후 사
 from __future__ import annotations
 
 import json
-from functools import lru_cache
 from typing import Literal
 
 from pydantic import BaseModel
@@ -57,11 +56,21 @@ _PROMPT = """당신은 한국 시장을 잘 아는 마케팅 리서치 애널리
 """
 
 
-@lru_cache(maxsize=64)
+_gemini_recommend_cache: dict[str, _Recommendation] = {}
+
+
 def _gemini_recommend(brand_name: str) -> _Recommendation | None:
     """Gemini 호출 결과를 브랜드명 기준으로 캐시 — recommend_category/recommend_competitors가
     같은 브랜드에 대해 매번 새로 호출하지 않고 이 캐시를 공유합니다. 실패 시 None을 반환해
-    호출부가 목업으로 폴백하게 합니다."""
+    호출부가 목업으로 폴백하게 합니다.
+
+    성공한 결과만 캐시합니다(수동 dict, lru_cache 아님) — lru_cache로 감싸면 일시적 실패
+    (네트워크 오류/quota/세이프티 필터 등)로 반환한 None까지 그대로 캐시돼, 그 브랜드는
+    같은 프로세스가 살아있는 동안 영구히 목업으로만 폴백하는 문제가 있었습니다(예: 나이키가
+    한 번 실패한 뒤 다른 브랜드는 정상인데 나이키만 계속 "경쟁사 X/Y/Z" 목업이 나오던 버그).
+    """
+    if brand_name in _gemini_recommend_cache:
+        return _gemini_recommend_cache[brand_name]
     try:
         from google.genai import types
 
@@ -76,11 +85,14 @@ def _gemini_recommend(brand_name: str) -> _Recommendation | None:
                 response_schema=_Recommendation,
             ),
         )
-        return _Recommendation.model_validate(json.loads(resp.text))
+        rec = _Recommendation.model_validate(json.loads(resp.text))
     except Exception:
         # §11 정책 — STEP 1 추천은 무료/즉시 단계라 실패해도 전체 실패로 취급하지 않고
         # 조용히 목업으로 대체한다(사용자는 어차피 §9에서 결과를 확인·수정할 수 있음).
+        # 실패는 캐시하지 않으므로 다음 시도에서 다시 실연동을 시도합니다.
         return None
+    _gemini_recommend_cache[brand_name] = rec
+    return rec
 
 
 def _mock_category(brand_name: str) -> str:

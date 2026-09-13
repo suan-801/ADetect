@@ -5,25 +5,31 @@
 
 ---
 
-## 1. 지금까지 만든 것 (현재 상태)
+## 1. 지금까지 만든 것 (현재 상태, 2026-09-13 갱신)
 
 | 영역 | 상태 | 위치 |
 |---|---|---|
 | 저장소 뼈대 (폴더 구조, .env, requirements) | ✅ 완료 | 루트 |
-| 디자인 시스템 — Black Monochrome / Minimal Glassmorphism, Pretendard | ✅ 완료 (2차 리디자인 반영, §5) | `config/theme.py`, `.streamlit/config.toml` |
-| 홈 화면 | ✅ 완료 | `pages/1_home.py` |
-| STEP 1 브랜드 설정 (타겟 입력 없음) + AI 추천 확인 화면 | ✅ 완료 | `pages/2_analyze.py` |
+| 디자인 시스템 — Black Monochrome / Minimal Glassmorphism, Pretendard | ✅ 완료 (2차 리디자인 + STEP1 UX 피드백 반영) | `config/theme.py`, `.streamlit/config.toml` |
+| 홈 화면 (히어로 오브젝트 포함) | ✅ 완료 | `pages/1_home.py`, `ui/hero.py` |
+| STEP 1 브랜드 설정 + AI 추천 확인 화면 | ✅ 완료 — **카테고리/경쟁사 추천 Gemini 실연동**(GEMINI_API_KEY 있으면), 실패해도 목업으로 조용히 폴백 | `pages/2_analyze.py`, `core/analyzers/recommender.py` |
 | STEP 2 Workspace 5개 탭 골격 + 상태 스트립 | ✅ 완료 | `pages/2_analyze.py` |
-| 시장분석 탭 | 🟡 목업 데이터로 동작 (담당자 확장 필요) | `ui/market_tab.py` |
-| 타겟분석 탭 (게이트 + 추천/확정/분석 2단계) | 🟡 목업 데이터로 동작 (담당자 확장 필요) | `ui/target_tab.py`, `core/analyzers/target_recommender.py` |
-| **브랜드분석 탭 (자사+경쟁사 통합)** | 🟢 **End-to-End 동작** (mock scraper → 실제 API로 교체만 하면 됨) | `ui/brand_tab.py`, `core/analyzers/brand_analyzer.py`, `core/scrapers/{naver_api,brand_site,ad_library}.py` |
-| 소재분석 / 종합분석 탭 | ⚪ 화면 골격만 (담당자 미배정) | `ui/creative_tab.py`, `ui/synthesis_tab.py` |
-| 이력 관리 / 설정 화면 | 🟡 골격만 (실제 재진입 기능 없음) | `pages/3_history.py`, `pages/4_settings.py` |
+| 시장분석 탭 | 🟡 **부분 실연동** — 검색량 추이(DataLab)·뉴스는 NAVER 키 있으면 실동작. `search_seasonality`/`reference_sources`/`market_issues`/`upcoming_changes`(§7-1) 및 다운로드는 아직 미구현 | `ui/market_tab.py`, `core/scrapers/naver_api.py` |
+| 타겟분석 탭 (게이트 + 추천/확정/분석 2단계) | 🟡 **부분 실연동** — `interest_keywords`는 네이버 검색광고 키워드도구 API(RelKwdStat) 실연동, `recommended_target`/`ai_persona`는 아직 규칙 기반 목업(Gemini 미연동) | `ui/target_tab.py`, `core/analyzers/target_recommender.py`, `core/scrapers/naver_ad_api.py` |
+| **브랜드분석 탭 (자사+경쟁사 통합)** | 🟡 **부분 실연동** — 브랜드 검색량(절대치 포함)·Meta 광고 요약은 Naver/Apify 키 있으면 실동작. 홈페이지 크롤링(Playwright)·Instagram 프로필·`brand_context`/해석 문구는 아직 목업(Gemini 미연동) | `ui/brand_tab.py`, `core/analyzers/brand_analyzer.py`, `core/scrapers/{naver_api,naver_ad_api,brand_site,ad_library}.py` |
+| **소재분석 탭** | 🟢 **End-to-End 동작** — Meta Ads Library 실연동(APIFY_API_TOKEN), 자동 페이지 매칭이 부정확할 때 URL/페이지명 직접 지정 폴백, 브랜드별 수집 진행상황(st.status) 표시, HTML/Excel/ZIP 다운로드 완료. `appeal_tags`(소구포인트) 태깅은 아직 규칙 기반 목업(Gemini Vision 미연동) | `ui/creative_tab.py`, `core/analyzers/creative_analyzer.py`, `core/scrapers/ad_library.py`, `core/exporters/*.py` |
+| 종합분석 탭 | ⚪ 화면 골격만 (담당자 미배정) | `ui/synthesis_tab.py` |
+| 이력 관리 / 설정 화면 | 🟡 골격만 (실제 재진입 기능 없음, API 키 상태 표시만 동작) | `pages/3_history.py`, `pages/4_settings.py` |
 | SQLite 이력 저장 (`analysis_session`/`function_run`) | ✅ 완료 | `database/db.py` |
 
-지금 `streamlit run app.py`로 실행하면 **브랜드명 입력 → STEP1 확인 → Workspace 진입 →
-시장분석/브랜드분석 시작 → 타겟분석 자동 잠금해제 → 추천/확정/분석**까지 전부 클릭으로 눌러볼 수 있습니다
-(전부 목업 데이터 기준).
+지금 `streamlit run app.py`로 실행하면 **브랜드명 입력 → STEP1 확인(키 있으면 Gemini 실추천) → Workspace 진입 →
+시장분석/브랜드분석/소재분석 시작(키 있으면 부분 실연동) → 타겟분석 자동 잠금해제 → 추천/확정/분석**까지
+전부 클릭으로 눌러볼 수 있습니다. API 키 발급 방법은 [`SETUP_GUIDE.md`](../SETUP_GUIDE.md) 참고 —
+키를 하나도 안 채워도 전체 화면이 목업 데이터로 그대로 동작합니다.
+
+> ⚠️ **다른 문서와의 정합성**: 위 표는 각 화면을 직접 열어보고 확인한 실제 상태입니다. 앞으로
+> 이 표가 또 실제와 어긋나지 않도록, 목업→실연동 전환처럼 눈에 보이는 변화가 생기면 이 표부터
+> 갱신해주세요 — README.md의 표는 이 표를 사용자 관점으로 요약한 것이라 함께 갱신이 필요합니다.
 
 ---
 
@@ -41,8 +47,9 @@ app.py (라우팅 + 전역 CSS)
  └─ pages/3_history.py    — SQLite 이력 조회
  └─ pages/4_settings.py   — API 키 상태 확인
 
-core/scrapers/*   — 실제 수집 (지금은 config.settings.USE_MOCK_DATA에 따라 mock 반환)
+core/scrapers/*   — 실제 수집 (서비스별 config.settings.*_MOCK 플래그에 따라 개별적으로 mock↔실연동 전환)
 core/analyzers/*  — AI 판단/추천 (§8 FACT/AI/REC 스키마 공통 사용, insight_synthesizer.build_insight)
+core/exporters/*  — 결과 내보내기 (지금은 소재분석 전용 HTML/Excel/ZIP만 존재)
 database/db.py    — analysis_session / function_run (PRD §6-1·§13)
 ```
 
@@ -56,41 +63,53 @@ database/db.py    — analysis_session / function_run (PRD §6-1·§13)
 
 | 파트 | 담당 파일 | 지금 할 일 |
 |---|---|---|
-| **시장분석** | `ui/market_tab.py`, `core/scrapers/naver_api.py`(`get_search_volume_trend`, `get_news`) | §7-1 `search_seasonality`/`reference_sources`/`market_issues`/`upcoming_changes` 추가, 실제 네이버 API 연동 |
-| **브랜드분석** (진행자: 본인, 백엔드 포함) | `ui/brand_tab.py`, `core/analyzers/brand_analyzer.py`, `core/scrapers/{naver_api,brand_site,ad_library}.py` | 아래 §4 참고 |
-| **타겟분석** | `ui/target_tab.py`, `core/analyzers/target_recommender.py` | §7-2-a AI Persona 3개 필드 근거 데이터 실측 연결, Gemini 프롬프트로 `recommend_target` 교체 |
-| **소재분석** (미배정) | `ui/creative_tab.py` (신규 작성 필요) | §7-11-4 기준 appeal_tags 태깅, 장기운영 분석 |
+| **시장분석** (신규 합류 예정) | `ui/market_tab.py`, `core/scrapers/naver_api.py`(`get_search_volume_trend`, `get_news`) | 검색량 추이·뉴스는 이미 실연동 완료 — §7-1 `search_seasonality`/`reference_sources`/`market_issues`/`upcoming_changes` 추가 및 HTML/Excel 다운로드가 남은 작업 |
+| **브랜드분석** (신규 합류 예정 — 지금까지는 본인이 진행) | `ui/brand_tab.py`, `core/analyzers/brand_analyzer.py`, `core/scrapers/{naver_api,naver_ad_api,brand_site,ad_library}.py` | 아래 §4 참고 — 검색량/Meta 광고는 이미 실연동, 홈페이지·Instagram·Gemini 해석이 남은 작업 |
+| **타겟분석** (미배정) | `ui/target_tab.py`, `core/analyzers/target_recommender.py` | `interest_keywords`는 이미 실연동 — §7-2-a AI Persona 3개 필드 근거 데이터 실측 연결, Gemini 프롬프트로 `recommend_target`/`ai_persona` 교체 |
+| **소재분석** (미배정, 진행 상황 좋음) | `ui/creative_tab.py`, `core/analyzers/creative_analyzer.py`, `core/scrapers/ad_library.py` | Meta Ads Library 실연동 + 페이지 직접 지정 폴백 + HTML/Excel/ZIP 다운로드까지 완료. 남은 작업: `appeal_tags`(소구포인트) 태깅을 Gemini Vision으로 교체 |
 | **종합분석** (미배정) | `ui/synthesis_tab.py` (신규 작성 필요) | §7-4 SOV/포지셔닝맵/White Space |
 
 각자 자기 파일만 건드리면 되도록 나눠놨기 때문에 **브랜치를 나눠도 병합 충돌이 거의 안 납니다.**
 단, `ui/components.py`·`config/theme.py`·`app.py`·`pages/1_home.py`·`pages/2_analyze.py`는
 디자인 시스템을 공유하는 파일이라 여러 명이 동시에 건드리면 충돌하기 쉽습니다 — 바꿀 일이 있으면 먼저 알리세요.
 
+> ⚠️ **소재분석 작업은 지금 `feature/creative-analysis`가 아니라 `feature/brand-analysis`
+> 브랜치에 들어가 있습니다** (전담자가 배정되기 전까지 임시로 이 브랜치에서 진행됨). 소재분석
+> 담당자가 정해지면 `feature/brand-analysis`에서 `feature/creative-analysis`를 새로 따서
+> 이어가거나, `main` 머지 후 새로 시작하는 쪽을 미리 정해주세요.
+
 ### Git 브랜치 전략 (제안)
 
 ```
 main                        — 항상 동작하는 상태만 유지 (지금 이 커밋)
-├─ feature/market-analysis  — 시장분석 담당
-├─ feature/brand-analysis   — 브랜드분석 담당 (본인)
-├─ feature/target-analysis  — 타겟분석 담당
-├─ feature/creative-analysis
-└─ feature/synthesis
+├─ feature/market-analysis  — 시장분석 담당 (신규 합류 예정)
+├─ feature/brand-analysis   — 브랜드분석 담당 (신규 합류 예정, 현재 소재분석 작업도 여기 포함)
+├─ feature/target-analysis  — 타겟분석 담당 (미배정)
+├─ feature/creative-analysis — 소재분석 전담자 배정 시 여기로 분리
+└─ feature/synthesis        — 종합분석 담당 (미배정)
 ```
 각자 브랜치에서 작업 → PR 생성 → 리뷰 후 `main` 머지. `ui/components.py`, `config/theme.py`,
 `database/db.py`처럼 여러 명이 공유하는 파일을 바꿀 때만 미리 이야기하고 진행하세요.
 
 ---
 
-## 4. 브랜드분석 파트 — 다음 단계 (본인 담당)
+## 4. 브랜드분석 파트 — 다음 단계 (신규 합류자 인계 예정, 지금까지는 본인이 진행)
 
-지금 `core/scrapers/naver_api.py` / `brand_site.py` / `ad_library.py`는 전부
-`config.settings.USE_MOCK_DATA`가 True일 때 결정론적 목업 값을 반환합니다. 실제 연동 순서 제안:
+각 서비스는 `config/settings.py`의 서비스별 `_MOCK` 플래그(`NAVER_DATALAB_MOCK`/`NAVER_AD_MOCK`/
+`APIFY_MOCK`/`GEMINI_MOCK`/`BRAND_SITE_MOCK`)에 따라 개별적으로 실연동 여부가 갈립니다.
+진행 상황:
 
-1. `SETUP_GUIDE.md` 따라 네이버 오픈API 키 발급 → `.env`에 입력 → `USE_MOCK_DATA`가 자동으로 `False` 전환 확인
-2. `core/scrapers/naver_api.py`의 `get_brand_search_volume()` 내부를 실제 DataLab `keywordGroups` 호출로 교체 (PRD §7-9 — 자사+경쟁사 한 번의 요청에 그룹으로 묶어야 비교 가능, 자사를 앵커로 고정)
-3. `brand_site.py`의 `crawl_brand_website()`를 실제 Playwright 크롤링으로 교체 (PRD §7-3 — 대표 상세페이지 없으면 홈페이지/브랜드스토리 폴백)
-4. `ad_library.py`의 `fetch_meta_ads()`/`fetch_instagram_profile()`을 실제 Apify 액터 호출로 교체
-5. `core/analyzers/insight_synthesizer.py`의 목업 문구 생성을 실제 Gemini 프롬프트 호출로 교체 (반환 shape `insight/source/evidence/confidence`는 그대로 유지)
+1. ✅ `SETUP_GUIDE.md` 따라 네이버 오픈API/검색광고 키 발급 → `.env`에 입력하는 절차는 정리됨
+2. ✅ `core/scrapers/naver_api.py`의 `get_brand_search_volume()` — DataLab `keywordGroups`(상대추이) +
+   `core/scrapers/naver_ad_api.py`(RelKwdStat, 절대 검색량·연관검색어) 실연동 완료 (PRD §7-9·§21-10)
+3. ⬜ `brand_site.py`의 `crawl_brand_website()` — 아직 목업(`BRAND_SITE_MOCK = True` 고정). 실제
+   Playwright 크롤링으로 교체 필요 (PRD §7-3 — 대표 상세페이지 없으면 홈페이지/브랜드스토리 폴백)
+4. 🟡 `ad_library.py`의 `fetch_meta_ads()` — Apify 실연동 완료(§21-11). `fetch_instagram_profile()`은
+   브랜드명→handle 해석 문제로 아직 목업(§7-10과 동일한 미해결 문제)
+5. ⬜ `infer_brand_context()`(`brand_analyzer.py`)와 `core/analyzers/insight_synthesizer.py`의 목업
+   문구 생성 — 아직 전부 규칙 기반 템플릿. 실제 Gemini 프롬프트 호출로 교체 필요 (반환 shape
+   `insight/source/evidence/confidence`는 그대로 유지). STEP1의 `core/analyzers/recommender.py`가
+   Gemini 실연동의 참고 예시가 될 수 있습니다 (구조화된 JSON 응답 스키마 + 실패 시 목업 폴백 패턴).
 6. `run_brand_analysis()`의 반환 shape은 바꾸지 마세요 — `ui/brand_tab.py`가 그 shape을 그대로 렌더링하고 있습니다.
 
 ---
@@ -203,11 +222,27 @@ CSS를 작성했고, `.streamlit/config.toml`의 테마 값이 정상 로드되�
 
 ## 6. 마일스톤 제안
 
-| 단계 | 목표 | 참고 |
-|---|---|---|
-| **M0 (지금)** | 뼈대 + 프로토타입 — 5개 기능이 눈에 보이고 클릭 가능 | 완료 |
-| **M1** | 브랜드분석 실제 API 연동 (네이버+Apify+Gemini) | PRD §22 Phase 0~1 |
-| **M2** | 시장분석 실제 API 연동 | PRD §22 Phase 1~2 |
-| **M3** | 타겟분석 Gemini 프롬프트 연동 | PRD §22 Phase 1~2 |
-| **M4** | 소재분석·종합분석 신규 구현 | PRD §22 Phase 2~3 |
-| **M5** | Excel/HTML/ZIP 내보내기, 이력 재진입 | PRD §22 Phase 3~4 |
+| 단계 | 목표 | 상태 | 참고 |
+|---|---|---|---|
+| **M0** | 뼈대 + 프로토타입 — 5개 기능이 눈에 보이고 클릭 가능 | ✅ 완료 | |
+| **M1** | 브랜드분석 실제 API 연동 (네이버+Apify+Gemini) | 🟡 부분 완료 — 네이버·Apify는 실연동, Gemini(brand_context/해석 문구)는 아직 | PRD §22 Phase 0~1 |
+| **M2** | 시장분석 실제 API 연동 | 🟡 부분 완료 — 검색량·뉴스는 실연동, 계절성/참고자료/이슈 필드는 아직 | PRD §22 Phase 1~2 |
+| **M3** | 타겟분석 Gemini 프롬프트 연동 | 🟡 부분 완료 — 관심 키워드는 실연동(§21-10), `recommend_target`/AI Persona는 아직 목업 | PRD §22 Phase 1~2 |
+| **M4** | 소재분석·종합분석 신규 구현 | 🟡 부분 완료 — 소재분석은 Meta 실연동+다운로드까지 완료(appeal_tags 태깅만 목업), 종합분석은 미착수 | PRD §22 Phase 2~3 |
+| **M5** | Excel/HTML/ZIP 내보내기, 이력 재진입 | 🟡 부분 완료 — 소재분석 다운로드만 완료, 나머지 4개 탭 다운로드·이력 재진입은 아직 | PRD §22 Phase 3~4 |
+
+---
+
+## 7. 최근 변경 이력 (요약)
+
+각 세션마다 이 문서를 계속 갱신하지 못하면 실제 코드와 계획서가 어긋나기 쉬워서, 굵직한 변경만
+간단히 누적 기록합니다. 자세한 내용은 `git log`/커밋 메시지를 참고하세요.
+
+- **2026-09-13**: STEP1 확인화면 UX 개선(문구/로딩 표시/경쟁사 태그 색상/체크박스 기본값/여백),
+  소재분석에 브랜드별 수집 진행상황 표시 + Meta 페이지 자동 매칭 실패 시 URL/페이지명 직접 지정
+  폴백 추가. `_gemini_recommend()`가 `lru_cache`로 실패(`None`)까지 영구 캐시해 한 번 실패한
+  브랜드가 그 프로세스 안에서 계속 목업으로만 나오던 버그 수정(성공한 결과만 캐시하도록 변경).
+  Streamlit 기본 "Deploy" 버튼이 안 가려지던 CSS 누락 수정. `SETUP_GUIDE.md`/`.env.example`에
+  이미 발급받은 키를 빠르게 채워 넣는 빠른 참고표 추가.
+- 이전: Meta Ads Library/네이버 검색광고 실연동, STEP1 Gemini 추천 실연동, 소재분석 HTML/Excel/ZIP
+  내보내기, 홈 화면 히어로 이미지, Black Monochrome 리디자인(§5) — 커밋 `4addcfc`/`774d4cc` 참고.

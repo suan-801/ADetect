@@ -40,7 +40,9 @@ html, body, [class*="css"] {{
 }}
 
 /* ── 기본 크롬 정리: 배포/메뉴 버튼 등 시각 노이즈 제거 ───────────────────── */
-[data-testid="stToolbarActions"], #MainMenu, footer {{ display: none; }}
+/* "Deploy" 버튼은 stToolbarActions가 아니라 별도 요소(stAppDeployButton)라 기존 규칙으로는
+   안 가려졌다 — Streamlit Community Cloud 배포용 버튼이라 사내 툴에서는 의미가 없다. */
+[data-testid="stToolbarActions"], [data-testid="stAppDeployButton"], #MainMenu, footer {{ display: none; }}
 [data-testid="stAppHeader"] {{ background: transparent; }}
 [data-testid="stDecoration"] {{ display: none; }}
 
