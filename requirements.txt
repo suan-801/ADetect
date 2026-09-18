@@ -1,7 +1,8 @@
 # Phase 0~1(뼈대/프로토타입) 최소 의존성.
 # 실제 수집기(Playwright/Apify/Gemini)는 각 모듈 담당자가 실제 연동을 붙일 때 추가합니다.
 # (PRD §15 기술스택 / §22 로드맵 참고)
-streamlit>=1.38
+# streamlit>=1.42 — st.navigation(position="top") 공식 API 사용 (Top Navigation 리뉴얼)
+streamlit>=1.42
 python-dotenv>=1.0.1
 pandas>=2.2
 requests>=2.32

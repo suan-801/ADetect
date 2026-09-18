@@ -238,6 +238,20 @@ CSS를 작성했고, `.streamlit/config.toml`의 테마 값이 정상 로드되�
 각 세션마다 이 문서를 계속 갱신하지 못하면 실제 코드와 계획서가 어긋나기 쉬워서, 굵직한 변경만
 간단히 누적 기록합니다. 자세한 내용은 `git log`/커밋 메시지를 참고하세요.
 
+- **2026-09-18**: 대규모 UI/UX 리뉴얼 — "Premium AI Intelligence / Cinematic Editorial / Luminous Dark".
+  1차 리디자인(§5, 골드 계열 black monochrome)에서 한 단계 더 나아가 dark + ice blue/soft cyan/soft
+  violet 3-accent 팔레트로 전환. Framework Audit 결과 Streamlit 유지 결정(설치된 1.63이 `st.navigation
+  (position="top")`/`st.segmented_control`/`st.dialog`를 이미 공식 지원 — `requirements.txt` 최소버전
+  `>=1.42`로 상향). 주요 변경: (1) 사이드바 내비게이션 → 공식 Top Navigation(`app.py`, `st.logo`),
+  (2) `config/theme.py` 디자인 토큰 전면 재정의 + 반응형(1280/1024/768/390) 규칙 추가, (3) 홈 전체를
+  Hero/Value Prop/5개 Story Section(시장→타겟→브랜드→소재→종합)/Product Preview/CTA 구조로 재구성
+  (`pages/1_home.py`, `ui/hero.py`), (4) 오리지널 abstract SVG 일러스트 세트 신규 추가(`ui/illustrations.py`,
+  레퍼런스 자산 비복제), (5) `ui/components.py`에 Metric/InsightBlock/StatusBadge/BrandContextBar/
+  FeatureStory/EmptyState 등 재사용 컴포넌트 확충, (6) Workspace에 Brand Context Bar 도입 및 탭 스타일
+  절제, (7) History를 row 기반 리스트 + Workspace 재진입 버튼으로, Settings를 상태 배지 기반으로 개선.
+  기능/데이터 스키마/analyzer·scraper 로직은 전혀 변경하지 않음 — `tests/test_smoke.py` 전체 통과 확인.
+  알려진 한계: History 재진입은 브랜드 컨텍스트만 복원하고 기능별 결과 자동 복원은 미구현
+  (`save_function_run()`이 어디서도 호출되지 않는 기존 프로토타입 상태, 이번 리뉴얼 범위 밖).
 - **2026-09-13**: STEP1 확인화면 UX 개선(문구/로딩 표시/경쟁사 태그 색상/체크박스 기본값/여백),
   소재분석에 브랜드별 수집 진행상황 표시 + Meta 페이지 자동 매칭 실패 시 URL/페이지명 직접 지정
   폴백 추가. `_gemini_recommend()`가 `lru_cache`로 실패(`None`)까지 영구 캐시해 한 번 실패한

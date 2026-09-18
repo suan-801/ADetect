@@ -11,7 +11,7 @@ import streamlit as st
 
 from config import settings
 from core.scrapers.naver_api import NaverApiError, get_news, get_search_volume_trend
-from ui.components import feature_intro, sample_data_notice, status_icon, tab_header
+from ui.components import feature_intro, metric_row, sample_data_notice, status_icon, tab_header
 
 
 def render(session: dict):
@@ -55,6 +55,17 @@ def render(session: dict):
     with tabs[0]:
         if settings.NAVER_DATALAB_MOCK:
             sample_data_notice()
+        trend = result.get("trend", [])
+        if trend:
+            first_val = trend[0]["search_index"]
+            last_val = trend[-1]["search_index"]
+            change_pct = ((last_val - first_val) / first_val * 100) if first_val else 0
+            trend_dir = "up" if change_pct > 1 else "down" if change_pct < -1 else "flat"
+            metric_row([
+                ("검색지수(최근)", str(last_val), None),
+                ("증감률(구간)", f"{change_pct:+.1f}<span class='unit'>%</span>", trend_dir),
+                ("주요 뉴스", str(len(result.get("news", []))), None),
+            ])
         st.write(
             f"**{result.get('category')}** 카테고리의 최근 3개월 검색량 추이와 관련 뉴스를 확인할 수 있습니다."
         )

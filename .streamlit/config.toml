@@ -1,25 +1,26 @@
 [theme]
 base = "dark"
-backgroundColor = "#070707"
-secondaryBackgroundColor = "#111113"
-textColor = "#F2F2F0"
-borderColor = "#232326"
+backgroundColor = "#06070A"
+secondaryBackgroundColor = "#10151C"
+textColor = "#F5F7FA"
+borderColor = "#1A1F27"
 font = "Pretendard:https://cdn.jsdelivr.net/gh/orioncactus/pretendard@1.3.9/dist/web/static/pretendard.css"
 headingFont = "Pretendard:https://cdn.jsdelivr.net/gh/orioncactus/pretendard@1.3.9/dist/web/static/pretendard.css"
-baseFontWeight = 350
-baseRadius = "0.9rem"
-buttonRadius = "0.6rem"
+baseFontWeight = 380
+baseRadius = "0.85rem"
+buttonRadius = "0.55rem"
 showWidgetBorder = false
 showSidebarBorder = false
-primaryColor = "#F2F2F0"
-linkColor = "#C9A227"
-# 헤딩이 기본값보다 무겁고 커 보이지 않도록 전체적으로 한 단계씩 축소 (PRD 피드백 §5 Typography)
-headingFontSizes = ["2.4rem", "1.6rem", "1.15rem", "1.0rem", "0.95rem", "0.9rem"]
-headingFontWeights = ["600", "550", "500", "500", "500", "500"]
+primaryColor = "#AEEBFF"
+linkColor = "#AEEBFF"
+# eyebrow/headline/description 위계를 명확히 하기 위해 헤딩 자체는 절제된 크기로 유지하고
+# 큰 타이틀은 config/theme.py의 커스텀 클래스(.adetect-hero-title 등)가 전담합니다.
+headingFontSizes = ["2.1rem", "1.5rem", "1.15rem", "1.0rem", "0.95rem", "0.9rem"]
+headingFontWeights = ["600", "560", "520", "500", "500", "500"]
 
 [theme.sidebar]
-backgroundColor = "#070707"
-borderColor = "#1C1C1F"
+backgroundColor = "#06070A"
+borderColor = "#1A1F27"
 
 [server]
 headless = true

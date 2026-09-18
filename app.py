@@ -3,7 +3,12 @@
 전체 구조는 PRD §3(디렉터리)·§15(기술스택)·§16(화면 구성)을 따릅니다.
 이 파일은 페이지 라우팅과 전역 스타일 주입만 담당하고, 실제 화면 로직은 pages/*.py에 있습니다.
 아이콘은 이모지 대신 Streamlit 내장 Material Symbols(선 아이콘, `:material/...:`)만 사용합니다.
+
+Navigation은 sidebar가 아니라 공식 `st.navigation(position="top")` API로 구현합니다
+(Framework Audit 결론 — Streamlit 1.42+ 공식 기능, DOM hack 불필요, docs/PROJECT_PLAN.md 참고).
 """
+from pathlib import Path
+
 import streamlit as st
 
 from config.settings import APP_NAME
@@ -14,22 +19,19 @@ st.set_page_config(
     page_title=APP_NAME,
     page_icon=":material/lens:",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="collapsed",
 )
 inject_global_css()
 init_db()
 
-home = st.Page("pages/1_home.py", title="홈", icon=":material/home:", default=True)
-analyze = st.Page("pages/2_analyze.py", title="분석하기", icon=":material/search:")
-history = st.Page("pages/3_history.py", title="이력 관리", icon=":material/history:")
-settings_page = st.Page("pages/4_settings.py", title="설정", icon=":material/tune:")
+_LOGO_PATH = Path(__file__).resolve().parent / "ui" / "assets" / "logo.svg"
+if _LOGO_PATH.exists():
+    st.logo(str(_LOGO_PATH), size="medium")
 
-st.sidebar.markdown(
-    "<div style='font-weight:500;font-size:1rem;letter-spacing:0.02em;'>ADetect</div>"
-    "<div style='color:#5C5C60;font-size:0.75rem;margin-top:2px;margin-bottom:1.2rem;'>"
-    "Brand Intelligence Engine</div>",
-    unsafe_allow_html=True,
-)
+home = st.Page("pages/1_home.py", title="Home", icon=None, default=True)
+analyze = st.Page("pages/2_analyze.py", title="Analyze", icon=None)
+history = st.Page("pages/3_history.py", title="History", icon=None)
+settings_page = st.Page("pages/4_settings.py", title="Settings", icon=None)
 
-nav = st.navigation([home, analyze, history, settings_page])
+nav = st.navigation([home, analyze, history, settings_page], position="top")
 nav.run()

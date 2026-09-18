@@ -15,7 +15,7 @@ from config import settings
 from core.analyzers.brand_analyzer import run_brand_analysis
 from core.scrapers.ad_library import ApifyFetchError
 from core.scrapers.naver_api import NaverApiError
-from ui.components import feature_intro, render_insight_card, sample_data_notice, status_icon, tab_header
+from ui.components import feature_intro, metric_row, render_insight_card, sample_data_notice, status_icon, tab_header
 
 
 def render(session: dict):
@@ -70,6 +70,12 @@ def render(session: dict):
             sample_data_notice()
         elif settings.BRAND_SITE_MOCK:
             st.caption("브랜드 검색량·광고 소재는 실데이터, 홈페이지 분석·Instagram은 아직 목업입니다.")
+        own_sv = own["brand_search_volume"]
+        metric_row([
+            ("자사 검색량(30일)", f"{own_sv['absolute_30d_pc'] + own_sv['absolute_30d_mobile']:,}", None),
+            ("자사 활성 광고", str(own["ad_count"]), None),
+            ("비교 경쟁사", str(len(competitors)), None),
+        ])
         st.write(
             f"**{own['brand']}** vs 경쟁사 {len(competitors)}개 브랜드를 동일한 기준으로 비교했습니다."
         )

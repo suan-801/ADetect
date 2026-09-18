@@ -20,7 +20,7 @@ from core.exporters.html_builder import build_creative_html
 from core.exporters.packager import build_creative_zip
 from core.scrapers.ad_library import ApifyFetchError
 from core.scrapers.naver_api import NaverApiError
-from ui.components import feature_intro, render_insight_card, sample_data_notice, status_icon, tab_header
+from ui.components import feature_intro, metric_row, render_insight_card, sample_data_notice, status_icon, tab_header
 
 
 def _brand_label(b: dict) -> str:
@@ -119,6 +119,11 @@ def render(session: dict):
     with tabs[0]:
         if settings.APIFY_MOCK:
             sample_data_notice()
+        metric_row([
+            ("전체 활성 소재", str(sum(b["ad_count"] for b in all_brands)), None),
+            ("자사 소재", str(own["ad_count"]), None),
+            ("비교 경쟁사", str(len(competitors)), None),
+        ])
         st.write(
             f"**{own['brand']}** vs 경쟁사 {len(competitors)}개 브랜드의 활성 광고 소재를 "
             f"동일한 기준으로 비교했습니다. (총 {sum(b['ad_count'] for b in all_brands)}건)"

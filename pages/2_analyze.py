@@ -1,6 +1,11 @@
 """분석하기 — STEP 1 브랜드 설정 → STEP 2 분석 Workspace (PRD §16-1·§16-2·§16-4).
 
 타겟 입력 필드는 없습니다 (★ 15차 개정) — 타겟은 타겟분석 탭에서 게이트 통과 후 추천됩니다.
+Workspace의 5개 기능은 `st.tabs`를 유지합니다 — PRD §6-1이 "지속되는 5개 탭"으로 명시하고
+있고(탭 전환과 무관하게 각 탭의 session 상태가 항상 최신으로 유지되어야 함), 이를
+`st.segmented_control` 기반 단일 렌더링으로 바꾸면 비활성 탭의 상태 갱신 타이밍이 달라집니다.
+대신 기본 tab underline/pill을 CSS로 전면 제거하고 절제된 segmented 느낌으로 재도색했습니다
+(config/theme.py `[data-baseweb="tab-*"]` 규칙 참고).
 """
 from __future__ import annotations
 
@@ -10,7 +15,7 @@ from config.theme import cta_row_marker, glass_marker
 from core.analyzers.recommender import recommend_category, recommend_competitors
 from database.db import create_session
 from ui import brand_tab, creative_tab, market_tab, synthesis_tab, target_tab
-from ui.components import status_icon
+from ui.components import brand_context_bar, status_icon
 
 st.session_state.setdefault("step", "input")
 st.session_state.setdefault("session", None)
@@ -19,7 +24,7 @@ st.session_state.setdefault("session", None)
 if st.session_state.step == "input":
     st.markdown(
         "<span class='adetect-eyebrow'>Step 1</span>"
-        "<p class='adetect-hero-title' style='font-size:1.7rem;'>브랜드 설정</p>",
+        "<p class='adetect-page-title'>브랜드 설정</p>",
         unsafe_allow_html=True,
     )
     st.write("")
@@ -53,7 +58,7 @@ elif st.session_state.step == "confirm":
     draft = st.session_state.draft
     st.markdown(
         "<span class='adetect-eyebrow'>Step 1 · Information</span>"
-        "<p class='adetect-hero-title' style='font-size:1.7rem;'>브랜드명을 기반으로 추천합니다</p>",
+        "<p class='adetect-page-title'>브랜드명을 기반으로 추천합니다</p>",
         unsafe_allow_html=True,
     )
     st.write("")
@@ -108,37 +113,31 @@ elif st.session_state.step == "confirm":
         st.session_state.step = "workspace"
         st.rerun()
 
-# ── STEP 2: 분석 Workspace (5개 탭) ─────────────────────────────────────
+# ── STEP 2: 분석 Workspace (5개 기능, segmented navigation) ────────────
 elif st.session_state.step == "workspace":
     session = st.session_state.session
 
-    target_display = session.get("confirmed_target") or "타겟 미확정"
     target_gate_open = session["market_status"] in ("완료", "부분 실패") and session["brand_status"] in ("완료", "부분 실패")
     if not target_gate_open:
-        target_icon = "🔒"
+        target_status_for_chip = "🔒"
     elif session["target_status"] == "confirmed":
-        target_icon = status_icon("완료")
+        target_status_for_chip = "완료"
     else:
-        target_icon = status_icon("미실행")
+        target_status_for_chip = "미실행"
 
     synthesis_gate_open = any(
         session[k] in ("완료", "부분 실패") for k in ("market_status", "brand_status", "creative_status")
     ) or session["target_status"] == "confirmed"
-    synthesis_icon = status_icon("미실행") if synthesis_gate_open else "🔒"
+    synthesis_status_for_chip = "미실행" if synthesis_gate_open else "🔒"
 
-    strip = (
-        f"<div class='adetect-status-strip'>"
-        f"<b>{session['brand_name']}</b>"
-        f"<span>{session['category']}</span>"
-        f"<span>{target_display}</span>"
-        f"<span class='adetect-status-item'>시장 {status_icon(session['market_status'])}</span>"
-        f"<span class='adetect-status-item'>브랜드 {status_icon(session['brand_status'])}</span>"
-        f"<span class='adetect-status-item'>소재 {status_icon(session['creative_status'])}</span>"
-        f"<span class='adetect-status-item'>타겟 {target_icon}</span>"
-        f"<span class='adetect-status-item'>종합 {synthesis_icon}</span>"
-        f"</div>"
-    )
-    st.markdown(strip, unsafe_allow_html=True)
+    status_items = [
+        ("시장", session["market_status"]),
+        ("브랜드", session["brand_status"]),
+        ("소재", session["creative_status"]),
+        ("타겟", target_status_for_chip),
+        ("종합", synthesis_status_for_chip),
+    ]
+    brand_context_bar(session, status_items)
 
     if st.button("새 브랜드로 다시 시작", key="btn_reset_session"):
         st.session_state.session = None
@@ -146,9 +145,17 @@ elif st.session_state.step == "workspace":
         st.rerun()
 
     # 분석 순서: 시장 → 브랜드 → 소재 → 타겟 → 종합 (타겟·종합은 게이트형, §6-1)
-    tab_market, tab_brand, tab_creative, tab_target, tab_synth = st.tabs(
-        ["시장분석", "브랜드분석", "소재분석", "타겟분석", "종합분석"]
-    )
+    section_status = {
+        "시장분석": session["market_status"],
+        "브랜드분석": session["brand_status"],
+        "소재분석": session["creative_status"],
+        "타겟분석": target_status_for_chip,
+        "종합분석": synthesis_status_for_chip,
+    }
+    tab_labels = [
+        f"{label}  {'🔒' if st_val == '🔒' else status_icon(st_val)}" for label, st_val in section_status.items()
+    ]
+    tab_market, tab_brand, tab_creative, tab_target, tab_synth = st.tabs(tab_labels)
     with tab_market:
         market_tab.render(session)
     with tab_brand:
