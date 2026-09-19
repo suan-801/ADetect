@@ -127,13 +127,19 @@ def feature_intro(desc_lines: list[str]):
 
 
 def brand_context_header(session: dict):
-    """BrandContextHeader 컴포넌트 — Analysis Header 왼쪽 블록(브랜드/카테고리/타겟)."""
-    target_display = session.get("confirmed_target") or "타겟 미확정"
+    """BrandContextHeader 컴포넌트 — Analysis Header 왼쪽 블록(브랜드/카테고리/경쟁사).
+
+    Target은 더 이상 독립 설정/분석 단계가 아니므로(§16) 여기서 "타겟 미확정" 문구를
+    보여주지 않는다 — Target Insight는 종합분석 탭 결과 안에서만 노출한다.
+    """
+    competitors = session.get("competitors") or []
+    meta_bits = [f"<b>{_html.escape(session.get('category') or '카테고리 미지정')}</b>"]
+    if competitors:
+        meta_bits.append(f"경쟁사 {len(competitors)}개")
     st.markdown(
         '<div class="adetect-context-block">'
         f'<p class="adetect-context-brand">{_html.escape(session["brand_name"])}</p>'
-        f'<p class="adetect-context-meta"><b>{_html.escape(session.get("category") or "카테고리 미지정")}</b>'
-        f' · {_html.escape(target_display)}</p>'
+        f'<p class="adetect-context-meta">{" · ".join(meta_bits)}</p>'
         '</div>',
         unsafe_allow_html=True,
     )
@@ -141,7 +147,8 @@ def brand_context_header(session: dict):
 
 def analysis_status_index(status_items: list[tuple[str, str]]):
     """AnalysisStatus 컴포넌트 — Analysis Header 오른쪽 블록.
-    가로로 길게 나열하던 상태 목록을 01~05 vertical index로 재구성했다.
+    가로로 길게 나열하던 상태 목록을 01~N vertical index로 재구성했다(N=Primary Analysis
+    Function 개수, 현재 4개 — 시장/브랜드/소재/종합. Target은 독립 항목이 아니다, §17).
     status_items: [(기능명, status 문자열 또는 '🔒')]."""
     done_count = sum(1 for _, s in status_items if s in ("완료", "부분 실패"))
     rows = []
@@ -166,8 +173,9 @@ def analysis_status_index(status_items: list[tuple[str, str]]):
 
 
 def intelligence_pipeline(steps: list[tuple[str, str]]):
-    """IntelligencePipeline 컴포넌트 — Hero 오른쪽 visual. Blue orb 대신 실제 제품 구조(5단계
-    분석 파이프라인)를 thin line + number + typography로 표현한다. steps: [(번호, 라벨)]."""
+    """IntelligencePipeline 컴포넌트 — Hero 오른쪽 visual. Blue orb 대신 실제 제품 구조(4단계
+    분석 파이프라인: Market/Brand/Creative/Synthesis)를 thin line + number + typography로
+    표현한다. steps: [(번호, 라벨)]."""
     rows = "".join(
         f'<div class="adetect-pipeline-step"><div class="adetect-pipeline-num">{_html.escape(num)}</div>'
         f'<div class="adetect-pipeline-label">{_html.escape(label)}</div></div>'

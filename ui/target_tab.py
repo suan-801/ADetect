@@ -1,9 +1,13 @@
-"""타겟분석 탭 — 게이트형 + 추천/분석 2단계 (PRD §6-1·§7-2·§9-2·§16-2).
+"""[DEPRECATED — 더 이상 Workspace에서 사용하지 않음] 타겟분석 독립 탭 (구 PRD §6-1·§7-2·§9-2·§16-2).
 
-★ 담당: 타겟분석 파트.
-핵심 규칙(반드시 유지):
-1) STEP 1에서 타겟을 입력받지 않습니다 — 이 탭은 시장분석+브랜드분석이 끝나야 열립니다.
-2) "추천"(자동, 무료)과 "분석"(확정 후 실행, function_run)은 서로 다른 단계입니다.
+Target은 더 이상 독립 Primary Analysis Function이 아니다 — pages/2_analyze.py는 이 모듈을
+import/render하지 않는다. 대체 위치: ui/synthesis_tab.py의 Target Insight subsection
+(core/analyzers/insight_synthesizer.build_target_insight, 실제 evidence 기반).
+
+이 파일과 core/analyzers/target_recommender.py는 과거 세션/DB 호환(target_status/
+recommended_target/confirmed_target 컬럼)을 깨지 않기 위해 destructive migration 없이
+그대로 남겨둔 것이며, 신규 UI 어디에서도 호출하지 않는다. recommend_target()은 seeded_random
+기반 mock이라 그대로 재사용하면 안 된다 — 신뢰도 문제는 PRD §14/§7-2 참고.
 """
 from __future__ import annotations
 

@@ -8,10 +8,10 @@ from __future__ import annotations
 
 import streamlit as st
 
-from config.theme import command_marker
+from config.theme import command_marker, pipeline_wrap_marker
 from ui.components import cta_section, feature_story, section_header_block
 from ui.hero import render_hero_copy, render_hero_object
-from ui.illustrations import audience_visual, brand_visual, creative_visual, market_visual, synthesis_visual
+from ui.illustrations import brand_visual, creative_visual, market_visual, synthesis_visual
 
 
 def _command_bar(key_prefix: str):
@@ -44,14 +44,18 @@ def _command_bar(key_prefix: str):
                 st.switch_page("pages/2_analyze.py")
 
 
-# ── SECTION 01 · HERO (12-col: 7 텍스트+입력 / 5 Intelligence Pipeline) ────
+# ── SECTION 01 · HERO (12-col: ~7.5 텍스트+입력 / ~4.5 Intelligence Pipeline) ──
+# Visual priority: 1) Hero Headline  2) Brand Input/CTA  3) Intelligence Pipeline.
+# Pipeline은 pipeline_wrap_marker()로 폭을 제한하고 오른쪽에 anchor해 Headline과
+# 경쟁하지 않게 한다(§3 Home 배치 개선).
 st.markdown('<div class="adetect-hero-shell">', unsafe_allow_html=True)
-copy_col, pipeline_col = st.columns([7, 5], gap="large")
+copy_col, pipeline_col = st.columns([7.5, 4.5], gap="large")
 with copy_col:
     render_hero_copy()
     st.write("")
     _command_bar("hero")
 with pipeline_col:
+    pipeline_wrap_marker()
     st.markdown("<span class='adetect-eyebrow' style='margin-bottom:0.6rem;'>Intelligence Pipeline</span>", unsafe_allow_html=True)
     render_hero_object()
 st.markdown("</div>", unsafe_allow_html=True)
@@ -67,18 +71,18 @@ with st.container():
     )
     st.markdown("</div>", unsafe_allow_html=True)
 
-# ── SECTION 03~07 · ANALYSIS STORY ───────────────────────────────────────
+# ── SECTION 03~06 · ANALYSIS STORY (4단계 — Target은 독립 단계가 아니라
+#    Synthesis 안의 Target Insight로 설명한다, §4) ─────────────────────────
 stories = [
     ("01", "MARKET", "시장이 움직이는\n방향부터.", "검색량 추이와 계절성, 카테고리 뉴스와 시장 신호를 모아 "
      "지금 시장이 커지는지 정체되는지부터 확인합니다.", market_visual, False),
-    ("02", "AUDIENCE", "누가 반응하는지\n확인합니다.", "시장·브랜드 분석 결과를 근거로 핵심 타겟을 먼저 추천합니다. "
-     "연령·성별, 관심 키워드, AI Persona까지 확정된 타겟 기준으로 분석합니다.", audience_visual, True),
-    ("03", "BRAND", "브랜드와 경쟁사를\n같은 기준에서.", "자사와 경쟁사의 검색량, 홈페이지 메시지, SNS·매체 운영 현황을 "
-     "동일한 기준으로 나란히 비교합니다.", brand_visual, False),
-    ("04", "CREATIVE", "지금 실제로 집행되는\n광고까지.", "Meta Ads Library에 노출 중인 실제 광고 소재를 수집해 "
-     "메시지·표현 방식·운영 기간을 분석합니다.", creative_visual, True),
-    ("05", "SYNTHESIS", "데이터를\n전략으로.", "앞선 네 가지 분석이 쌓이면, 별도 수집 없이 결과를 조합해 "
-     "포지셔닝과 White Space, 핵심 기회를 한 줄 인사이트로 도출합니다.", synthesis_visual, False),
+    ("02", "BRAND", "브랜드와 경쟁사를\n같은 기준에서.", "자사와 경쟁사의 검색량, 홈페이지 메시지, SNS·매체 운영 현황을 "
+     "동일한 기준으로 나란히 비교합니다.", brand_visual, True),
+    ("03", "CREATIVE", "지금 실제로 집행되는\n광고까지.", "Meta Ads Library에 노출 중인 실제 광고 소재를 수집해 "
+     "메시지·표현 방식·운영 기간을 분석합니다.", creative_visual, False),
+    ("04", "SYNTHESIS", "데이터를\n전략으로.", "시장·브랜드·소재 데이터를 연결해 핵심 시장 기회, 브랜드 포지셔닝, "
+     "Target Insight, White Space, Recommended Action을 도출합니다. 근거가 부족한 타겟은 "
+     "추정하지 않고 데이터가 없다고 정직하게 표시합니다.", synthesis_visual, True),
 ]
 for num, eyebrow_text, lead, desc, visual_fn, reverse in stories:
     with st.container():
@@ -96,7 +100,7 @@ with st.container():
         '<div class="adetect-preview-frame">'
         '<div class="adetect-preview-dots"><span></span><span></span><span></span></div>'
         '<p class="adetect-context-brand" style="font-size:1.3rem;">메리츠화재</p>'
-        '<p class="adetect-context-meta" style="margin-bottom:1.2rem;"><b>손해보험</b> · 30~50대 남녀</p>'
+        '<p class="adetect-context-meta" style="margin-bottom:1.2rem;"><b>손해보험</b> · 경쟁사 3개</p>'
         '<div class="adetect-metric-row" style="padding-bottom:1.1rem;">'
         '<div class="adetect-metric"><div class="adetect-metric-label">검색량 증감(3M)</div>'
         '<div class="adetect-metric-value">+18<span class="unit">%</span></div>'

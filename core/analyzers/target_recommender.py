@@ -1,9 +1,13 @@
-"""타겟 추천/타겟분석 — PRD §7-2·§9-2 (게이트형 + 추천/분석 2단계).
+"""[DEPRECATED — 더 이상 신규 UI에서 호출하지 않음] 타겟 추천/타겟분석 — 구 PRD §7-2·§9-2.
 
-★ 담당: 타겟분석 파트. 지금은 시장분석·브랜드분석 결과를 받아 규칙 기반으로
-recommended_target을 만드는 목업입니다. 실제 구현 시 Gemini 프롬프트로 교체하되,
-"경쟁사는 OOO / 시장상황은 OOO / 그래서 우리는 OOO 타겟을 선점·탈환·고수해야 한다"
-서술 템플릿(§7-2)은 유지해주세요.
+recommend_target()은 seeded_random()으로 성별+연령 세그먼트를 무작위 선택하는 목업이며,
+실제 근거(evidence) 없이 확정적인 타겟처럼 보이는 문장을 만든다 — 이 로직을 그대로
+Synthesis의 Target Insight로 옮기면 안 된다(PRD §14). Target Insight는
+core/analyzers/insight_synthesizer.build_target_insight()가 시장분석/브랜드분석의
+실제 캐시 데이터만으로 생성하며, 근거가 없는 인구통계는 추정하지 않는다.
+
+이 모듈은 ui/target_tab.py(더 이상 Workspace에서 render되지 않음)와의 하위 호환을 위해서만
+남겨둔다. 신규 코드에서는 사용하지 마세요.
 """
 from __future__ import annotations
 

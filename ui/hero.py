@@ -10,12 +10,13 @@ import streamlit as st
 
 from ui.components import intelligence_pipeline
 
+# Target은 독립 파이프라인 단계가 아니라 Synthesis 내부의 Target Insight다 — 사용자에게
+# 보이는 Top-level flow는 항상 4단계로 통일한다 (Home Pipeline/Story, Workspace 탭, Status Index).
 PIPELINE_STEPS = [
     ("01", "MARKET"),
-    ("02", "AUDIENCE"),
-    ("03", "BRAND"),
-    ("04", "CREATIVE"),
-    ("05", "SYNTHESIS"),
+    ("02", "BRAND"),
+    ("03", "CREATIVE"),
+    ("04", "SYNTHESIS"),
 ]
 
 

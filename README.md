@@ -1,6 +1,8 @@
 # ADetect
 
-브랜드명만 입력하면 시장·타겟·브랜드·소재 데이터를 수집·분석해 인사이트를 제공하는 사내 마케팅 리서치 웹 서비스입니다.
+브랜드명만 입력하면 시장·브랜드·소재 데이터를 수집·분석해 인사이트를 제공하는 사내 마케팅 리서치 웹 서비스입니다.
+4개의 Primary Analysis Function(Market · Brand · Creative · Synthesis)으로 구성되며, Target Insight는
+독립 기능이 아니라 종합분석(Synthesis) 결과 안에서 시장+브랜드 데이터를 근거로 도출됩니다.
 전체 요구사항/스키마/화면 설계는 **[PRD.md](./PRD.md)** 가 기준 문서입니다. 이 README는 실행 방법만 다룹니다.
 
 ## 5분 퀵스타트
@@ -29,13 +31,12 @@ streamlit run app.py
 
 | 화면 | 상태 |
 |---|---|
-| 홈 | 완성 (브랜드 빠른 입력 폼 + 5개 기능 소개) |
+| 홈 | 완성 (브랜드 빠른 입력 폼 + 4개 기능 소개, Target Insight는 Synthesis 설명에 포함) |
 | 분석하기 STEP 1 (브랜드 설정) | 완성 (타겟 입력 없음 — PRD §16-1). 카테고리·경쟁사 추천은 GEMINI_API_KEY가 있으면 실제 Gemini 호출로 동작 |
 | 분석하기 STEP 2 · 시장분석 탭 | 검색량 추이는 NAVER_CLIENT_ID/SECRET(NCP)가 있으면 실연동(§21-8), 뉴스도 실연동. 없으면 목업 |
-| 분석하기 STEP 2 · 타겟분석 탭 | 게이트/추천/확정/분석 흐름 동작. 관심 키워드는 NAVER_AD_* 키가 있으면 실연동(§21-10), AI Persona 해석은 아직 목업 |
 | 분석하기 STEP 2 · 브랜드분석 탭 | 브랜드 검색량·Meta 광고 요약은 Naver/Apify 키가 있으면 실연동, 홈페이지 분석·Instagram은 아직 목업 |
-| 분석하기 STEP 2 · 소재분석 탭 | APIFY_API_TOKEN이 있으면 **Meta Ads Library 실연동**(§21-11) — 소재 ID 마우스오버 시 실제 이미지/영상 썸네일 미리보기 포함. 없으면 목업. **HTML/Excel/ZIP 다운로드 구현 완료**(§16-5) — 다른 4개 탭 다운로드는 아직 미구현 |
-| 분석하기 STEP 2 · 종합분석 탭 | 화면 골격만 (담당자 미배정) |
+| 분석하기 STEP 2 · 소재분석 탭 | APIFY_API_TOKEN이 있으면 **Meta Ads Library 실연동**(§21-11) — 소재 ID 마우스오버 시 실제 이미지/영상 썸네일 미리보기 포함. 없으면 목업. **HTML/Excel/ZIP 다운로드 구현 완료**(§16-5) — 다른 3개 탭 다운로드는 아직 미구현. 소구포인트(Appeal Point) 태깅은 근거 없는 mock이라 MVP에서 제거함 |
+| 분석하기 STEP 2 · 종합분석 탭 | 화면 골격 + **Target Insight subsection 구현** — 시장분석+브랜드분석 결과가 있으면 근거 기반으로 생성, 근거 부족 시 임의 인구통계 대신 정직하게 안내. SOV/포지셔닝맵 등 나머지는 담당자 미배정 |
 | 이력 관리 / 설정 | 화면 골격 |
 
 자세한 개발 계획과 담당 분담은 [docs/PROJECT_PLAN.md](./docs/PROJECT_PLAN.md) 를 참고하세요.
@@ -47,7 +48,7 @@ API 키 발급 방법은 [SETUP_GUIDE.md](./SETUP_GUIDE.md) 를 참고하세요.
 ADetect/
 ├── app.py                 — Streamlit 진입점 (라우팅 + 전역 스타일)
 ├── pages/                 — 화면 4개 (홈/분석하기/이력관리/설정)
-├── ui/                    — 탭별 렌더링 로직 (시장/타겟/브랜드/소재/종합)
+├── ui/                    — 탭별 렌더링 로직 (시장/브랜드/소재/종합, Target Insight는 종합 탭 내부)
 ├── core/
 │   ├── scrapers/          — 데이터 수집 (지금은 목업, .env 채우면 실제 연동으로 전환)
 │   └── analyzers/         — AI 판단/추천 로직 (지금은 규칙 기반 목업)

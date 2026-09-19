@@ -1,12 +1,13 @@
 """분석하기 — STEP 1 브랜드 설정 → STEP 2 분석 Workspace (PRD §16-1·§16-2·§16-4).
 
-타겟 입력 필드는 없습니다 (★ 15차 개정) — 타겟은 타겟분석 탭에서 게이트 통과 후 추천됩니다.
+타겟 입력 필드는 없습니다 — Target은 독립 Primary Analysis Function이 아니라 종합분석
+탭 안의 Target Insight subsection이다(§4·§12·§15). Workspace의 4개 1차 탭은 항상
+시장/브랜드/소재/종합 순서로 고정한다.
 
-3차 리뉴얼: Analysis Header를 "브랜드/카테고리/타겟 + 5개 상태가 한 줄에 섞여 가독성이 낮던"
-구조에서 7:5 grid(왼쪽 Brand Context, 오른쪽 01~05 Vertical Analysis Status Index)로 재설계했다.
-탭 표시 순서도 PRD 내부 실행 순서(시장→브랜드→소재→타겟→종합, 게이트 의존성 때문)는 그대로 두되
-화면에는 Market/Audience/Brand/Creative/Synthesis 순서로 보이도록 재배치했다 — gate 판정 로직
-자체(target_gate_open 등)는 전혀 건드리지 않았다.
+Target 관련 레거시 코드(ui/target_tab.py, core/analyzers/target_recommender.py,
+DB의 target_status/recommended_target/confirmed_target)는 과거 세션·DB 호환을 위해
+그대로 남겨두되, 이 화면에서는 더 이상 import/render하지 않는다 — 독립 tab·독립
+function_run으로 다시 노출하지 않는다(destructive migration 아님).
 """
 from __future__ import annotations
 
@@ -15,7 +16,7 @@ import streamlit as st
 from config.theme import command_marker, cta_row_marker
 from core.analyzers.recommender import recommend_category, recommend_competitors
 from database.db import create_session
-from ui import brand_tab, creative_tab, market_tab, synthesis_tab, target_tab
+from ui import brand_tab, creative_tab, market_tab, synthesis_tab
 from ui.components import analysis_status_index, brand_context_header
 
 st.session_state.setdefault("step", "input")
@@ -114,23 +115,16 @@ elif st.session_state.step == "confirm":
         st.session_state.step = "workspace"
         st.rerun()
 
-# ── STEP 2: 분석 Workspace (5개 기능) ───────────────────────────────────
+# ── STEP 2: 분석 Workspace (4개 Primary Analysis Function) ──────────────
 elif st.session_state.step == "workspace":
     session = st.session_state.session
 
-    # 게이트 판정 로직은 리뉴얼 이전과 동일 — 화면 표시 순서만 Market/Audience/Brand/Creative/
-    # Synthesis로 바꿨을 뿐, target_gate_open 등 실행 조건은 그대로다.
-    target_gate_open = session["market_status"] in ("완료", "부분 실패") and session["brand_status"] in ("완료", "부분 실패")
-    if not target_gate_open:
-        target_status_for_index = "🔒"
-    elif session["target_status"] == "confirmed":
-        target_status_for_index = "완료"
-    else:
-        target_status_for_index = "미실행"
-
+    # 종합분석 활성화 조건: 시장/브랜드/소재 중 최소 1개 이상 완료(또는 부분 실패) — Target은
+    # 더 이상 이 게이트에 관여하지 않는다(§6-1·§12). Target Insight는 종합분석 탭 내부에서
+    # 시장+브랜드 결과 유무로 자체 판단한다(ui/synthesis_tab.py 참고).
     synthesis_gate_open = any(
         session[k] in ("완료", "부분 실패") for k in ("market_status", "brand_status", "creative_status")
-    ) or session["target_status"] == "confirmed"
+    )
     synthesis_status_for_index = "미실행" if synthesis_gate_open else "🔒"
 
     header_col, status_col = st.columns([7, 5], gap="large")
@@ -143,7 +137,6 @@ elif st.session_state.step == "workspace":
     with status_col:
         analysis_status_index([
             ("시장 분석", session["market_status"]),
-            ("타겟 분석", target_status_for_index),
             ("브랜드 분석", session["brand_status"]),
             ("소재 분석", session["creative_status"]),
             ("종합 분석", synthesis_status_for_index),
@@ -151,14 +144,12 @@ elif st.session_state.step == "workspace":
 
     st.write("")
 
-    # 탭 표시 순서: Market → Audience(타겟) → Brand → Creative → Synthesis
-    tab_market, tab_target, tab_brand, tab_creative, tab_synth = st.tabs(
-        ["01 시장분석", "02 타겟분석", "03 브랜드분석", "04 소재분석", "05 종합분석"]
+    # Workspace 1차 탭은 항상 4개(Market/Brand/Creative/Synthesis) — Target은 독립 탭이 아니다.
+    tab_market, tab_brand, tab_creative, tab_synth = st.tabs(
+        ["01 시장분석", "02 브랜드분석", "03 소재분석", "04 종합분석"]
     )
     with tab_market:
         market_tab.render(session)
-    with tab_target:
-        target_tab.render(session)
     with tab_brand:
         brand_tab.render(session)
     with tab_creative:

@@ -1,29 +1,29 @@
 # ADetect 개발 계획서 (뼈대/프로토타입 단계)
 
-> 기준 문서: [`PRD.md`](../PRD.md) (15차 개정 — 브랜드 범용화 + 타겟 후추천 구조).
+> 기준 문서: [`PRD.md`](../PRD.md) (16차 개정 — 4개 Primary Analysis Function + Target Insight 구조).
 > 이 문서는 "그 PRD를 실제로 어떻게, 누가, 어떤 순서로 만들 것인가"만 다룹니다.
 
 ---
 
-## 1. 지금까지 만든 것 (현재 상태, 2026-09-13 갱신)
+## 1. 지금까지 만든 것 (현재 상태, 2026-09-19 갱신)
 
 | 영역 | 상태 | 위치 |
 |---|---|---|
 | 저장소 뼈대 (폴더 구조, .env, requirements) | ✅ 완료 | 루트 |
-| 디자인 시스템 — Black Monochrome / Minimal Glassmorphism, Pretendard | ✅ 완료 (2차 리디자인 + STEP1 UX 피드백 반영) | `config/theme.py`, `.streamlit/config.toml` |
-| 홈 화면 (히어로 오브젝트 포함) | ✅ 완료 | `pages/1_home.py`, `ui/hero.py` |
-| STEP 1 브랜드 설정 + AI 추천 확인 화면 | ✅ 완료 — **카테고리/경쟁사 추천 Gemini 실연동**(GEMINI_API_KEY 있으면), 실패해도 목업으로 조용히 폴백 | `pages/2_analyze.py`, `core/analyzers/recommender.py` |
-| STEP 2 Workspace 5개 탭 골격 + 상태 스트립 | ✅ 완료 | `pages/2_analyze.py` |
+| 디자인 시스템 — Brand Intelligence Platform / Flat Black / Orange accent (§29 Active Design Direction) | ✅ 완료 | `config/theme.py`, `.streamlit/config.toml` |
+| 홈 화면 (Intelligence Pipeline 4단계 포함) | ✅ 완료 | `pages/1_home.py`, `ui/hero.py` |
+| STEP 1 브랜드 설정 + AI 추천 확인 화면 | ✅ 완료 — **카테고리/경쟁사 추천 Gemini 실연동**(GEMINI_API_KEY 있으면), 실패해도 목업으로 조용히 폴백. 타겟 입력 필드 없음 | `pages/2_analyze.py`, `core/analyzers/recommender.py` |
+| STEP 2 Workspace **4개 탭** 골격 + 상태 스트립 | ✅ 완료 (16차 개정 — 독립 타겟분석 탭 제거) | `pages/2_analyze.py` |
 | 시장분석 탭 | 🟡 **부분 실연동** — 검색량 추이(DataLab)·뉴스는 NAVER 키 있으면 실동작. `search_seasonality`/`reference_sources`/`market_issues`/`upcoming_changes`(§7-1) 및 다운로드는 아직 미구현 | `ui/market_tab.py`, `core/scrapers/naver_api.py` |
-| 타겟분석 탭 (게이트 + 추천/확정/분석 2단계) | 🟡 **부분 실연동** — `interest_keywords`는 네이버 검색광고 키워드도구 API(RelKwdStat) 실연동, `recommended_target`/`ai_persona`는 아직 규칙 기반 목업(Gemini 미연동) | `ui/target_tab.py`, `core/analyzers/target_recommender.py`, `core/scrapers/naver_ad_api.py` |
 | **브랜드분석 탭 (자사+경쟁사 통합)** | 🟡 **부분 실연동** — 브랜드 검색량(절대치 포함)·Meta 광고 요약은 Naver/Apify 키 있으면 실동작. 홈페이지 크롤링(Playwright)·Instagram 프로필·`brand_context`/해석 문구는 아직 목업(Gemini 미연동) | `ui/brand_tab.py`, `core/analyzers/brand_analyzer.py`, `core/scrapers/{naver_api,naver_ad_api,brand_site,ad_library}.py` |
-| **소재분석 탭** | 🟢 **End-to-End 동작** — Meta Ads Library 실연동(APIFY_API_TOKEN), 자동 페이지 매칭이 부정확할 때 URL/페이지명 직접 지정 폴백, 브랜드별 수집 진행상황(st.status) 표시, HTML/Excel/ZIP 다운로드 완료. `appeal_tags`(소구포인트) 태깅은 아직 규칙 기반 목업(Gemini Vision 미연동) | `ui/creative_tab.py`, `core/analyzers/creative_analyzer.py`, `core/scrapers/ad_library.py`, `core/exporters/*.py` |
-| 종합분석 탭 | ⚪ 화면 골격만 (담당자 미배정) | `ui/synthesis_tab.py` |
+| **소재분석 탭** | 🟢 **End-to-End 동작** — Meta Ads Library 실연동(APIFY_API_TOKEN), 자동 페이지 매칭이 부정확할 때 URL/페이지명 직접 지정 폴백, 브랜드별 수집 진행상황(st.status) 표시, HTML/Excel/ZIP 다운로드 완료. **소구포인트(appeal_tags) 태깅은 근거 없는 mock이라 16차 개정에서 제거**(§0) — `creative_key_visual`은 FACT 지표(활성 광고 수/포맷 구성/장기 운영 소재 수)만 사용 | `ui/creative_tab.py`, `core/analyzers/creative_analyzer.py`, `core/scrapers/ad_library.py`, `core/exporters/*.py` |
+| 종합분석 탭 | 🟡 **Target Insight 구현 완료** — 시장분석+브랜드분석 결과가 있으면 근거 기반 insight 생성, 근거 부족 시 `insufficient_data`/정직한 안내로 처리(임의 인구통계 생성 없음). SOV/포지셔닝맵/White Space 등 나머지 필드는 화면 골격만(담당자 미배정) | `ui/synthesis_tab.py`, `core/analyzers/insight_synthesizer.py` |
 | 이력 관리 / 설정 화면 | 🟡 골격만 (실제 재진입 기능 없음, API 키 상태 표시만 동작) | `pages/3_history.py`, `pages/4_settings.py` |
-| SQLite 이력 저장 (`analysis_session`/`function_run`) | ✅ 완료 | `database/db.py` |
+| SQLite 이력 저장 (`analysis_session`/`function_run`) | ✅ 완료 (레거시 `target_status`/`recommended_target`/`confirmed_target` 컬럼은 destructive migration 없이 유지, 신규 UI는 사용 안 함) | `database/db.py` |
+| [DEPRECATED] `ui/target_tab.py`, `core/analyzers/target_recommender.py` | ⚫ 코드는 유지하되 Workspace에서 import/render하지 않음 — `recommend_target()`은 seeded_random mock이라 재사용 금지(§0·§14) | `ui/target_tab.py`, `core/analyzers/target_recommender.py` |
 
 지금 `streamlit run app.py`로 실행하면 **브랜드명 입력 → STEP1 확인(키 있으면 Gemini 실추천) → Workspace 진입 →
-시장분석/브랜드분석/소재분석 시작(키 있으면 부분 실연동) → 타겟분석 자동 잠금해제 → 추천/확정/분석**까지
+시장분석/브랜드분석/소재분석 시작(키 있으면 부분 실연동) → 종합분석 탭 진입 시 Target Insight 자동 표시**까지
 전부 클릭으로 눌러볼 수 있습니다. API 키 발급 방법은 [`SETUP_GUIDE.md`](../SETUP_GUIDE.md) 참고 —
 키를 하나도 안 채워도 전체 화면이 목업 데이터로 그대로 동작합니다.
 
@@ -38,19 +38,21 @@
 ```
 app.py (라우팅 + 전역 CSS)
  └─ pages/1_home.py       — 홈(랜딩)
- └─ pages/2_analyze.py    — STEP1 입력 → STEP2 Workspace(5탭)
+ └─ pages/2_analyze.py    — STEP1 입력 → STEP2 Workspace(4탭)
  │     └─ ui/market_tab.py     ─┐
- │     └─ ui/target_tab.py      │  각 탭은 session(dict)을 받아 그리고,
- │     └─ ui/brand_tab.py       │  core/analyzers/*.py 를 호출해 결과를 채움
- │     └─ ui/creative_tab.py    │
- │     └─ ui/synthesis_tab.py  ─┘
+ │     └─ ui/brand_tab.py       │  각 탭은 session(dict)을 받아 그리고,
+ │     └─ ui/creative_tab.py    │  core/analyzers/*.py 를 호출해 결과를 채움
+ │     └─ ui/synthesis_tab.py  ─┘  (Target Insight는 synthesis_tab 안의 subsection)
  └─ pages/3_history.py    — SQLite 이력 조회
  └─ pages/4_settings.py   — API 키 상태 확인
 
 core/scrapers/*   — 실제 수집 (서비스별 config.settings.*_MOCK 플래그에 따라 개별적으로 mock↔실연동 전환)
-core/analyzers/*  — AI 판단/추천 (§8 FACT/AI/REC 스키마 공통 사용, insight_synthesizer.build_insight)
+core/analyzers/*  — AI 판단/추천 (§8 FACT/AI/REC 스키마 공통 사용, insight_synthesizer.build_insight/build_target_insight)
 core/exporters/*  — 결과 내보내기 (지금은 소재분석 전용 HTML/Excel/ZIP만 존재)
 database/db.py    — analysis_session / function_run (PRD §6-1·§13)
+
+[DEPRECATED, Workspace에서 import/render하지 않음] ui/target_tab.py, core/analyzers/target_recommender.py
+— 과거 세션/DB 호환용으로만 코드베이스에 남아있음(§0 16차 개정).
 ```
 
 **중요한 설계 원칙**: `ui/*_tab.py`는 화면만 그리고, 실제 로직은 항상 `core/analyzers/*.py`
@@ -65,9 +67,10 @@ database/db.py    — analysis_session / function_run (PRD §6-1·§13)
 |---|---|---|
 | **시장분석** (신규 합류 예정) | `ui/market_tab.py`, `core/scrapers/naver_api.py`(`get_search_volume_trend`, `get_news`) | 검색량 추이·뉴스는 이미 실연동 완료 — §7-1 `search_seasonality`/`reference_sources`/`market_issues`/`upcoming_changes` 추가 및 HTML/Excel 다운로드가 남은 작업 |
 | **브랜드분석** (신규 합류 예정 — 지금까지는 본인이 진행) | `ui/brand_tab.py`, `core/analyzers/brand_analyzer.py`, `core/scrapers/{naver_api,naver_ad_api,brand_site,ad_library}.py` | 아래 §4 참고 — 검색량/Meta 광고는 이미 실연동, 홈페이지·Instagram·Gemini 해석이 남은 작업 |
-| **타겟분석** (미배정) | `ui/target_tab.py`, `core/analyzers/target_recommender.py` | `interest_keywords`는 이미 실연동 — §7-2-a AI Persona 3개 필드 근거 데이터 실측 연결, Gemini 프롬프트로 `recommend_target`/`ai_persona` 교체 |
-| **소재분석** (미배정, 진행 상황 좋음) | `ui/creative_tab.py`, `core/analyzers/creative_analyzer.py`, `core/scrapers/ad_library.py` | Meta Ads Library 실연동 + 페이지 직접 지정 폴백 + HTML/Excel/ZIP 다운로드까지 완료. 남은 작업: `appeal_tags`(소구포인트) 태깅을 Gemini Vision으로 교체 |
-| **종합분석** (미배정) | `ui/synthesis_tab.py` (신규 작성 필요) | §7-4 SOV/포지셔닝맵/White Space |
+| **소재분석** (미배정, 진행 상황 좋음) | `ui/creative_tab.py`, `core/analyzers/creative_analyzer.py`, `core/scrapers/ad_library.py` | Meta Ads Library 실연동 + 페이지 직접 지정 폴백 + HTML/Excel/ZIP 다운로드까지 완료. 소구포인트(appeal_tags) 태깅은 근거 없는 mock이라 16차 개정에서 완전히 제거함(Gemini Vision으로 교체하지 않음) — 남은 작업은 없음 |
+| **종합분석** (미배정) | `ui/synthesis_tab.py`, `core/analyzers/insight_synthesizer.py` | Target Insight subsection은 구현 완료(`build_target_insight`, §7-2) — 남은 작업은 §7-4 SOV/포지셔닝맵/White Space |
+
+> **타겟분석 파트는 더 이상 존재하지 않습니다** (16차 개정) — 독립 탭·독립 담당 영역이 아니라 종합분석 파트의 Target Insight subsection으로 흡수됐습니다. `ui/target_tab.py`/`core/analyzers/target_recommender.py`는 과거 DB 호환용으로만 남아있고 신규 작업 대상이 아닙니다.
 
 각자 자기 파일만 건드리면 되도록 나눠놨기 때문에 **브랜치를 나눠도 병합 충돌이 거의 안 납니다.**
 단, `ui/components.py`·`config/theme.py`·`app.py`·`pages/1_home.py`·`pages/2_analyze.py`는
@@ -84,10 +87,11 @@ database/db.py    — analysis_session / function_run (PRD §6-1·§13)
 main                        — 항상 동작하는 상태만 유지 (지금 이 커밋)
 ├─ feature/market-analysis  — 시장분석 담당 (신규 합류 예정)
 ├─ feature/brand-analysis   — 브랜드분석 담당 (신규 합류 예정, 현재 소재분석 작업도 여기 포함)
-├─ feature/target-analysis  — 타겟분석 담당 (미배정)
 ├─ feature/creative-analysis — 소재분석 전담자 배정 시 여기로 분리
-└─ feature/synthesis        — 종합분석 담당 (미배정)
+└─ feature/synthesis        — 종합분석 담당 (미배정, Target Insight 포함)
 ```
+> `feature/target-analysis` 브랜치는 16차 개정으로 담당 영역 자체가 없어졌습니다(Target은 종합분석에
+> 흡수됨) — 기존 브랜치를 강제로 삭제하지는 않았으니, 정리가 필요하면 별도로 확인 후 처리하세요.
 각자 브랜치에서 작업 → PR 생성 → 리뷰 후 `main` 머지. `ui/components.py`, `config/theme.py`,
 `database/db.py`처럼 여러 명이 공유하는 파일을 바꿀 때만 미리 이야기하고 진행하세요.
 
@@ -114,7 +118,14 @@ main                        — 항상 동작하는 상태만 유지 (지금 이
 
 ---
 
-## 5. 디자인 리디자인 — "Premium AI Intelligence / Black Monochrome / Minimal Glassmorphism"
+## 5. [Design History — 1차 리디자인, 현재 지침 아님] "Premium AI Intelligence / Black Monochrome / Minimal Glassmorphism"
+
+> ⚠️ 이 절은 **1차 리디자인 기록**이다. 이후 2차("Luminous Dark", ice blue/violet)와 3차("Brand
+> Intelligence Platform / Editorial Technology", flat black + orange, §7 최근 변경 이력 최상단
+> 항목)를 거치며 대부분 교체됐다. **현재 Active Design Direction은 §8(Flat Black / Orange
+> accent / No gradient·glow·glassmorphism / 작은 radius)와 `config/theme.py`의 실제 코드가
+> 기준**이다 — 아래 표의 "Glassmorphism"·"골드"·"ice blue" 관련 서술은 과거 방향이며 지금 코드와
+> 다르다. 새로 합류하는 사람은 이 절 대신 §8과 `config/theme.py`를 먼저 확인할 것.
 
 1차 프로토타입(다크+골드, 카드 나열형)이 "전형적인 SaaS 관리자 대시보드"처럼 보인다는 피드백을 받아
 전면 리디자인했습니다. 기능/데이터 구조는 전혀 건드리지 않았고 Layout·Typography·Color·Glassmorphism·
@@ -224,12 +235,12 @@ CSS를 작성했고, `.streamlit/config.toml`의 테마 값이 정상 로드되�
 
 | 단계 | 목표 | 상태 | 참고 |
 |---|---|---|---|
-| **M0** | 뼈대 + 프로토타입 — 5개 기능이 눈에 보이고 클릭 가능 | ✅ 완료 | |
+| **M0** | 뼈대 + 프로토타입 — 4개 기능이 눈에 보이고 클릭 가능 (16차 개정 전에는 5개였음) | ✅ 완료 | |
 | **M1** | 브랜드분석 실제 API 연동 (네이버+Apify+Gemini) | 🟡 부분 완료 — 네이버·Apify는 실연동, Gemini(brand_context/해석 문구)는 아직 | PRD §22 Phase 0~1 |
 | **M2** | 시장분석 실제 API 연동 | 🟡 부분 완료 — 검색량·뉴스는 실연동, 계절성/참고자료/이슈 필드는 아직 | PRD §22 Phase 1~2 |
-| **M3** | 타겟분석 Gemini 프롬프트 연동 | 🟡 부분 완료 — 관심 키워드는 실연동(§21-10), `recommend_target`/AI Persona는 아직 목업 | PRD §22 Phase 1~2 |
-| **M4** | 소재분석·종합분석 신규 구현 | 🟡 부분 완료 — 소재분석은 Meta 실연동+다운로드까지 완료(appeal_tags 태깅만 목업), 종합분석은 미착수 | PRD §22 Phase 2~3 |
-| **M5** | Excel/HTML/ZIP 내보내기, 이력 재진입 | 🟡 부분 완료 — 소재분석 다운로드만 완료, 나머지 4개 탭 다운로드·이력 재진입은 아직 | PRD §22 Phase 3~4 |
+| ~~M3~~ | ~~타겟분석 Gemini 프롬프트 연동~~ — **폐기(16차 개정)**. Target Insight는 종합분석(M4)의 일부로 구현 완료 | ⚫ 폐기 | §0 |
+| **M4** | 소재분석·종합분석 신규 구현 | 🟡 부분 완료 — 소재분석은 Meta 실연동+다운로드까지 완료(appeal_tags는 근거 없는 mock이라 재도입 없이 완전 제거), 종합분석은 Target Insight 구현 완료, SOV/포지셔닝맵은 미착수 | PRD §22 Phase 2~3 |
+| **M5** | Excel/HTML/ZIP 내보내기, 이력 재진입 | 🟡 부분 완료 — 소재분석 다운로드만 완료, 나머지 3개 탭 다운로드·이력 재진입은 아직 | PRD §22 Phase 3~4 |
 
 ---
 
@@ -238,6 +249,27 @@ CSS를 작성했고, `.streamlit/config.toml`의 테마 값이 정상 로드되�
 각 세션마다 이 문서를 계속 갱신하지 못하면 실제 코드와 계획서가 어긋나기 쉬워서, 굵직한 변경만
 간단히 누적 기록합니다. 자세한 내용은 `git log`/커밋 메시지를 참고하세요.
 
+- **2026-09-19**: **PRD 16차 개정 — Information Architecture 변경** (PRD.md §0). 5개 독립
+  기능(시장/타겟/브랜드/소재/종합) → **4개 Primary Analysis Function**(시장/브랜드/소재/종합)으로
+  축소, Target은 독립 탭·독립 `function_run`이 아니라 **종합분석 탭 안의 Target Insight
+  subsection**으로 흡수(`core/analyzers/insight_synthesizer.build_target_insight`, 근거 없는
+  인구통계 생성 금지, 근거 부족 시 정직하게 안내). **소구포인트(appeal_tags) 완전 제거** — 기존
+  구현이 `seeded_random()` 기반 mock이라 실제 광고 해석이 아니었음(§0 Guardrail). 주요 변경:
+  (1) Home Hero의 Intelligence Pipeline을 4단계로 축소하고 `pipeline_wrap_marker()`로 오른쪽
+  column에 anchor(최대폭 340px, Headline과 경쟁하지 않게), Analysis Story의 독립 AUDIENCE
+  section 제거, (2) Primary 버튼 텍스트 대비 개선 — `accent`(#FF4D2E)는 line/dot 전용으로 남기고
+  넓은 CTA 배경은 `accent_surface`(#B23A1F, 더 어두운 톤) + `text_on_accent`(#FFF8F4)로 분리해
+  WCAG AA(~6:1) 확보, (3) Creative 표 정보 위계를 브랜드→소재ID→헤드라인→CTA→포맷→운영일수→노출
+  지면(Placement, secondary·1줄 압축) 순으로 재배치하고 HTML export에도 동일 반영, (4) Workspace
+  1차 탭을 4개(`01 시장분석/02 브랜드분석/03 소재분석/04 종합분석`)로 축소, Brand Context Header에서
+  "타겟 미확정" 문구 제거, (5) Top Navigation이 본문을 가리던 문제를 `--nav-height`/
+  `--content-top-gap` CSS 변수로 근본 수정(페이지별 임시 여백 추가 방식 금지), (6)
+  `tests/test_smoke.py`를 새 흐름(Market→Brand→Creative→Synthesis)으로 재작성 + Target Insight/
+  Appeal 제거 회귀 테스트 추가. `ui/target_tab.py`/`core/analyzers/target_recommender.py`와 DB의
+  `target_status`/`recommended_target`/`confirmed_target` 컬럼은 destructive migration 없이
+  유지(과거 세션 호환), 단 신규 UI 어디에서도 호출하지 않음. `pytest tests/test_smoke.py -v`
+  7개 전체 통과, 실 API 키(Naver/Apify) 연동 상태에서 Home/Workspace/Creative/Synthesis 화면을
+  브라우저로 직접 확인.
 - **2026-09-18 (2차)**: 3차 리뉴얼 — "Brand Intelligence Platform / Editorial Technology Product".
   2차 리뉴얼(바로 아래 항목, ice blue/soft violet 3-accent)이 "전형적인 AI SaaS 데모"처럼 보인다는
   피드백을 받아 교정. Blue glow/orb/gradient/glassmorphism/backdrop-filter를 전부 제거하고 flat
@@ -277,3 +309,30 @@ CSS를 작성했고, `.streamlit/config.toml`의 테마 값이 정상 로드되�
   이미 발급받은 키를 빠르게 채워 넣는 빠른 참고표 추가.
 - 이전: Meta Ads Library/네이버 검색광고 실연동, STEP1 Gemini 추천 실연동, 소재분석 HTML/Excel/ZIP
   내보내기, 홈 화면 히어로 이미지, Black Monochrome 리디자인(§5) — 커밋 `4addcfc`/`774d4cc` 참고.
+
+---
+
+## 8. Active Design Direction (Source of Truth)
+
+이 절이 지금 유효한 디자인 지침의 유일한 출처다. §5(1차 리디자인)·2차("Luminous Dark")는 모두
+Design History일 뿐 지금 코드와 다르다 — 실제 값은 항상 `config/theme.py`/`.streamlit/config.toml`
+을 확인한다.
+
+* **컨셉**: Brand Intelligence Platform / Editorial Technology Product
+* **배경**: Flat Black(`#060708`), 이미지·gradient depth 없음
+* **Accent**: Orange-red(`#FF4D2E`) — active nav/key action/section index/important highlight/selected
+  state 등 **좁은 면적에만**. 넓은 CTA 배경처럼 면적이 넓은 곳은 더 어두운 `accent_surface`
+  (`#B23A1F`) + 밝은 텍스트(`text_on_accent`, `#FFF8F4`)를 쓴다(WCAG AA 대비 확보, 16차 개정)
+* **금지**: decorative gradient, glow, glassmorphism(`backdrop-filter: blur`), 큰 rounded card
+* **Radius**: 작게 유지(4/6/9px 토큰) — 큰 radius는 SaaS 대시보드 인상을 준다
+* **우선순위**: Grid → Typography → Spacing → Information hierarchy → Data → Color → Decoration
+  (Decoration은 항상 마지막)
+* **Navigation**: `st.navigation(position="top")` 공식 API. 본문 시작 위치는 `--nav-height`/
+  `--content-top-gap` CSS 변수로 계산(`calc(var(--nav-height) + var(--content-top-gap))`) —
+  페이지별로 임시 여백(`st.write("")` 등)을 추가하는 방식은 금지한다
+* **Iconography**: 이모지 금지. PRD §16-2 상태 기호(○●✓△✕🔒)는 기능 표기이므로 예외
+* **Contrast**: 넓은 accent 면적 위 텍스트는 항상 WCAG AA(4.5:1 이상, 가능하면) 확인 후 확정 —
+  "느낌상 괜찮아 보임"으로 판단하지 않는다(16차 개정 CTA 대비 수정이 실제 사례)
+
+새 화면/컴포넌트를 만들 때 이 목록과 충돌하면 이 목록이 우선한다. 이 목록 자체를 바꾸는 변경은
+§7 최근 변경 이력에도 함께 기록한다.

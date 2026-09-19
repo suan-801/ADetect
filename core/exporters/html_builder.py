@@ -12,6 +12,8 @@ from datetime import datetime
 
 import requests
 
+from core.analyzers.creative_analyzer import compact_platforms
+
 
 def _fetch_data_uri(url: str | None, timeout: float = 4.0) -> str | None:
     """이미지를 내려받아 data URI로 변환. 실패하면 None(호출부가 원본 URL로 폴백)."""
@@ -41,33 +43,23 @@ def _brand_label(b: dict) -> str:
 
 
 def _ad_row(ad: dict) -> str:
+    # 정보 위계: 헤드라인이 핵심 카피, 노출 지면(Placement)은 마지막 secondary metadata(§7).
     return f"""
     <tr>
       <td class="thumb">{_img_tag(ad)}</td>
       <td>{html.escape(ad.get("ad_id", ""))}</td>
-      <td>{html.escape(ad.get("format", ""))}</td>
-      <td>{html.escape(ad.get("publisher_platforms") or "-")}</td>
-      <td>{html.escape(ad.get("headline") or "-")}</td>
+      <td class="col-headline">{html.escape(ad.get("headline") or "-")}</td>
       <td>{html.escape((ad.get("body") or "-")[:200])}</td>
       <td>{html.escape(ad.get("cta") or "-")}</td>
-      <td>{html.escape(", ".join(ad.get("appeal_tags", [])))}</td>
+      <td>{html.escape(ad.get("format", ""))}</td>
       <td>{ad.get("ad_running_days") if ad.get("ad_running_days") is not None else "확인 불가"}</td>
+      <td class="col-placement">{html.escape(compact_platforms(ad.get("publisher_platforms")))}</td>
     </tr>"""
-
-
-def _appeal_table(rows: list[dict]) -> str:
-    if not rows:
-        return "<p class='muted'>활성 광고가 0건이라 소구 비중이 없습니다.</p>"
-    body = "".join(
-        f"<tr><td>{html.escape(r['appeal_tag'])}</td><td>{r['count']}</td><td>{r['pct_of_brand_total']:.1f}%</td></tr>"
-        for r in rows
-    )
-    return f"<table><thead><tr><th>소구포인트</th><th>건수</th><th>비중</th></tr></thead><tbody>{body}</tbody></table>"
 
 
 def _brand_section(b: dict) -> str:
     ad_rows = "".join(_ad_row(ad) for ad in b["ads"]) or (
-        "<tr><td colspan='9' class='muted'>활성 광고가 0건입니다.</td></tr>"
+        "<tr><td colspan='8' class='muted'>활성 광고가 0건입니다.</td></tr>"
     )
     return f"""
     <section>
@@ -75,13 +67,11 @@ def _brand_section(b: dict) -> str:
       <h3>소재 목록</h3>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>미리보기</th><th>소재 ID</th><th>포맷</th><th>노출 지면</th><th>헤드라인</th>
-          <th>본문</th><th>CTA</th><th>소구포인트</th><th>운영일수</th></tr></thead>
+          <thead><tr><th>미리보기</th><th>소재 ID</th><th>헤드라인</th><th>본문</th><th>CTA</th>
+          <th>포맷</th><th>운영일수</th><th>노출 지면</th></tr></thead>
           <tbody>{ad_rows}</tbody>
         </table>
       </div>
-      <h3>Appeal Distribution</h3>
-      {_appeal_table(b["appeal_distribution"])}
     </section>"""
 
 
@@ -98,6 +88,8 @@ table { border-collapse:collapse; width:100%; font-size:0.82rem; }
 th, td { text-align:left; padding:0.5rem 0.7rem; border-bottom:1px solid rgba(255,255,255,0.08); vertical-align:top; }
 th { color:#9A9A9E; text-transform:uppercase; font-size:0.68rem; letter-spacing:0.06em; white-space:nowrap; }
 td.thumb img { width:64px; height:64px; object-fit:cover; border-radius:0.4rem; background:rgba(255,255,255,0.05); }
+td.col-headline { min-width:220px; max-width:320px; color:#F2F2F0; font-weight:560; white-space:normal; }
+td.col-placement { max-width:130px; color:#7A7A80; font-size:0.76rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 footer { margin-top:3rem; color:#5C5C60; font-size:0.75rem; }
 """
 
@@ -120,7 +112,7 @@ def build_creative_html(session: dict, result: dict) -> str:
   <h1>{html.escape(session["brand_name"])} — 소재분석 리포트</h1>
   <p class="meta">경쟁사 {len(competitors)}개 브랜드 비교 · 생성일시 {generated_at} · ADetect</p>
   <div class="insight">
-    <div class="muted">AI INTERPRETATION · Confidence: {html.escape(insight.get("confidence", "-"))}</div>
+    <div class="muted">FACT · Confidence: {html.escape(insight.get("confidence", "-"))}</div>
     <p>{html.escape(insight.get("insight", ""))}</p>
   </div>
   {sections}

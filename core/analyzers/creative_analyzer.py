@@ -2,10 +2,14 @@
 
 '소재분석 시작하기' 버튼이 호출하는 최상위 함수가 run_creative_analysis()입니다.
 core/scrapers/ad_library.py의 fetch_meta_ads_detail()이 브랜드별 개별 광고 목록을 반환하면,
-이 모듈이 소구포인트 태깅(appeal_tags)·소구 비중 집계·운영기간 분석을 수행합니다.
+이 모듈이 포맷 구성(format_mix)·운영기간 분석을 수행합니다.
 
-지금은 Gemini 대신 결정론적 목업으로 appeal_tags를 부여하지만, 반환 shape은 실제 Gemini
-Vision 연동 후에도 그대로 유지되도록 설계했습니다(§7-3 appeal_tags 참고).
+[제거됨] 소구포인트(appeal_tags) 태깅은 이번 버전에서 사용자 화면·export 어디에도
+노출하지 않습니다 — 이전 구현은 seeded_random()으로 태그를 무작위 샘플링하는 목업이었고,
+실제 광고 카피/이미지를 해석한 결과가 아니었습니다(예: 프로모션 문구가 근거 없이
+"공포소구"로 분류될 수 있었음). 실제 근거(evidence)·confidence 없는 AI classification을
+확정 결과처럼 보여주지 않는다는 원칙(PRD §5 Guardrail)에 따라 제거했습니다. 재도입 조건은
+PRD §11(taxonomy 정의, multi-label, evidence, confidence, low-confidence 숨김 등) 참고.
 """
 from __future__ import annotations
 
@@ -13,20 +17,25 @@ from typing import Callable
 
 from core.analyzers.insight_synthesizer import build_insight
 from core.scrapers.ad_library import fetch_meta_ads_detail
-from core.scrapers.naver_api import seeded_random
 
-APPEAL_TAGS = ["가격소구", "신뢰·전문성소구", "편의성소구", "사회적증거", "공포소구", "트렌드소구"]
+_PLATFORM_LABELS = {
+    "FACEBOOK": "Facebook", "INSTAGRAM": "Instagram",
+    "AUDIENCE_NETWORK": "Audience Network", "MESSENGER": "Messenger",
+}
 
 
-def _tag_ad(ad: dict) -> list[str]:
-    """소재 1건에 소구포인트 다중 라벨을 부여하는 목업(§7-3 appeal_tags).
-
-    실제 연동 시 Gemini Vision이 소재 이미지/영상+카피를 보고 판단하지만, 이 함수의
-    입출력 shape(ad dict → 태그 리스트)은 그대로 유지하면 됩니다.
-    """
-    rng = seeded_random(f"appeal:{ad['ad_id']}")
-    k = rng.randint(1, 2)
-    return rng.sample(APPEAL_TAGS, k=k)
+def compact_platforms(raw: str | None) -> str:
+    """publisher_platforms(콤마 구분 원본 문자열)를 "Instagram · Facebook · +2"처럼
+    1줄 secondary metadata로 압축한다(§6 Placement 정보 위계 변경). UI/HTML export 공용."""
+    if not raw:
+        return "-"
+    items = [p.strip() for p in raw.split(",") if p.strip()]
+    if not items:
+        return "-"
+    labels = [_PLATFORM_LABELS.get(p.upper(), p.title()) for p in items]
+    if len(labels) <= 2:
+        return " · ".join(labels)
+    return " · ".join(labels[:2]) + f" · +{len(labels) - 2}"
 
 
 def _running_days_bucket(days: int | None) -> str:
@@ -42,37 +51,21 @@ def _running_days_bucket(days: int | None) -> str:
 def _analyze_single_brand_creatives(brand_name: str, is_own: bool, page_override: str | None = None) -> dict:
     ads = fetch_meta_ads_detail(brand_name, page_override=page_override)
     for ad in ads:
-        ad["appeal_tags"] = _tag_ad(ad)
         ad["running_days_bucket"] = _running_days_bucket(ad.get("ad_running_days"))
 
-    tag_counts: dict[str, int] = {}
+    format_mix: dict[str, int] = {}
     for ad in ads:
-        for tag in ad["appeal_tags"]:
-            tag_counts[tag] = tag_counts.get(tag, 0) + 1
-    total_tags = sum(tag_counts.values())
-    appeal_distribution = [
-        {
-            "appeal_tag": tag,
-            "count": count,
-            "pct_of_brand_total": round(count / total_tags * 100, 1) if total_tags else 0.0,
-        }
-        for tag, count in sorted(tag_counts.items(), key=lambda kv: kv[1], reverse=True)
-    ]
+        fmt = ad.get("format") or "unknown"
+        format_mix[fmt] = format_mix.get(fmt, 0) + 1
 
     bucket_ads: dict[str, list[dict]] = {}
     for ad in ads:
         bucket_ads.setdefault(ad["running_days_bucket"], []).append(ad)
     long_running_analysis = []
     for bucket, bucket_ad_list in bucket_ads.items():
-        bucket_tag_counts: dict[str, int] = {}
-        for ad in bucket_ad_list:
-            for tag in ad["appeal_tags"]:
-                bucket_tag_counts[tag] = bucket_tag_counts.get(tag, 0) + 1
-        dominant = sorted(bucket_tag_counts, key=bucket_tag_counts.get, reverse=True)[:2]
         known_days = [a["ad_running_days"] for a in bucket_ad_list if a.get("ad_running_days") is not None]
         long_running_analysis.append({
             "running_days_bucket": bucket,
-            "dominant_appeal_tags": dominant,
             "avg_running_days": round(sum(known_days) / len(known_days), 1) if known_days else None,
             "ad_count": len(bucket_ad_list),
         })
@@ -82,7 +75,7 @@ def _analyze_single_brand_creatives(brand_name: str, is_own: bool, page_override
         "is_own": is_own,
         "ads": ads,
         "ad_count": len(ads),
-        "appeal_distribution": appeal_distribution,
+        "format_mix": format_mix,
         "long_running_analysis": long_running_analysis,
     }
 
@@ -114,31 +107,31 @@ def run_creative_analysis(
         on_progress("수집한 데이터를 종합하는 중...")
     own, *competitor_results = all_brands
 
-    top_brand = max(all_brands, key=lambda b: b["ad_count"])
-    top_appeal = top_brand["appeal_distribution"][0] if top_brand["appeal_distribution"] else None
-    long_running_own = [
-        b for b in own["long_running_analysis"]
-        if b["running_days_bucket"] == "장기(90일+)" and b["avg_running_days"] is not None
-    ]
+    # creative_key_visual은 실제로 확인 가능한 FACT 지표(활성 광고 수/포맷 구성/장기 운영 소재 수)만
+    # 사용해 구성한다 — 근거 없는 소구포인트 해석 문장을 만들지 않는다(PRD §10 Guardrail).
+    total_ads = sum(b["ad_count"] for b in all_brands)
+    own_video = own["format_mix"].get("video", 0)
+    own_long_running = next(
+        (lr for lr in own["long_running_analysis"] if lr["running_days_bucket"] == "장기(90일+)"), None
+    )
+    own_long_running_count = own_long_running["ad_count"] if own_long_running else 0
 
-    if top_appeal:
+    if own["ad_count"] > 0:
         one_line = (
-            f"{top_brand['brand']}는 광고의 {top_appeal['pct_of_brand_total']:.0f}%가 "
-            f"'{top_appeal['appeal_tag']}' 소구이며, "
-            + (
-                f"90일 이상 장기 운영 소재는 평균 {long_running_own[0]['avg_running_days']:.0f}일 운영됨"
-                if long_running_own
-                else "장기 운영(90일+) 소재는 아직 없음"
-            )
+            f"{brand_name}는 현재 활성 광고 {own['ad_count']}건을 운영 중이며, "
+            f"이 중 영상 소재가 {own_video}건, 90일 이상 장기 운영 소재가 {own_long_running_count}건입니다."
         )
     else:
-        one_line = f"{brand_name} 및 경쟁사 전원의 활성 광고가 0건입니다."
+        one_line = f"{brand_name}의 활성 광고가 현재 0건입니다."
 
     creative_key_visual = build_insight(
         insight=one_line,
-        source=[f"Meta Ads Library {sum(b['ad_count'] for b in all_brands)}건 (자사+경쟁사)"],
-        evidence=[f"{b['brand']}: {b['ad_count']}건" for b in all_brands],
-        confidence="medium",
+        source=[f"Meta Ads Library {total_ads}건 (자사+경쟁사)"],
+        evidence=[
+            f"{b['brand']}: 활성 {b['ad_count']}건 (영상 {b['format_mix'].get('video', 0)}건)"
+            for b in all_brands
+        ],
+        confidence="high",
     )
 
     return {

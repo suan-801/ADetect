@@ -14,7 +14,7 @@ import html
 import streamlit as st
 
 from config import settings
-from core.analyzers.creative_analyzer import run_creative_analysis
+from core.analyzers.creative_analyzer import compact_platforms, run_creative_analysis
 from core.exporters.excel_builder import build_creative_excel
 from core.exporters.html_builder import build_creative_html
 from core.exporters.packager import build_creative_zip
@@ -42,16 +42,23 @@ def _ad_id_cell(ad: dict) -> str:
     )
 
 
-def _render_html_table(rows: list[dict], columns: list[tuple[str, str]]):
-    """columns: [(표시 헤더, row dict 키)]. 각 셀 값은 이미 HTML-safe 문자열이어야 합니다."""
+def _render_html_table(rows: list[dict], columns: list[tuple[str, str, str | None]]):
+    """columns: [(표시 헤더, row dict 키, 선택적 CSS class)]. 셀 값은 이미 HTML-safe 문자열이어야 합니다.
+
+    Headline이 다른 metadata보다 먼저·크게 보이고, Placement는 1줄을 넘지 않는 secondary
+    metadata로 압축되도록 col-headline/col-placement 클래스를 지원한다(§6 정보 위계 변경).
+    """
     if not rows:
         st.caption("활성 광고가 0건입니다.")
         return
-    thead = "".join(f"<th>{html.escape(label)}</th>" for label, _ in columns)
+    thead = "".join(f"<th>{html.escape(label)}</th>" for label, _, _ in columns)
     body_rows = []
     for row in rows:
-        cells = "".join(f"<td>{row[key]}</td>" for _, key in columns)
-        body_rows.append(f"<tr>{cells}</tr>")
+        cells = []
+        for _, key, css_class in columns:
+            cls_attr = f' class="{css_class}"' if css_class else ""
+            cells.append(f"<td{cls_attr}>{row[key]}</td>")
+        body_rows.append(f"<tr>{''.join(cells)}</tr>")
     st.markdown(
         f'<div class="adetect-ad-table-wrap"><table class="adetect-ad-table">'
         f"<thead><tr>{thead}</tr></thead><tbody>{''.join(body_rows)}</tbody></table></div>",
@@ -66,7 +73,7 @@ def render(session: dict):
     if status in ("미실행", "전체 실패"):
         feature_intro([
             "Meta Ads Library 활성 광고 소재 (FB+IG 노출 포함)",
-            "소구포인트 다중 라벨 태깅 및 비중",
+            "헤드라인·CTA·포맷 등 실제 소재 정보",
             "운영기간 분석 (단기/중기/장기)",
         ])
         st.write("")
@@ -114,7 +121,7 @@ def render(session: dict):
     competitors = result["competitors"]
     all_brands = [own, *competitors]
 
-    tabs = st.tabs(["개요", "소재 목록", "Creative Analysis", "Appeal Distribution", "Long Running"])
+    tabs = st.tabs(["개요", "소재 목록", "Creative Analysis", "Long Running"])
 
     with tabs[0]:
         if settings.APIFY_MOCK:
@@ -129,7 +136,7 @@ def render(session: dict):
             f"동일한 기준으로 비교했습니다. (총 {sum(b['ad_count'] for b in all_brands)}건)"
         )
         st.caption("소재 ID에 마우스를 올리면 이미지(영상은 썸네일)를 미리 볼 수 있습니다 — '소재 목록'/'Creative Analysis' 탭 참고.")
-        render_insight_card("소재 총평", result["creative_key_visual"], kind="AI")
+        render_insight_card("소재 총평", result["creative_key_visual"], kind="FACT")
 
         if not settings.APIFY_MOCK:
             with st.expander("브랜드별로 실제 매칭된 Meta 페이지 확인"):
@@ -143,22 +150,26 @@ def render(session: dict):
                 st.rerun()
 
     with tabs[1]:
+        # 정보 우선순위: 브랜드 → 소재ID → 헤드라인(핵심 카피) → CTA → 포맷 → 운영일수 →
+        # 노출 지면(secondary, 1줄 압축) — Placement가 Headline보다 먼저/길게 나오던 문제 수정(§6).
         rows = [
             {
                 "브랜드": html.escape(_brand_label(b)),
                 "소재 ID": _ad_id_cell(ad),
-                "포맷": html.escape(ad["format"]),
-                "노출 지면": html.escape(ad["publisher_platforms"] or "-"),
                 "헤드라인": html.escape(ad["headline"] or "-"),
                 "CTA": html.escape(ad["cta"] or "-"),
+                "포맷": html.escape(ad["format"]),
                 "운영일수": ad["ad_running_days"] if ad.get("ad_running_days") is not None else "확인 불가",
+                "노출 지면": html.escape(compact_platforms(ad.get("publisher_platforms"))),
             }
             for b in all_brands
             for ad in b["ads"]
         ]
         _render_html_table(rows, [
-            ("브랜드", "브랜드"), ("소재 ID", "소재 ID"), ("포맷", "포맷"),
-            ("노출 지면", "노출 지면"), ("헤드라인", "헤드라인"), ("CTA", "CTA"), ("운영일수", "운영일수"),
+            ("브랜드", "브랜드", None), ("소재 ID", "소재 ID", None),
+            ("헤드라인", "헤드라인", "col-headline"), ("CTA", "CTA", None),
+            ("포맷", "포맷", None), ("운영일수", "운영일수", None),
+            ("노출 지면", "노출 지면", "col-placement"),
         ])
 
     with tabs[2]:
@@ -167,38 +178,22 @@ def render(session: dict):
                 "브랜드": html.escape(_brand_label(b)),
                 "소재 ID": _ad_id_cell(ad),
                 "헤드라인": html.escape(ad["headline"] or "-"),
-                "본문": html.escape((ad["body"] or "-")[:120]),
-                "소구포인트": html.escape(", ".join(ad["appeal_tags"])),
+                "본문": html.escape((ad["body"] or "-")[:160]),
             }
             for b in all_brands
             for ad in b["ads"]
         ]
         _render_html_table(rows, [
-            ("브랜드", "브랜드"), ("소재 ID", "소재 ID"), ("헤드라인", "헤드라인"),
-            ("본문", "본문"), ("소구포인트", "소구포인트"),
+            ("브랜드", "브랜드", None), ("소재 ID", "소재 ID", None),
+            ("헤드라인", "헤드라인", "col-headline"), ("본문", "본문", None),
         ])
 
     with tabs[3]:
-        import pandas as pd
-        for b in all_brands:
-            st.markdown(f"**{_brand_label(b)}**")
-            if b["appeal_distribution"]:
-                st.dataframe(
-                    pd.DataFrame(b["appeal_distribution"]).rename(columns={
-                        "appeal_tag": "소구포인트", "count": "건수", "pct_of_brand_total": "비중(%)",
-                    }),
-                    width="stretch", hide_index=True,
-                )
-            else:
-                st.caption("활성 광고가 0건이라 소구 비중을 산출할 수 없습니다.")
-
-    with tabs[4]:
         import pandas as pd
         rows = [
             {
                 "브랜드": _brand_label(b),
                 "운영기간": lr["running_days_bucket"],
-                "주요 소구포인트": ", ".join(lr["dominant_appeal_tags"]),
                 "평균 운영일수": lr["avg_running_days"] if lr["avg_running_days"] is not None else "확인 불가",
                 "소재 수": lr["ad_count"],
             }
