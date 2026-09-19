@@ -1,69 +1,24 @@
-"""ADetect 고유의 abstract SVG illustration 세트.
+"""ADetect 고유의 abstract SVG illustration 세트 (3차 리뉴얼, 2026-09).
 
-레퍼런스 이미지의 오브젝트를 복제하지 않고, ADetect 팔레트(ice blue / soft cyan / soft violet)
-로만 구성한 오리지널 visual language입니다. 전부 인라인 SVG라 별도 asset 파일 없이 크기가
-작고(성능), 텍스트처럼 CSS로 애니메이션(soft float)을 걸 수 있습니다.
+이전 리비전은 ice blue/violet gradient glow를 사용했으나, "전형적인 AI SaaS 데모"처럼 보인다는
+피드백에 따라 전면 재작업했다. 원칙:
 
-새 일러스트가 필요하면 이 파일에 `_grad()` 헬퍼로 그라디언트를 정의하고 함수를 추가하세요.
-PNG/WebP 에셋으로 교체하려면 ui/hero.py의 render_hero_object()만 바꾸면 됩니다.
+- 구조는 muted line(중립 회색, text_dim)으로만 그린다 — gradient/glow/blur 금지.
+- Orange accent(브랜드 컬러)는 각 illustration에서 "핵심 데이터 포인트/자사"를 가리키는
+  단 하나의 지점에만 쓴다 — 장식이 아니라 의미가 있는 강조.
+- Hero의 blue orb는 완전히 제거했다 — 대신 ui/components.intelligence_pipeline()이 HTML/CSS
+  기반 pipeline diagram을 그린다(텍스트 접근성·반응형을 위해 SVG가 아닌 HTML로 구현).
+
+새 일러스트가 필요하면 `_story_panel()` 헬퍼로 감싸는 패턴을 그대로 따르세요.
 """
 from __future__ import annotations
 
-ICE = "#AEEBFF"
-CYAN = "#64D8FF"
-VIOLET = "#A59BFF"
+LINE = "#8D949E"
+LINE_SOFT = "#3A3F46"
+ACCENT = "#FF4D2E"
 
 
-def hero_visual() -> str:
-    """Home Hero의 visual anchor — orbital intelligence object.
-    서로 다른 각도의 궤도 3개 + 노드 + 은은한 glow core. 브랜드/시장/타겟/소재 데이터가
-    하나의 코어로 수렴한다는 컨셉을 형상화합니다(실제 브랜드/로고 요소 없음)."""
-    return f"""
-<svg viewBox="0 0 480 480" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="ADetect abstract intelligence visual">
-  <defs>
-    <radialGradient id="heroCore" cx="50%" cy="50%" r="50%">
-      <stop offset="0%" stop-color="{ICE}" stop-opacity="0.95"/>
-      <stop offset="55%" stop-color="{CYAN}" stop-opacity="0.35"/>
-      <stop offset="100%" stop-color="{CYAN}" stop-opacity="0"/>
-    </radialGradient>
-    <linearGradient id="orbitA" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="{ICE}" stop-opacity="0.75"/>
-      <stop offset="100%" stop-color="{VIOLET}" stop-opacity="0.15"/>
-    </linearGradient>
-    <linearGradient id="orbitB" x1="100%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" stop-color="{VIOLET}" stop-opacity="0.7"/>
-      <stop offset="100%" stop-color="{CYAN}" stop-opacity="0.12"/>
-    </linearGradient>
-    <linearGradient id="orbitC" x1="0%" y1="100%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="{CYAN}" stop-opacity="0.55"/>
-      <stop offset="100%" stop-color="{ICE}" stop-opacity="0.08"/>
-    </linearGradient>
-  </defs>
-
-  <circle cx="240" cy="240" r="120" fill="url(#heroCore)"/>
-
-  <ellipse cx="240" cy="240" rx="190" ry="90" stroke="url(#orbitA)" stroke-width="1.4"
-           transform="rotate(-18 240 240)"/>
-  <ellipse cx="240" cy="240" rx="160" ry="150" stroke="url(#orbitB)" stroke-width="1.2"
-           transform="rotate(38 240 240)"/>
-  <ellipse cx="240" cy="240" rx="205" ry="70" stroke="url(#orbitC)" stroke-width="1"
-           transform="rotate(96 240 240)"/>
-
-  <circle cx="240" cy="240" r="34" fill="none" stroke="{ICE}" stroke-width="1.5" opacity="0.9"/>
-  <circle cx="240" cy="240" r="10" fill="{ICE}"/>
-
-  <g opacity="0.92">
-    <circle cx="420" cy="205" r="5.5" fill="{ICE}"/>
-    <circle cx="90" cy="300" r="4.5" fill="{VIOLET}"/>
-    <circle cx="340" cy="365" r="4" fill="{CYAN}"/>
-    <circle cx="115" cy="140" r="3.5" fill="{CYAN}"/>
-    <circle cx="330" cy="95" r="3" fill="{VIOLET}"/>
-  </g>
-</svg>
-"""
-
-
-def _story_panel(inner: str, viewbox: str = "0 0 400 220") -> str:
+def _story_panel(inner: str, viewbox: str = "0 0 400 200") -> str:
     return (
         f'<svg viewBox="{viewbox}" fill="none" xmlns="http://www.w3.org/2000/svg" '
         f'style="width:100%;height:100%;display:block;" aria-hidden="true">{inner}</svg>'
@@ -71,73 +26,58 @@ def _story_panel(inner: str, viewbox: str = "0 0 400 220") -> str:
 
 
 def market_visual() -> str:
-    """시장분석 — 상승하는 신호 라인 + 은은한 area glow."""
+    """시장분석 — muted line chart. 마지막(최신) 포인트만 accent로 강조."""
     return _story_panel(f"""
-    <defs>
-      <linearGradient id="mkArea" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stop-color="{ICE}" stop-opacity="0.28"/>
-        <stop offset="100%" stop-color="{ICE}" stop-opacity="0"/>
-      </linearGradient>
-    </defs>
-    <path d="M20 170 L80 150 L140 158 L200 108 L260 122 L320 66 L380 44 L380 220 L20 220 Z" fill="url(#mkArea)"/>
-    <path d="M20 170 L80 150 L140 158 L200 108 L260 122 L320 66 L380 44" stroke="{ICE}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-    <circle cx="380" cy="44" r="5" fill="{ICE}"/>
-    <circle cx="200" cy="108" r="3.5" fill="{CYAN}" opacity="0.85"/>
+    <path d="M20 150 L80 132 L140 140 L200 96 L260 108 L320 58 L370 40"
+          stroke="{LINE}" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+    <circle cx="370" cy="40" r="4.5" fill="{ACCENT}"/>
+    <line x1="20" y1="180" x2="380" y2="180" stroke="{LINE_SOFT}" stroke-width="1"/>
     """)
 
 
 def audience_visual() -> str:
-    """타겟분석 — 세그먼트를 나타내는 동심원 + 노드."""
+    """타겟분석 — 세그먼트 동심원. 확정된 핵심 세그먼트(중심)만 accent."""
     return _story_panel(f"""
-    <circle cx="200" cy="110" r="70" stroke="{VIOLET}" stroke-opacity="0.45" stroke-width="1.3"/>
-    <circle cx="200" cy="110" r="46" stroke="{ICE}" stroke-opacity="0.55" stroke-width="1.3"/>
-    <circle cx="200" cy="110" r="22" fill="{VIOLET}" fill-opacity="0.18" stroke="{VIOLET}" stroke-width="1.4"/>
-    <circle cx="200" cy="110" r="5" fill="{ICE}"/>
-    <circle cx="270" cy="70" r="4" fill="{CYAN}"/>
-    <circle cx="128" cy="150" r="3.5" fill="{VIOLET}"/>
-    <circle cx="255" cy="150" r="3" fill="{ICE}" opacity="0.8"/>
+    <circle cx="180" cy="100" r="66" stroke="{LINE_SOFT}" stroke-width="1.2"/>
+    <circle cx="180" cy="100" r="42" stroke="{LINE}" stroke-width="1.2"/>
+    <circle cx="180" cy="100" r="7" fill="{ACCENT}"/>
+    <circle cx="250" cy="62" r="3" fill="{LINE}"/>
+    <circle cx="118" cy="140" r="3" fill="{LINE}"/>
+    <circle cx="235" cy="145" r="2.5" fill="{LINE}"/>
     """)
 
 
 def brand_visual() -> str:
-    """브랜드분석 — 자사/경쟁사를 같은 눈높이로 비교하는 두 개의 겹친 링."""
+    """브랜드분석 — 자사(accent) vs 경쟁사(muted line)를 같은 크기로 나란히."""
     return _story_panel(f"""
-    <circle cx="165" cy="110" r="64" stroke="{ICE}" stroke-width="1.6" fill="{ICE}" fill-opacity="0.05"/>
-    <circle cx="245" cy="110" r="64" stroke="{VIOLET}" stroke-width="1.6" fill="{VIOLET}" fill-opacity="0.05"/>
-    <line x1="120" y1="110" x2="290" y2="110" stroke="{CYAN}" stroke-opacity="0.35" stroke-dasharray="3 5"/>
-    <circle cx="165" cy="110" r="4" fill="{ICE}"/>
-    <circle cx="245" cy="110" r="4" fill="{VIOLET}"/>
+    <circle cx="150" cy="100" r="58" stroke="{ACCENT}" stroke-width="1.6"/>
+    <circle cx="150" cy="100" r="3.5" fill="{ACCENT}"/>
+    <circle cx="250" cy="100" r="58" stroke="{LINE_SOFT}" stroke-width="1.4"/>
+    <line x1="212" y1="100" x2="188" y2="100" stroke="{LINE_SOFT}" stroke-width="1" stroke-dasharray="2 4"/>
     """)
 
 
 def creative_visual() -> str:
-    """소재분석 — 겹쳐진 소재 프레임(레이어드 카드)."""
+    """소재분석 — 겹쳐진 소재 프레임(레이어드), 활성 소재 1개만 accent 테두리."""
     return _story_panel(f"""
-    <rect x="150" y="46" width="150" height="104" rx="12" stroke="{VIOLET}" stroke-opacity="0.4" stroke-width="1.3" transform="rotate(-6 225 98)"/>
-    <rect x="130" y="58" width="150" height="104" rx="12" stroke="{CYAN}" stroke-opacity="0.5" stroke-width="1.3" transform="rotate(3 205 110)"/>
-    <rect x="110" y="70" width="150" height="104" rx="12" fill="rgba(174,235,255,0.045)" stroke="{ICE}" stroke-width="1.6"/>
-    <line x1="132" y1="98" x2="230" y2="98" stroke="{ICE}" stroke-opacity="0.55" stroke-width="2" stroke-linecap="round"/>
-    <line x1="132" y1="118" x2="205" y2="118" stroke="{ICE}" stroke-opacity="0.3" stroke-width="2" stroke-linecap="round"/>
+    <rect x="140" y="40" width="140" height="96" rx="4" stroke="{LINE_SOFT}" stroke-width="1.2" transform="rotate(-5 210 88)"/>
+    <rect x="120" y="52" width="140" height="96" rx="4" stroke="{LINE}" stroke-width="1.2" transform="rotate(3 190 100)"/>
+    <rect x="100" y="64" width="140" height="96" rx="4" stroke="{ACCENT}" stroke-width="1.6"/>
+    <line x1="122" y1="92" x2="210" y2="92" stroke="{LINE}" stroke-width="1.6" stroke-linecap="round"/>
+    <line x1="122" y1="110" x2="188" y2="110" stroke="{LINE_SOFT}" stroke-width="1.6" stroke-linecap="round"/>
     """)
 
 
 def synthesis_visual() -> str:
-    """종합분석 — 여러 신호가 하나의 인사이트 노드로 수렴."""
+    """종합분석 — 여러 신호(muted)가 하나의 핵심 인사이트(accent)로 수렴."""
     return _story_panel(f"""
-    <defs>
-      <radialGradient id="synCore" cx="50%" cy="50%" r="50%">
-        <stop offset="0%" stop-color="{ICE}" stop-opacity="0.9"/>
-        <stop offset="100%" stop-color="{ICE}" stop-opacity="0"/>
-      </radialGradient>
-    </defs>
-    <circle cx="200" cy="110" r="46" fill="url(#synCore)"/>
-    <line x1="60" y1="50" x2="200" y2="110" stroke="{CYAN}" stroke-opacity="0.5" stroke-width="1.3"/>
-    <line x1="60" y1="170" x2="200" y2="110" stroke="{VIOLET}" stroke-opacity="0.5" stroke-width="1.3"/>
-    <line x1="340" y1="50" x2="200" y2="110" stroke="{VIOLET}" stroke-opacity="0.4" stroke-width="1.3"/>
-    <line x1="340" y1="170" x2="200" y2="110" stroke="{CYAN}" stroke-opacity="0.4" stroke-width="1.3"/>
-    <circle cx="60" cy="50" r="4" fill="{CYAN}"/>
-    <circle cx="60" cy="170" r="4" fill="{VIOLET}"/>
-    <circle cx="340" cy="50" r="4" fill="{VIOLET}"/>
-    <circle cx="340" cy="170" r="4" fill="{CYAN}"/>
-    <circle cx="200" cy="110" r="9" fill="{ICE}"/>
+    <line x1="60" y1="45" x2="200" y2="100" stroke="{LINE_SOFT}" stroke-width="1.2"/>
+    <line x1="60" y1="160" x2="200" y2="100" stroke="{LINE_SOFT}" stroke-width="1.2"/>
+    <line x1="340" y1="45" x2="200" y2="100" stroke="{LINE_SOFT}" stroke-width="1.2"/>
+    <line x1="340" y1="160" x2="200" y2="100" stroke="{LINE_SOFT}" stroke-width="1.2"/>
+    <circle cx="60" cy="45" r="3.5" fill="{LINE}"/>
+    <circle cx="60" cy="160" r="3.5" fill="{LINE}"/>
+    <circle cx="340" cy="45" r="3.5" fill="{LINE}"/>
+    <circle cx="340" cy="160" r="3.5" fill="{LINE}"/>
+    <circle cx="200" cy="100" r="8" fill="{ACCENT}"/>
     """)

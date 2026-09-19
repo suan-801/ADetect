@@ -1,21 +1,22 @@
 """분석하기 — STEP 1 브랜드 설정 → STEP 2 분석 Workspace (PRD §16-1·§16-2·§16-4).
 
 타겟 입력 필드는 없습니다 (★ 15차 개정) — 타겟은 타겟분석 탭에서 게이트 통과 후 추천됩니다.
-Workspace의 5개 기능은 `st.tabs`를 유지합니다 — PRD §6-1이 "지속되는 5개 탭"으로 명시하고
-있고(탭 전환과 무관하게 각 탭의 session 상태가 항상 최신으로 유지되어야 함), 이를
-`st.segmented_control` 기반 단일 렌더링으로 바꾸면 비활성 탭의 상태 갱신 타이밍이 달라집니다.
-대신 기본 tab underline/pill을 CSS로 전면 제거하고 절제된 segmented 느낌으로 재도색했습니다
-(config/theme.py `[data-baseweb="tab-*"]` 규칙 참고).
+
+3차 리뉴얼: Analysis Header를 "브랜드/카테고리/타겟 + 5개 상태가 한 줄에 섞여 가독성이 낮던"
+구조에서 7:5 grid(왼쪽 Brand Context, 오른쪽 01~05 Vertical Analysis Status Index)로 재설계했다.
+탭 표시 순서도 PRD 내부 실행 순서(시장→브랜드→소재→타겟→종합, 게이트 의존성 때문)는 그대로 두되
+화면에는 Market/Audience/Brand/Creative/Synthesis 순서로 보이도록 재배치했다 — gate 판정 로직
+자체(target_gate_open 등)는 전혀 건드리지 않았다.
 """
 from __future__ import annotations
 
 import streamlit as st
 
-from config.theme import cta_row_marker, glass_marker
+from config.theme import command_marker, cta_row_marker
 from core.analyzers.recommender import recommend_category, recommend_competitors
 from database.db import create_session
 from ui import brand_tab, creative_tab, market_tab, synthesis_tab, target_tab
-from ui.components import brand_context_bar, status_icon
+from ui.components import analysis_status_index, brand_context_header
 
 st.session_state.setdefault("step", "input")
 st.session_state.setdefault("session", None)
@@ -29,7 +30,7 @@ if st.session_state.step == "input":
     )
     st.write("")
     with st.container():
-        glass_marker()
+        command_marker()
         brand_name = st.text_input(
             "브랜드명 *", value=st.session_state.pop("prefill_brand", ""), key="input_brand_name"
         )
@@ -75,7 +76,7 @@ elif st.session_state.step == "confirm":
     )
 
     with st.container():
-        glass_marker()
+        command_marker()
         category = st.text_input("카테고리", value=category, key="confirm_category")
         st.caption("경쟁사 — 직접 입력한 값이 있다면 그 값을 우선 반영합니다.")
         selected = []
@@ -113,56 +114,54 @@ elif st.session_state.step == "confirm":
         st.session_state.step = "workspace"
         st.rerun()
 
-# ── STEP 2: 분석 Workspace (5개 기능, segmented navigation) ────────────
+# ── STEP 2: 분석 Workspace (5개 기능) ───────────────────────────────────
 elif st.session_state.step == "workspace":
     session = st.session_state.session
 
+    # 게이트 판정 로직은 리뉴얼 이전과 동일 — 화면 표시 순서만 Market/Audience/Brand/Creative/
+    # Synthesis로 바꿨을 뿐, target_gate_open 등 실행 조건은 그대로다.
     target_gate_open = session["market_status"] in ("완료", "부분 실패") and session["brand_status"] in ("완료", "부분 실패")
     if not target_gate_open:
-        target_status_for_chip = "🔒"
+        target_status_for_index = "🔒"
     elif session["target_status"] == "confirmed":
-        target_status_for_chip = "완료"
+        target_status_for_index = "완료"
     else:
-        target_status_for_chip = "미실행"
+        target_status_for_index = "미실행"
 
     synthesis_gate_open = any(
         session[k] in ("완료", "부분 실패") for k in ("market_status", "brand_status", "creative_status")
     ) or session["target_status"] == "confirmed"
-    synthesis_status_for_chip = "미실행" if synthesis_gate_open else "🔒"
+    synthesis_status_for_index = "미실행" if synthesis_gate_open else "🔒"
 
-    status_items = [
-        ("시장", session["market_status"]),
-        ("브랜드", session["brand_status"]),
-        ("소재", session["creative_status"]),
-        ("타겟", target_status_for_chip),
-        ("종합", synthesis_status_for_chip),
-    ]
-    brand_context_bar(session, status_items)
+    header_col, status_col = st.columns([7, 5], gap="large")
+    with header_col:
+        brand_context_header(session)
+        if st.button("새 브랜드로 다시 시작", key="btn_reset_session"):
+            st.session_state.session = None
+            st.session_state.step = "input"
+            st.rerun()
+    with status_col:
+        analysis_status_index([
+            ("시장 분석", session["market_status"]),
+            ("타겟 분석", target_status_for_index),
+            ("브랜드 분석", session["brand_status"]),
+            ("소재 분석", session["creative_status"]),
+            ("종합 분석", synthesis_status_for_index),
+        ])
 
-    if st.button("새 브랜드로 다시 시작", key="btn_reset_session"):
-        st.session_state.session = None
-        st.session_state.step = "input"
-        st.rerun()
+    st.write("")
 
-    # 분석 순서: 시장 → 브랜드 → 소재 → 타겟 → 종합 (타겟·종합은 게이트형, §6-1)
-    section_status = {
-        "시장분석": session["market_status"],
-        "브랜드분석": session["brand_status"],
-        "소재분석": session["creative_status"],
-        "타겟분석": target_status_for_chip,
-        "종합분석": synthesis_status_for_chip,
-    }
-    tab_labels = [
-        f"{label}  {'🔒' if st_val == '🔒' else status_icon(st_val)}" for label, st_val in section_status.items()
-    ]
-    tab_market, tab_brand, tab_creative, tab_target, tab_synth = st.tabs(tab_labels)
+    # 탭 표시 순서: Market → Audience(타겟) → Brand → Creative → Synthesis
+    tab_market, tab_target, tab_brand, tab_creative, tab_synth = st.tabs(
+        ["01 시장분석", "02 타겟분석", "03 브랜드분석", "04 소재분석", "05 종합분석"]
+    )
     with tab_market:
         market_tab.render(session)
+    with tab_target:
+        target_tab.render(session)
     with tab_brand:
         brand_tab.render(session)
     with tab_creative:
         creative_tab.render(session)
-    with tab_target:
-        target_tab.render(session)
     with tab_synth:
         synthesis_tab.render(session)

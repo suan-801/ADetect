@@ -12,3 +12,4 @@ storage/exports/*
 .streamlit/secrets.toml
 .DS_Store
 *.log
+/*.png

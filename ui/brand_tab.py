@@ -99,7 +99,7 @@ def render(session: dict):
         own_trend = pd.DataFrame(own["brand_search_volume"]["relative_trend"])
         if not own_trend.empty:
             own_trend["date"] = pd.to_datetime(own_trend["date"])
-            st.line_chart(own_trend.set_index("date")["search_index"])
+            st.line_chart(own_trend.set_index("date")["search_index"], color="#5AA9E6")
 
     with tabs[2]:
         for b in [own, *competitors]:

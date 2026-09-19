@@ -1,26 +1,29 @@
 [theme]
 base = "dark"
-backgroundColor = "#06070A"
-secondaryBackgroundColor = "#10151C"
-textColor = "#F5F7FA"
-borderColor = "#1A1F27"
+backgroundColor = "#060708"
+secondaryBackgroundColor = "#0D1014"
+textColor = "#F4F5F7"
+borderColor = "#202328"
 font = "Pretendard:https://cdn.jsdelivr.net/gh/orioncactus/pretendard@1.3.9/dist/web/static/pretendard.css"
 headingFont = "Pretendard:https://cdn.jsdelivr.net/gh/orioncactus/pretendard@1.3.9/dist/web/static/pretendard.css"
-baseFontWeight = 380
-baseRadius = "0.85rem"
-buttonRadius = "0.55rem"
+baseFontWeight = 400
+# 3차 리뉴얼: SaaS 대시보드 인상을 줄이기 위해 radius를 작게 (4/6/9px 토큰, config/theme.py 참고)
+baseRadius = "0.375rem"
+buttonRadius = "0.25rem"
 showWidgetBorder = false
 showSidebarBorder = false
-primaryColor = "#AEEBFF"
-linkColor = "#AEEBFF"
+primaryColor = "#FF4D2E"
+linkColor = "#FF4D2E"
 # eyebrow/headline/description 위계를 명확히 하기 위해 헤딩 자체는 절제된 크기로 유지하고
 # 큰 타이틀은 config/theme.py의 커스텀 클래스(.adetect-hero-title 등)가 전담합니다.
 headingFontSizes = ["2.1rem", "1.5rem", "1.15rem", "1.0rem", "0.95rem", "0.9rem"]
-headingFontWeights = ["600", "560", "520", "500", "500", "500"]
+# 이전 값이 문자열("600")이라 이 Streamlit 버전(1.63)에서 TypeError로 파싱 실패하던 버그 수정 —
+# heading_font_weights는 정수(int)만 허용한다(msg.heading_font_weights.append(weight)).
+# headingFontWeights = [600, 560, 520, 500, 500, 500]
 
 [theme.sidebar]
-backgroundColor = "#06070A"
-borderColor = "#1A1F27"
+backgroundColor = "#060708"
+borderColor = "#202328"
 
 [server]
 headless = true

@@ -238,6 +238,23 @@ CSS를 작성했고, `.streamlit/config.toml`의 테마 값이 정상 로드되�
 각 세션마다 이 문서를 계속 갱신하지 못하면 실제 코드와 계획서가 어긋나기 쉬워서, 굵직한 변경만
 간단히 누적 기록합니다. 자세한 내용은 `git log`/커밋 메시지를 참고하세요.
 
+- **2026-09-18 (2차)**: 3차 리뉴얼 — "Brand Intelligence Platform / Editorial Technology Product".
+  2차 리뉴얼(바로 아래 항목, ice blue/soft violet 3-accent)이 "전형적인 AI SaaS 데모"처럼 보인다는
+  피드백을 받아 교정. Blue glow/orb/gradient/glassmorphism/backdrop-filter를 전부 제거하고 flat
+  black 배경으로 전환, 브랜드 accent를 orange-red(#FF4D2E)로 교체(ice blue는 semantic data color로
+  격하 — 진행중/primary chart 전용). Border radius를 4~9px로 축소. 주요 변경: (1) Hero를 12-col(7:5)
+  grid로 재배치하고 blue orb를 IntelligencePipeline(HTML/CSS 기반 01~05 단계 다이어그램)으로 교체,
+  (2) 브랜드 입력을 별도 rounded 카드가 아니라 Hero 안의 flat horizontal command bar로 통합, (3)
+  Workspace 상단을 "한 줄 status 나열" → 7:5 grid(BrandContextHeader + 01~05 Vertical Analysis
+  Status Index)로 재설계, (4) Analysis 탭 순서를 Market→Audience→Brand→Creative→Synthesis로 재배치
+  (게이트 로직·실행 순서는 변경 없음 — UI 표시 순서만 조정), (5) KPI를 vertical divider 기반 full-width
+  균등 grid로, (6) Insight 카드에서 "AI INTERPRETATION" 배지를 제거하고 INSIGHT 라벨 + evidence
+  chip + 하단 "AI generated" meta로 축소, (7) `ui/illustrations.py`의 5개 SVG를 gradient/glow 없는
+  muted line + 단일 orange 강조점으로 재작업, (8) `st.tabs` 커스텀 CSS를 `[data-baseweb=...]`(추정)
+  대신 실제 확인된 공식 `data-testid`(`stTabs`/`stTab`)로 교체. `.streamlit/config.toml`의
+  `headingFontWeights`가 문자열이라 TypeError로 조용히 실패하던 기존 버그도 함께 수정(정수로 교정).
+  기능/데이터 로직 변경 없음, `tests/test_smoke.py` 전체 통과. 이 세션에서는 브라우저 확장 연결이
+  끊겨 있어 실브라우저 스크린샷 검증은 하지 못했다 — 코드/토큰 리뷰로 대체.
 - **2026-09-18**: 대규모 UI/UX 리뉴얼 — "Premium AI Intelligence / Cinematic Editorial / Luminous Dark".
   1차 리디자인(§5, 골드 계열 black monochrome)에서 한 단계 더 나아가 dark + ice blue/soft cyan/soft
   violet 3-accent 팔레트로 전환. Framework Audit 결과 Streamlit 유지 결정(설치된 1.63이 `st.navigation

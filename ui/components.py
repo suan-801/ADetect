@@ -1,5 +1,7 @@
-"""탭/페이지 전반에서 재사용하는 UI 컴포넌트. 카드로 감싸지 않고,
-여백/구분선/타이포/절제된 glow로 위계를 표현합니다 (design system, docs/PROJECT_PLAN.md §5).
+"""탭/페이지 전반에서 재사용하는 UI 컴포넌트 (3차 리뉴얼 — Brand Intelligence Platform).
+
+카드로 감싸지 않고, 여백/구분선/타이포/절제된 accent로 위계를 표현합니다. glow/gradient/
+과도한 radius는 config/theme.py에서 전면 제거했고, 이 파일의 컴포넌트들도 그 규칙을 따릅니다.
 """
 from __future__ import annotations
 
@@ -29,6 +31,16 @@ _STATUS_CLASS = {
     "잠금": "st-locked",
 }
 
+# Analysis Status 인덱스에서 쓰는 표시 라벨(§9) — 데이터를 지어내지 않고 실제 status 값만 재표기.
+_STATUS_DISPLAY_LABEL = {
+    "미실행": "대기",
+    "완료": "완료",
+    "부분 실패": "부분 실패",
+    "전체 실패": "실패",
+    "취소": "취소",
+    "잠금": "잠금",
+}
+
 
 def status_icon(status: str) -> str:
     """PRD §16-2 상태 기호 (○/●/✓/△/✕/취소/🔒) — 규격화된 상태 표기."""
@@ -44,24 +56,40 @@ def status_badge(status: str, label: str | None = None) -> str:
 
 def render_insight_card(title: str, insight_obj: dict, kind: str = "AI"):
     """§8 insight/source/evidence/confidence 스키마 렌더링 — InsightBlock 컴포넌트.
-    좌측 얇은 accent 라인 + badge + 근거는 expander 안에 접어 화면 밀도를 낮춥니다."""
+
+    "AI INTERPRETATION" 같은 굵은 배지 대신 작은 INSIGHT 라벨을 먼저 보여주고, 실제 분석
+    문장을 가장 먼저 읽히게 한다. Evidence는 소스 칩으로, AI 생성 여부는 하단 작은 meta로.
+    """
+    kind_label = {"FACT": "FACT", "AI": "INSIGHT", "REC": "RECOMMENDATION", "SAMPLE": "SAMPLE DATA"}.get(kind, kind)
+    kind_cls = {"AI": "kind-ai", "REC": "kind-rec"}.get(kind, "")
     st.markdown(
         f'<div class="adetect-insight">'
-        f'<div class="adetect-insight-head">{badge(kind)}<b>{_html.escape(title)}</b></div>'
+        f'<div class="adetect-insight-label {kind_cls}">{_html.escape(kind_label)}</div>'
+        f'<div class="adetect-insight-title">{_html.escape(title)}</div>'
         f'</div>',
         unsafe_allow_html=True,
     )
     st.write(insight_obj.get("insight", ""))
+
+    sources = insight_obj.get("source", [])
+    if sources:
+        chips = "".join(f'<span class="adetect-evidence-chip">{_html.escape(str(s))}</span>' for s in sources)
+        st.markdown(f'<div class="adetect-evidence-chips">{chips}</div>', unsafe_allow_html=True)
+
+    evidence = insight_obj.get("evidence", [])
+    if evidence:
+        with st.expander("근거 상세 보기"):
+            for e in evidence:
+                st.write(f"- {e}")
+
+    meta_bits = []
     conf = insight_obj.get("confidence")
     if conf:
-        st.caption(f"Confidence — {conf}")
-    with st.expander("근거 보기 (source / evidence)"):
-        st.write("**Source**")
-        for s in insight_obj.get("source", []):
-            st.write(f"- {s}")
-        st.write("**Evidence**")
-        for e in insight_obj.get("evidence", []):
-            st.write(f"- {e}")
+        meta_bits.append(f"Confidence — {conf}")
+    if kind == "AI":
+        meta_bits.append("AI generated")
+    if meta_bits:
+        st.markdown(f'<div class="adetect-insight-meta">{" · ".join(meta_bits)}</div>', unsafe_allow_html=True)
 
 
 def sample_data_notice():
@@ -70,7 +98,7 @@ def sample_data_notice():
 
 
 def metric_row(items: list[tuple[str, str, str | None]]):
-    """Metric 컴포넌트 — 숫자 + 작은 라벨 + trend. 카드 대신 가로로 나열합니다.
+    """Metric 컴포넌트 — 전체 폭을 균등 분할하고 vertical divider로 구분합니다.
     items: [(label, value_html, trend)] — trend는 'up'/'down'/'flat'/None."""
     cells = []
     for label, value_html, trend in items:
@@ -87,20 +115,8 @@ def metric_row(items: list[tuple[str, str, str | None]]):
     st.markdown(f'<div class="adetect-metric-row">{"".join(cells)}</div>', unsafe_allow_html=True)
 
 
-def module_row(label: str, title: str, desc: str):
-    """하위 호환용 — 얇은 구분선 에디토리얼 리스트 한 행 (더 이상 Home 기본 레이아웃은 아님)."""
-    st.markdown(
-        f'<div class="adetect-module">'
-        f'<div class="adetect-module-label">{_html.escape(label)}</div>'
-        f'<div><p class="adetect-module-title">{_html.escape(title)}</p>'
-        f'<p class="adetect-module-desc">{_html.escape(desc)}</p></div>'
-        f'</div>',
-        unsafe_allow_html=True,
-    )
-
-
 def tab_header(label: str, title: str, status_text: str = ""):
-    """탭 상단 헤더 — eyebrow + 제목 + 상태."""
+    """탭 상단 헤더 — eyebrow + Analysis headline + 상태."""
     section_title(label, title, status_text)
 
 
@@ -110,31 +126,61 @@ def feature_intro(desc_lines: list[str]):
     st.markdown(f'<div class="adetect-empty">{lines_html}</div>', unsafe_allow_html=True)
 
 
-def brand_context_bar(session: dict, status_items: list[tuple[str, str]]):
-    """Workspace 상단 Brand Context Bar — 브랜드명/카테고리/타겟 + 5개 기능 상태를 한 줄로.
-    status_items: [(라벨, status 문자열 또는 '🔒')]."""
+def brand_context_header(session: dict):
+    """BrandContextHeader 컴포넌트 — Analysis Header 왼쪽 블록(브랜드/카테고리/타겟)."""
     target_display = session.get("confirmed_target") or "타겟 미확정"
-    chips = []
-    for label, status in status_items:
-        if status == "🔒":
-            chip_html = f'<span class="adetect-status-dot st-locked">잠금</span>'
-        else:
-            chip_html = status_badge(status)
-        chips.append(f'<span class="adetect-context-chip"><b>{_html.escape(label)}</b>{chip_html}</span>')
-
     st.markdown(
-        f'<div class="adetect-context-bar">'
-        f'<span class="adetect-context-brand">{_html.escape(session["brand_name"])}</span>'
-        f'<span class="adetect-context-meta">{_html.escape(session.get("category") or "카테고리 미지정")}</span>'
-        f'<span class="adetect-context-meta">{_html.escape(target_display)}</span>'
-        f'<div class="adetect-context-chips">{"".join(chips)}</div>'
-        f'</div>',
+        '<div class="adetect-context-block">'
+        f'<p class="adetect-context-brand">{_html.escape(session["brand_name"])}</p>'
+        f'<p class="adetect-context-meta"><b>{_html.escape(session.get("category") or "카테고리 미지정")}</b>'
+        f' · {_html.escape(target_display)}</p>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+
+
+def analysis_status_index(status_items: list[tuple[str, str]]):
+    """AnalysisStatus 컴포넌트 — Analysis Header 오른쪽 블록.
+    가로로 길게 나열하던 상태 목록을 01~05 vertical index로 재구성했다.
+    status_items: [(기능명, status 문자열 또는 '🔒')]."""
+    done_count = sum(1 for _, s in status_items if s in ("완료", "부분 실패"))
+    rows = []
+    for i, (label, status) in enumerate(status_items, start=1):
+        st_key = "잠금" if status == "🔒" else status
+        cls = _STATUS_CLASS.get(st_key, "st-idle")
+        display = _STATUS_DISPLAY_LABEL.get(st_key, st_key)
+        rows.append(
+            f'<div class="adetect-status-row">'
+            f'<span class="adetect-status-num">{i:02d}</span>'
+            f'<span class="adetect-status-name">{_html.escape(label)}</span>'
+            f'<span class="adetect-status-value {cls}">{_html.escape(display)}</span>'
+            f'</div>'
+        )
+    st.markdown(
+        '<div class="adetect-status-header">'
+        '<span class="adetect-status-label">Analysis Status</span>'
+        f'<span class="adetect-status-count">{done_count} / {len(status_items)}</span>'
+        '</div>' + "".join(rows),
+        unsafe_allow_html=True,
+    )
+
+
+def intelligence_pipeline(steps: list[tuple[str, str]]):
+    """IntelligencePipeline 컴포넌트 — Hero 오른쪽 visual. Blue orb 대신 실제 제품 구조(5단계
+    분석 파이프라인)를 thin line + number + typography로 표현한다. steps: [(번호, 라벨)]."""
+    rows = "".join(
+        f'<div class="adetect-pipeline-step"><div class="adetect-pipeline-num">{_html.escape(num)}</div>'
+        f'<div class="adetect-pipeline-label">{_html.escape(label)}</div></div>'
+        for num, label in steps
+    )
+    st.markdown(
+        f'<div class="adetect-pipeline"><div class="adetect-pipeline-dot"></div>{rows}</div>',
         unsafe_allow_html=True,
     )
 
 
 def section_header_block(eyebrow_text: str, title_html: str, desc: str | None = None):
-    """Home 등에서 쓰는 큰 섹션 헤더 — eyebrow + display title (+ 선택 설명)."""
+    """Home 등에서 쓰는 섹션 헤더 — eyebrow + Section headline (+ 선택 설명)."""
     desc_html = f'<p class="adetect-body-lg" style="margin-top:1rem;">{desc}</p>' if desc else ""
     st.markdown(
         f'{eyebrow(eyebrow_text)}<p class="adetect-display-title">{title_html}</p>{desc_html}',

@@ -74,7 +74,7 @@ def render(session: dict):
         df = pd.DataFrame(result.get("trend", []))
         if not df.empty:
             df["date"] = pd.to_datetime(df["date"])
-            st.line_chart(df.set_index("date")["search_index"])
+            st.line_chart(df.set_index("date")["search_index"], color="#5AA9E6")
         else:
             st.caption("데이터가 없습니다.")
 
