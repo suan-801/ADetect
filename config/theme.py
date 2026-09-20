@@ -1,11 +1,16 @@
-"""디자인 시스템 — "Brand Intelligence Platform / Editorial Technology Product".
+"""디자인 시스템 — "Cinematic Editorial Intelligence" (4차 리뉴얼, 2026-09).
 
-3차 리뉴얼 원칙 (2026-09 교정, 이전 "Luminous Dark" 방향에서 전환):
-- Blue glow / orb / gradient / glassmorphism을 전부 제거한다 — 전형적인 "AI SaaS 데모" 인상을
-  주는 가장 큰 원인이었다. 배경은 순수 flat black이고, 장식은 존재하지 않는다.
-- Orange-red(#FF4D2E)는 브랜드 accent다. 넓은 면적을 채우지 않고 active nav/key action/
-  section index/important highlight/selected state 등 "의미가 있는 지점"에만 쓴다.
-  Ice blue는 브랜드 컬러가 아니라 semantic data color(진행중/primary chart/AI 해석)로 격하한다.
+4차 리뉴얼 원칙 — Home과 Workspace의 역할을 분리한다:
+- **Home**: Cinematic Brand Experience. Flat Black foundation 위에 "Controlled Luminous
+  Depth"(절제된 red/vermilion atmosphere)를 허용한다. 3차 리뉴얼의 "No gradient/No glow" 전면
+  금지는 과도했다는 판단 아래, large-scale atmospheric visual(Hero/Manifesto/Final CTA)에
+  한해서만 gradient/glow를 허용하도록 완화했다 — 버튼/입력/테이블/카드 등 UI 컴포넌트에는
+  여전히 금지다(§8 Active Design Direction 참고).
+- **Workspace**(Analyze/History/Settings): Functional Intelligence Product. 3차 리뉴얼의
+  flat/no-decoration 원칙을 그대로 유지한다 — 데이터 가독성이 최우선이다.
+- Orange-red accent는 과거(`#B23A1F`) rust/brown 톤을 완전히 교정했다 — R 채널이 확실히
+  우세하고 G/B가 낮아 "탁한 갈색"으로 보이지 않는 clean vermilion 계열로 재정의했다
+  (`accent_surface` 대비 WCAG AA 4.5:1 이상 확인, §4 Color System 재검증 결과).
 - Border radius는 작게(4/6/9px) 유지한다 — 큰 radius의 rounded card를 남발하면 SaaS 대시보드
   처럼 보인다는 지적을 반영했다. 카드로 감싸는 대신 여백/1px 구분선/grid/타이포로 구조를 만든다.
 - Grid → Typography → Spacing → Information hierarchy → Data → Color → Decoration 순으로
@@ -20,23 +25,29 @@ import streamlit as st
 # ── Design tokens ──────────────────────────────────────────────────────────
 
 COLORS = {
-    "bg": "#060708",
-    "bg_elevated": "#0A0C0F",
+    "bg": "#050506",
+    "bg_elevated": "#0B0B0D",
     "surface": "#0D1014",
     "border": "#202328",
     "border_soft": "#15181C",
-    "text": "#F4F5F7",
-    "text_dim": "#8D949E",
-    "text_faint": "#5F6670",
-    # Primary brand accent — orange-red. 좁은 면적에만: active nav, key action, section index,
-    # important highlight, key data point, selected state.
-    "accent": "#FF4D2E",
-    "accent_hover": "#FF6A4E",
-    # Filled CTA surface — accent(#FF4D2E)를 넓은 면적(버튼 배경)에 그대로 쓰면 밝은 텍스트도
-    # 어두운 텍스트도 대비가 애매해진다. 넓은 면적 전용으로 한 단계 더 어둡게 분리하고,
-    # 그 위에는 항상 밝은 텍스트(text_on_accent)를 쓴다 — WCAG AA(4.5:1 이상) 확인됨.
-    "accent_surface": "#B23A1F",
-    "accent_surface_hover": "#C2431F",
+    "text": "#F7F7F5",
+    # Secondary(본문) / Faint(eyebrow·meta) 2단계 — 과거 값은 faint가 대비 3.5:1로 AA 미달이었다.
+    "text_dim": "#A0A3AA",
+    "text_faint": "#797C84",
+    # Primary brand accent — clean vermilion/red-orange. 좁은 면적에만: active nav, key action,
+    # section index, important highlight, key data point, selected state.
+    "accent": "#F0462C",
+    "accent_hover": "#FF6542",
+    # Home Hero/Manifesto/Final CTA 같은 large-scale atmospheric visual 전용(§8) — 버튼/카드 등
+    # 넓은 UI 면적에는 쓰지 않는다. Hot core / soft diffuse 2단계로 radial light를 구성한다.
+    "accent_hot": "#FF3B1F",
+    "accent_soft": "#FF6542",
+    # Filled CTA surface — accent를 넓은 면적(버튼 배경)에 그대로 쓰면 대비가 애매해진다. 넓은
+    # 면적 전용으로 한 단계 더 어둡게 분리하고, 위에는 항상 밝은 텍스트(text_on_accent)를 쓴다.
+    # 과거 #B23A1F는 G/B 채널이 높아 rust/brown으로 보인다는 피드백에 따라 R이 확실히 우세한
+    # 값으로 교체(WCAG AA 4.5:1 이상 확인, 4차 리뉴얼 §4 Color System).
+    "accent_surface": "#CD351D",
+    "accent_surface_hover": "#C8331A",
     "text_on_accent": "#FFF8F4",
     # Data semantic colors — 브랜드 컬러가 아니라 상태/차트 전용.
     "data_blue": "#5AA9E6",
@@ -46,7 +57,7 @@ COLORS = {
     # §8 FACT/AI/REC 3단 스키마
     "fact": "#8D949E",
     "ai": "#5AA9E6",
-    "rec": "#FF4D2E",
+    "rec": "#F0462C",
 }
 
 SPACING = {"xs": 4, "sm": 8, "md": 12, "lg": 16, "xl": 24, "2xl": 32, "3xl": 48, "4xl": 64, "5xl": 96}
@@ -65,6 +76,8 @@ _CSS = f"""
     --text-dim: {COLORS['text_dim']};
     --text-faint: {COLORS['text_faint']};
     --accent: {COLORS['accent']};
+    --accent-hot: {COLORS['accent_hot']};
+    --accent-soft: {COLORS['accent_soft']};
     --accent-surface: {COLORS['accent_surface']};
     --accent-surface-hover: {COLORS['accent_surface_hover']};
     --text-on-accent: {COLORS['text_on_accent']};
@@ -93,16 +106,22 @@ html, body, [class*="css"] {{ letter-spacing: 0.003em; }}
     0%, 100% {{ opacity: 0.4; }}
     50%      {{ opacity: 1; }}
 }}
-@keyframes adetect-pipeline-move {{
-    0%   {{ top: 2%; opacity: 0; }}
-    8%   {{ opacity: 1; }}
-    92%  {{ opacity: 1; }}
-    100% {{ top: 96%; opacity: 0; }}
+/* Home atmosphere(Manifesto/Final CTA radial glow) 전용 — 아주 느린 drift(§26).
+   버튼/카드/입력 등 UI 컴포넌트에는 쓰지 않는다. */
+@keyframes adetect-atmosphere-drift {{
+    0%, 100% {{ transform: translate(-50%, -50%) scale(0.98); }}
+    50%      {{ transform: translate(-50%, -50%) scale(1.03); }}
 }}
 .adetect-fade-up {{ animation: adetect-fade-up 0.4s ease both; }}
 
-/* ── 배경: flat black, gradient/glow 없음 ─────────────────────────────────── */
-.stApp {{ background: {COLORS['bg']}; }}
+/* ── 배경: flat black. Gradient/glow는 Home의 large-scale atmospheric visual
+   (Hero/Manifesto/Final CTA)에 한해서만 허용한다 — UI 컴포넌트(버튼/카드/입력/
+   테이블)에는 여전히 전면 금지(§8 Active Design Direction, 4차 리뉴얼). ────── */
+.stApp {{ background: {COLORS['bg']}; overflow-x: hidden; }}
+/* Home의 full-bleed breakout(.adetect-bleed, 100vw 트릭)이 스크롤바 폭만큼 미세한 가로
+   스크롤을 만들 수 있어 방어적으로 막는다 — 모바일에서 "본문을 방해하지 않는다" 원칙(§31)과
+   동일한 목적. */
+html {{ overflow-x: hidden; }}
 
 /* ── 기본 크롬 정리 ─────────────────────────────────────────────────────── */
 [data-testid="stToolbarActions"], [data-testid="stAppDeployButton"], #MainMenu, footer {{ display: none; }}
@@ -248,94 +267,293 @@ a[data-testid="stTopNavLink"][aria-current="page"]::after {{
     .adetect-hero-sub, .adetect-body-lg {{ max-width: 100%; }}
 }}
 
-/* ── Hero grid (12-col: 왼쪽 7 / 오른쪽 5), 높이는 콘텐츠에 맞춰 자연스럽게 ─────── */
-.adetect-hero-shell {{ padding: 2.2rem 0 3rem; }}
-@media (max-width: 900px) {{ .adetect-hero-shell {{ padding: 1rem 0 2rem; }} }}
+/* ══════════════════════════════════════════════════════════════════════════
+   HOME — Cinematic Brand Experience (4차 리뉴얼). Workspace(Analyze/History/
+   Settings)는 이 블록의 영향을 받지 않는다 — 모두 .adetect-home-page-marker가
+   심어진 페이지(pages/1_home.py)에서만 매칭되는 :has() 셀렉터로 격리했다.
+   ══════════════════════════════════════════════════════════════════════════ */
 
-/* ── Intelligence Pipeline wrap (Hero 오른쪽 컬럼 anchor) ──────────────────
-   Pipeline이 5-col 폭 전체로 퍼지면 Headline과 시각적으로 경쟁하므로, 폭을 제한하고
-   오른쪽으로 anchor한다. Visual priority: Headline > Brand Input/CTA > Pipeline. */
-div[data-testid="column"]:has(div[data-testid="stElementContainer"] .adetect-pipeline-wrap-marker) {{
-    max-width: 340px;
-    margin-left: auto;
-    margin-top: 2.6rem;
+/* Home 전용 wide container — Workspace의 1200px 규칙은 그대로 두고 Home만 완화.
+   본문 텍스트는 각 컴포넌트의 max-width(28~34rem)가 계속 담당하므로, 컨테이너를
+   넓혀도 문단이 과도하게 길어지지 않는다. */
+[data-testid="stMainBlockContainer"]:has(.adetect-home-page-marker) {{
+    max-width: 1600px;
+    padding-left: clamp(1.2rem, 4vw, 4rem);
+    padding-right: clamp(1.2rem, 4vw, 4rem);
+}}
+
+/* Full-bleed breakout — Hero/Manifesto/Final CTA처럼 viewport 전체를 캔버스로
+   쓰는 scene에 적용한다. 안쪽 콘텐츠는 별도 max-width로 다시 제한한다.
+   scene_marker()로 심은 마커는 실제 크기가 없는 빈 div이므로, `.adetect-bleed` 자체가 아니라
+   그 마커를 담고 있는 실제 stVerticalBlock에 breakout을 적용해야 한다(:has() 트릭). */
+div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .adetect-bleed) {{
+    width: 100vw;
+    position: relative;
+    left: 50%;
+    right: 50%;
+    margin-left: -50vw;
+    margin-right: -50vw;
+}}
+
+/* ── HERO SCENE ────────────────────────────────────────────────────────────
+   background.png(공식 Hero visual asset)를 절대 위치 레이어로 깔고, 텍스트는
+   safe area(왼쪽)에서만 움직인다. Visual priority: Headline > background.png >
+   Brand Input > Pipeline(§65). */
+div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .adetect-hero-scene) {{
+    position: relative;
+    overflow: hidden;
+    min-height: calc(92vh - var(--nav-height));
+    display: flex;
+    align-items: center;
+    padding: 2.4rem clamp(1.2rem, 5vw, 5.5rem) 3rem;
+}}
+/* 텍스트 가독성 지원용 black fade — 새 glow/orb를 추가하는 게 아니라 이미지
+   왼쪽을 페이지 배경(순검정)과 자연스럽게 이어붙이는 용도(§48). */
+div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .adetect-hero-scene)::after {{
+    content: "";
+    position: absolute; inset: 0; z-index: 1; pointer-events: none;
+    background: linear-gradient(90deg,
+        {COLORS['bg']} 0%, rgba(5,5,6,0.94) 26%,
+        rgba(5,5,6,0.55) 48%, rgba(5,5,6,0.08) 66%, transparent 78%);
 }}
 @media (max-width: 900px) {{
-    div[data-testid="column"]:has(div[data-testid="stElementContainer"] .adetect-pipeline-wrap-marker) {{
-        max-width: 100%;
-        margin-left: 0;
-        margin-top: 2.4rem;
+    div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .adetect-hero-scene) {{
+        min-height: auto;
+        padding: 1.6rem 1.2rem 2.2rem;
     }}
 }}
 
-/* ── Intelligence Pipeline (Hero right visual) ────────────────────────────
-   thin line + number + label. glow/orb 없음. active indicator만 accent color. */
-.adetect-pipeline {{ position: relative; padding: 0.4rem 0 0.4rem 2.1rem; }}
-.adetect-pipeline::before {{
+/* background.png 자체 — decorative, pointer-events 없음(§57). 카드/보더/그림자로
+   감싸지 않는다(§44) — 페이지 배경과 이미지의 검정이 그대로 맞닿아야 한다. */
+/* Streamlit은 모든 stElementContainer에 기본 position:relative를 준다 — 우리 absolute
+   레이어(inset:0)가 그 바로 위 wrapper(보통 height:0)를 containing block으로 잡아버려서
+   납작하게 찌그러지는 문제가 있었다. 이 두 마커를 담은 stElementContainer만 static으로
+   되돌려 진짜 positioning context(:has()로 스타일링한 상위 stVerticalBlock scene)까지
+   건너뛰게 한다. */
+div[data-testid="stElementContainer"]:has(.adetect-hero-visual-layer),
+div[data-testid="stElementContainer"]:has(.adetect-story-num-bg) {{
+    position: static;
+}}
+
+.adetect-hero-visual-layer {{
+    position: absolute; inset: 0; z-index: 0; pointer-events: none;
+    background-repeat: no-repeat;
+    background-size: cover;
+    background-position: right -6vw center;
+}}
+@media (max-width: 900px) {{
+    .adetect-hero-visual-layer {{ background-position: 68% center; opacity: 0.55; }}
+}}
+@media (max-width: 480px) {{
+    .adetect-hero-visual-layer {{ opacity: 0.4; }}
+}}
+
+/* Hero content — safe area. z-index 2로 이미지/fade 위에 놓는다. */
+div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .adetect-hero-content) {{
+    position: relative; z-index: 2; max-width: 42rem;
+}}
+
+.adetect-hero-wordmark {{
+    display: block; color: {COLORS['text_faint']}; font-size: 0.76rem; font-weight: 600;
+    letter-spacing: 0.16em; text-transform: uppercase; margin-bottom: 1.6rem;
+}}
+.adetect-hero-wordmark b {{ color: {COLORS['text_dim']}; font-weight: 600; }}
+
+/* Hero headline — 표지 타이포그래피. desktop ~72~90px 수준까지 검토(§6). */
+.adetect-hero-title {{
+    font-size: clamp(2.6rem, 1.5rem + 3.8vw, 5.7rem) !important;
+    font-weight: 660;
+    letter-spacing: -0.03em;
+    line-height: 1.18;
+    margin: 0;
+    color: {COLORS['text']};
+}}
+.adetect-hero-sub {{
+    color: {COLORS['text_dim']};
+    font-size: 1.04rem;
+    font-weight: 400;
+    line-height: 1.68;
+    margin-top: 2.1rem;
+    max-width: 34rem;
+    white-space: nowrap;
+}}
+@media (max-width: 900px) {{
+    .adetect-hero-sub {{ white-space: normal; }}
+}}
+
+/* ── Command Bar — Hero의 웅장함을 방해하지 않는 가벼운 형태(§10). 사각 카드
+   대신 hairline underline 중심, 배경은 거의 투명. */
+div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .adetect-command-marker) {{
+    background: rgba(11, 11, 13, 0.55);
+    border: none;
+    border-bottom: 1px solid {COLORS['border']};
+    border-radius: 0;
+    padding: 0 0 1rem 0;
+}}
+.adetect-command-label {{
+    display: block; color: {COLORS['accent']}; font-size: 0.7rem; font-weight: 600;
+    letter-spacing: 0.14em; text-transform: uppercase; margin-bottom: 0.7rem;
+}}
+
+/* ── Intelligence Pipeline Rail — Hero의 secondary information layer(§49~51).
+   더 이상 Main Illustration이 아니라 제품 구조를 알려주는 compact index다.
+   4단계 모두 동일한 비중으로 보여준다 — 특정 단계(예: MARKET)만 accent로 강조하면 "이미
+   진행 중인 단계"처럼 오독되므로, num/label 모두 동일한 text 컬러를 쓴다. border box 없음,
+   moving line 없음, glow/pulse 애니메이션 없음(절제). */
+.adetect-pipeline-rail {{
+    display: flex; flex-wrap: wrap; gap: 0 clamp(1.4rem, 3vw, 2.6rem);
+    margin-top: 2.6rem; padding-top: 1.1rem; border-top: 1px solid {COLORS['border_soft']};
+    max-width: 40rem;
+}}
+.adetect-pipeline-rail-item {{ display: flex; align-items: baseline; gap: 0.5rem; padding: 0.3rem 0; }}
+.adetect-pipeline-rail-num {{ color: {COLORS['text_faint']}; font-size: 0.7rem; font-weight: 550; letter-spacing: 0.05em; }}
+.adetect-pipeline-rail-label {{ color: {COLORS['text']}; font-size: 0.78rem; font-weight: 550; letter-spacing: 0.04em; }}
+@media (max-width: 640px) {{
+    .adetect-pipeline-rail {{ gap: 0.5rem 1.4rem; }}
+}}
+
+/* ── MANIFESTO SCENE — Why ADetect를 일반 landing section이 아니라 하나의
+   statement로(§12). 큰 typography가 viewport를 크게 점유하고, 설명은 짧게. */
+div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .adetect-manifesto-scene) {{
+    position: relative; padding: 6rem clamp(1.2rem, 5vw, 5.5rem);
+    min-height: 46vh; display: flex; flex-direction: column; justify-content: center;
+    overflow: hidden;
+}}
+div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .adetect-manifesto-scene)::before {{
     content: "";
-    position: absolute; left: 7px; top: 6px; bottom: 6px; width: 1px;
-    background: {COLORS['border']};
+    position: absolute; top: 50%; left: 82%; width: 34vw; height: 34vw;
+    max-width: 560px; max-height: 560px;
+    transform: translate(-50%, -50%);
+    background: radial-gradient(circle, rgba(255,59,31,0.16), rgba(255,59,31,0.05) 45%, transparent 72%);
+    filter: blur(90px);
+    pointer-events: none;
+    z-index: 0;
+    animation: adetect-atmosphere-drift 14s ease-in-out infinite;
 }}
-.adetect-pipeline-dot {{
-    position: absolute; left: 3px; width: 9px; height: 9px; border-radius: 50%;
-    background: {COLORS['accent']};
-    animation: adetect-pipeline-move 6s ease-in-out infinite;
+.adetect-manifesto-title {{
+    position: relative; z-index: 1;
+    font-size: clamp(2rem, 1.2rem + 3vw, 4.4rem) !important;
+    font-weight: 640; letter-spacing: -0.025em; line-height: 1.16;
+    color: {COLORS['text']}; margin: 0 0 1.6rem; max-width: 46rem;
 }}
-.adetect-pipeline-step {{ position: relative; padding: 1.05rem 0; border-bottom: 1px solid {COLORS['border_soft']}; }}
-.adetect-pipeline-step:last-child {{ border-bottom: none; }}
-.adetect-pipeline-num {{ color: {COLORS['text_faint']}; font-size: 0.72rem; font-weight: 550; letter-spacing: 0.08em; }}
-.adetect-pipeline-label {{ color: {COLORS['text']}; font-size: 0.98rem; font-weight: 540; margin-top: 0.15rem; }}
+.adetect-manifesto-desc {{ position: relative; z-index: 1; color: {COLORS['text_dim']}; font-size: 1rem; line-height: 1.75; max-width: 30rem; margin: 0; }}
 
-/* ── Section shell — Home story section 공통 리듬 ─────────────────────────── */
-.adetect-section {{ padding: 4.5rem 0; border-top: 1px solid {COLORS['border']}; }}
-.adetect-section.is-first {{ border-top: none; padding-top: 0.5rem; }}
-.adetect-section-eyebrow-num {{ color: {COLORS['text_faint']}; font-size: 0.78rem; font-weight: 500; letter-spacing: 0.1em; margin-bottom: 0.8rem; }}
-@media (max-width: 900px) {{ .adetect-section {{ padding: 2.6rem 0; }} }}
+/* ── STORY SECTION shell (Home §3~6, Market/Brand/Creative/Synthesis) ──────
+   실제 stVerticalBlock에 걸리는 scene_marker 기반 shell — position:relative로
+   giant background number(§14)의 anchor 역할도 겸한다. */
+div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .adetect-story-section) {{
+    position: relative; overflow: hidden;
+    padding: 5rem clamp(0.4rem, 2vw, 1.4rem);
+    border-top: 1px solid {COLORS['border']};
+}}
+div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .adetect-story-section.is-first) {{
+    border-top: none; padding-top: 1.2rem;
+}}
+@media (max-width: 900px) {{
+    div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .adetect-story-section) {{ padding: 3rem 0.2rem; }}
+}}
 
-/* ── Feature Story (Home §3~6) ─────────────────────────────────────────── */
+/* Giant background number(§14) — 장식, 항상 콘텐츠 뒤(z-index:-1)로. */
+.adetect-story-num-bg {{
+    position: absolute; z-index: -1; pointer-events: none; user-select: none;
+    font-size: clamp(7rem, 18vw, 15rem); font-weight: 700; line-height: 0.8;
+    color: {COLORS['text']}; opacity: 0.045; letter-spacing: -0.04em;
+}}
+.adetect-story-num-bg.pos-br {{ right: -1vw; bottom: -6vw; }}
+.adetect-story-num-bg.pos-tl {{ left: -1vw; top: -5vw; }}
+.adetect-story-num-bg.pos-tr {{ right: -1vw; top: -5vw; }}
+@media (max-width: 640px) {{ .adetect-story-num-bg {{ opacity: 0.03; }} }}
+
 .adetect-story-copy p.adetect-story-lead {{
-    font-size: 1.4rem; font-weight: 560; letter-spacing: -0.01em; line-height: 1.32;
-    color: {COLORS['text']}; margin: 0 0 0.9rem 0;
+    font-size: 1.5rem; font-weight: 580; letter-spacing: -0.012em; line-height: 1.3;
+    color: {COLORS['text']}; margin: 0 0 0.9rem 0; position: relative; z-index: 1;
 }}
 .adetect-story-copy p.adetect-story-desc {{
     color: {COLORS['text_dim']}; font-size: 0.95rem; line-height: 1.72; font-weight: 400;
-    margin: 0; max-width: 28rem;
+    margin: 0; max-width: 28rem; position: relative; z-index: 1;
 }}
+/* Split variant(Brand/Creative) — data-chart를 감싸는 프레임, 카드 그리드가
+   아니라 하나의 데이터 패널이라는 의미로만 border를 쓴다. */
 .adetect-story-panel {{
     border: 1px solid {COLORS['border']};
     border-radius: {RADIUS['md']};
     background: {COLORS['bg_elevated']};
     padding: 1.5rem 1.6rem;
-    min-height: 200px;
+    min-height: 220px;
+    position: relative; z-index: 1;
+}}
+/* Banner variant(Market/Synthesis) — full-width, border 없이 편집적으로. */
+.adetect-story-visual-banner {{
+    width: 100%; min-height: 280px; margin: 0 0 2.2rem;
+    position: relative; z-index: 1;
+}}
+.adetect-story-visual-banner.is-dramatic::before {{
+    content: ""; position: absolute; inset: -25% -8%; z-index: -1;
+    background: radial-gradient(circle at 52% 55%, rgba(255,59,31,0.22), rgba(240,70,44,0.07) 42%, transparent 70%);
+    filter: blur(70px); pointer-events: none;
+}}
+.adetect-story-align-right {{ text-align: right; margin-left: auto; }}
+.adetect-story-align-right p.adetect-story-desc {{ margin-left: auto; }}
+@media (max-width: 900px) {{
+    .adetect-story-align-right {{ text-align: left; margin-left: 0; }}
+    .adetect-story-align-right p.adetect-story-desc {{ margin-left: 0; }}
 }}
 
-/* ── Value Prop (Home §2) ─────────────────────────────────────────────── */
-.adetect-valueprop {{ text-align: left; max-width: 40rem; }}
-
-/* ── Product Preview (Home §7) — flat frame, shadow 없음 ──────────────────── */
-.adetect-preview-frame {{
-    border-radius: {RADIUS['md']};
-    border: 1px solid {COLORS['border']};
-    background: {COLORS['bg_elevated']};
-    padding: 1.4rem 1.6rem 1.7rem;
+/* ── SAMPLE OUTPUT — Editorial Product Showcase(§15~17 Option A). 실제 앱
+   화면(browser frame/dashboard mockup)을 그대로 그리지 않는다 — 버튼/입력처럼
+   보이는 요소를 만들지 않고, "결과가 이렇게 보인다"는 포스터 형태로 보여준다. */
+div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .adetect-showcase-scene) {{
+    position: relative;
+    padding: 4.5rem clamp(0.4rem, 3vw, 2rem);
+    border-top: 1px solid {COLORS['border']};
+    pointer-events: none;
+    cursor: default;
 }}
-.adetect-preview-dots {{ display: flex; gap: 0.35rem; margin-bottom: 1.1rem; }}
-.adetect-preview-dots span {{ width: 6px; height: 6px; border-radius: 50%; background: {COLORS['border']}; }}
+.adetect-showcase-caption {{
+    color: {COLORS['text_faint']}; font-size: 0.86rem; line-height: 1.6; margin: 0.6rem 0 2.6rem; max-width: 34rem;
+}}
+.adetect-showcase-stats {{
+    display: flex; flex-wrap: wrap; gap: 3rem 3.6rem; padding: 0 0 2.6rem;
+    border-bottom: 1px solid {COLORS['border_soft']}; margin-bottom: 2.4rem;
+}}
+.adetect-showcase-stat-value {{
+    font-size: clamp(2.6rem, 1.8rem + 2.6vw, 4.6rem); font-weight: 660; letter-spacing: -0.03em;
+    color: {COLORS['text']}; line-height: 1;
+}}
+.adetect-showcase-stat-value .unit {{ font-size: 0.5em; font-weight: 500; color: {COLORS['text_dim']}; margin-left: 0.1em; }}
+.adetect-showcase-stat-label {{
+    color: {COLORS['text_faint']}; font-size: 0.72rem; font-weight: 550; letter-spacing: 0.1em;
+    text-transform: uppercase; margin-top: 0.6rem;
+}}
+.adetect-showcase-quote {{
+    font-size: clamp(1.3rem, 1rem + 1vw, 1.9rem); font-weight: 540; letter-spacing: -0.015em;
+    line-height: 1.42; color: {COLORS['text_dim']}; max-width: 44rem; margin: 0;
+}}
+.adetect-showcase-quote b {{ color: {COLORS['text']}; font-weight: 600; }}
 
-/* ── CTA section (Home §8) ────────────────────────────────────────────── */
+/* ── FINAL CTA SCENE(§32/§61) — Hero보다 약한 atmosphere, 한 번 더 반복하지
+   않는 background.png 대신 절제된 radial glow만. ──────────────────────────── */
+div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .adetect-final-cta-scene) {{
+    position: relative; overflow: hidden;
+    padding: 6rem clamp(1.2rem, 5vw, 5.5rem) 5.5rem;
+    border-top: 1px solid {COLORS['border']};
+}}
+div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .adetect-final-cta-scene)::before {{
+    content: "";
+    position: absolute; top: 30%; left: 12%; width: 30vw; height: 30vw;
+    max-width: 420px; max-height: 420px; transform: translate(-50%, -50%);
+    background: radial-gradient(circle, rgba(255,59,31,0.1), rgba(255,59,31,0.03) 45%, transparent 72%);
+    filter: blur(90px); pointer-events: none; z-index: 0;
+    animation: adetect-atmosphere-drift 16s ease-in-out infinite;
+}}
 .adetect-cta-title {{
-    font-size: clamp(1.6rem, 1.1rem + 1.4vw, 2.3rem);
-    font-weight: 560; letter-spacing: -0.015em; line-height: 1.25; color: {COLORS['text']};
-    text-align: left; margin: 0 0 1.8rem;
+    position: relative; z-index: 1;
+    font-size: clamp(2rem, 1.3rem + 2.6vw, 3.6rem);
+    font-weight: 620; letter-spacing: -0.02em; line-height: 1.18; color: {COLORS['text']};
+    text-align: left; margin: 0 0 2.2rem; max-width: 34rem;
 }}
 
-/* ── Brand Command Bar (Hero, flat — glass/blur/glow 없음) ────────────────── */
-div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .adetect-command-marker) {{
-    background: {COLORS['surface']};
-    border: 1px solid {COLORS['border']};
-    border-radius: {RADIUS['md']};
-    padding: 1.1rem 1.2rem;
-}}
+/* ── Command Bar 재사용(Hero + Final CTA 공통, 위 HERO SCENE 블록에서 정의) ── */
 
 /* ── Input ─────────────────────────────────────────────────────────────── */
 [data-testid="stTextInput"] input,
@@ -557,10 +775,25 @@ def command_marker():
 glass_marker = command_marker
 
 
-def pipeline_wrap_marker():
-    """이 함수를 Hero 오른쪽 column의 첫 줄에서 호출하면 그 column이 Intelligence Pipeline
-    anchor(최대폭 제한 + 오른쪽 정렬)로 스타일링됩니다."""
-    st.markdown('<div class="adetect-pipeline-wrap-marker"></div>', unsafe_allow_html=True)
+def home_page_marker():
+    """pages/1_home.py 최상단에서 한 번 호출합니다 — 이 마커가 존재하는 동안만
+    `[data-testid="stMainBlockContainer"]`의 wide-container 규칙이 적용되어 Home만 Workspace의
+    1200px 규칙에서 벗어납니다(§21 Home/Workspace 역할 분리)."""
+    st.markdown('<div class="adetect-home-page-marker"></div>', unsafe_allow_html=True)
+
+
+def scene_marker(class_name: str):
+    """`with st.container():` 블록의 첫 줄에서 호출하면, 그 컨테이너의 실제
+    `div[data-testid="stVerticalBlock"]`에 `class_name`을 키로 하는 CSS `:has()` 규칙이 적용됩니다.
+    Home cinematic scene(Hero/Manifesto/Story/Showcase/Final CTA)의 범용 레이아웃 훅 —
+    `class_name`에 공백으로 여러 클래스를 넘기면(예: "adetect-story-section is-first") 각각을
+    독립된 CSS 규칙에서 참조할 수 있습니다. `command_marker()`도 동일한 매커니즘의 특수 사례입니다.
+
+    주의: Streamlit 1.63 기준 실제 컬럼 컨테이너의 data-testid는 `stColumn`이지 `column`이
+    아닙니다 — 과거 `pipeline_wrap_marker()`가 잘못된 셀렉터(`column`)를 써서 조용히 무효화돼
+    있었던 버그를 이 리뉴얼에서 발견/제거했습니다. 새 셀렉터를 작성할 때는 브라우저 DOM에서
+    실제 `data-testid` 값을 먼저 확인하세요."""
+    st.markdown(f'<div class="{class_name}"></div>', unsafe_allow_html=True)
 
 
 def cta_row_marker():

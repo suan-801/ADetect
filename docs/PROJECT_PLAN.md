@@ -10,8 +10,8 @@
 | 영역 | 상태 | 위치 |
 |---|---|---|
 | 저장소 뼈대 (폴더 구조, .env, requirements) | ✅ 완료 | 루트 |
-| 디자인 시스템 — Brand Intelligence Platform / Flat Black / Orange accent (§29 Active Design Direction) | ✅ 완료 | `config/theme.py`, `.streamlit/config.toml` |
-| 홈 화면 (Intelligence Pipeline 4단계 포함) | ✅ 완료 | `pages/1_home.py`, `ui/hero.py` |
+| 디자인 시스템 — Cinematic Editorial Intelligence(4차 리뉴얼, §8 Active Design Direction) | ✅ 완료 | `config/theme.py`, `.streamlit/config.toml` |
+| 홈 화면 — Cinematic Brand Experience(Hero/Manifesto/Story/Sample Output/Final CTA scene 구성) | ✅ 완료 | `pages/1_home.py`, `ui/hero.py`, `ui/components.py` |
 | STEP 1 브랜드 설정 + AI 추천 확인 화면 | ✅ 완료 — **카테고리/경쟁사 추천 Gemini 실연동**(GEMINI_API_KEY 있으면), 실패해도 목업으로 조용히 폴백. 타겟 입력 필드 없음 | `pages/2_analyze.py`, `core/analyzers/recommender.py` |
 | STEP 2 Workspace **4개 탭** 골격 + 상태 스트립 | ✅ 완료 (16차 개정 — 독립 타겟분석 탭 제거) | `pages/2_analyze.py` |
 | 시장분석 탭 | 🟡 **부분 실연동** — 검색량 추이(DataLab)·뉴스는 NAVER 키 있으면 실동작. `search_seasonality`/`reference_sources`/`market_issues`/`upcoming_changes`(§7-1) 및 다운로드는 아직 미구현 | `ui/market_tab.py`, `core/scrapers/naver_api.py` |
@@ -249,6 +249,30 @@ CSS를 작성했고, `.streamlit/config.toml`의 테마 값이 정상 로드되�
 각 세션마다 이 문서를 계속 갱신하지 못하면 실제 코드와 계획서가 어긋나기 쉬워서, 굵직한 변경만
 간단히 누적 기록합니다. 자세한 내용은 `git log`/커밋 메시지를 참고하세요.
 
+- **2026-09-20**: **4차 리뉴얼 — "Cinematic Editorial Intelligence" (Home 시각 경험 전면 개편)**.
+  3차 리뉴얼("Brand Intelligence Platform / Editorial Technology")이 기술적으로는 정돈됐지만
+  "잘 만든 SaaS 대시보드"처럼 보인다는 피드백에 따라, Home을 "브랜드 존재감이 있는 Cinematic
+  Brand Experience"로 재구성했다. **기능/IA/analyzer·scraper 로직/DB 스키마/Export 로직은 전혀
+  변경하지 않음** — 이번 리뉴얼은 Home visual experience 중심이다. 주요 변경:
+  (1) 사용자가 확정한 공식 Hero asset(`ui/assets/home/background.png`, WebP 변환본 병행 보관)을
+  Hero의 atmospheric background + primary visual anchor로 채택 — `ui/hero.py`가 base64 data URI로
+  인라인 임베드(Streamlit이 임의 정적 파일을 URL로 서빙하지 않아 fragile한 static-serving 설정
+  대신 선택, §8 Hero Master Asset), (2) Color System 재검증 — `accent_surface`가 `#B23A1F`(rust/
+  brown 톤, R/G 채널 비율이 forbidden 계열과 가까웠음)에서 `#CD351D`(WCAG AA 4.5:1 이상 재확인)로,
+  `text_faint`가 대비 3.5:1(AA 미달)이던 `#5F6670`에서 4.88:1인 `#797C84`로 교체, (3) Gradient/Glow
+  전면 금지 원칙을 "Home의 large-scale atmospheric visual(Hero/Manifesto/Final CTA)에 한해서만
+  허용, UI 컴포넌트는 여전히 금지"로 완화(§8 재정의), (4) Intelligence Pipeline을 Hero의 Main
+  Illustration에서 secondary compact rail(가로 index, moving-line 애니메이션 제거)로 축소,
+  (5) Market/Brand/Creative/Synthesis 4개 Story section에 서로 다른 composition(split vs
+  full-width banner) + 거대 배경 숫자(§8) 적용, Synthesis에 가장 dramatic한 atmosphere glow,
+  (6) 기존 "Inside the Workspace" 브라우저 프레임 mockup을 제거하고 "SAMPLE OUTPUT" 라벨 +
+  포스터형 큰 타이포그래피의 Editorial Product Showcase로 교체 — 실제 기능처럼 보이지 않게
+  `pointer-events:none` 적용, (7) Home 전용 wide container(`home_page_marker()`) 도입 — Workspace
+  (Analyze/History/Settings)의 1200px 규칙은 그대로 유지, (8) **버그 수정**: 과거
+  `pipeline_wrap_marker()`가 존재하지 않는 data-testid(`column`, 실제는 `stColumn`)를 셀렉터로
+  써서 조용히 무효화돼 있던 것을 발견 — 신규 `scene_marker()` 범용 헬퍼로 교체하며 함께 정리.
+  `pytest tests/test_smoke.py -v` 7개 전체 통과, `streamlit run app.py` 기동 후 Home(1440/1280/
+  768/390 대응 확인)·Analyze(Workspace 4탭)·History·Settings를 브라우저로 직접 확인 — 회귀 없음.
 - **2026-09-19**: **PRD 16차 개정 — Information Architecture 변경** (PRD.md §0). 5개 독립
   기능(시장/타겟/브랜드/소재/종합) → **4개 Primary Analysis Function**(시장/브랜드/소재/종합)으로
   축소, Target은 독립 탭·독립 `function_run`이 아니라 **종합분석 탭 안의 Target Insight
@@ -314,16 +338,39 @@ CSS를 작성했고, `.streamlit/config.toml`의 테마 값이 정상 로드되�
 
 ## 8. Active Design Direction (Source of Truth)
 
-이 절이 지금 유효한 디자인 지침의 유일한 출처다. §5(1차 리디자인)·2차("Luminous Dark")는 모두
-Design History일 뿐 지금 코드와 다르다 — 실제 값은 항상 `config/theme.py`/`.streamlit/config.toml`
-을 확인한다.
+이 절이 지금 유효한 디자인 지침의 유일한 출처다. §5(1차 리디자인)·2차("Luminous Dark")·3차
+("Brand Intelligence Platform / Editorial Technology")는 모두 Design History일 뿐 지금 코드와
+다르다 — 실제 값은 항상 `config/theme.py`/`.streamlit/config.toml`을 확인한다.
 
-* **컨셉**: Brand Intelligence Platform / Editorial Technology Product
-* **배경**: Flat Black(`#060708`), 이미지·gradient depth 없음
-* **Accent**: Orange-red(`#FF4D2E`) — active nav/key action/section index/important highlight/selected
-  state 등 **좁은 면적에만**. 넓은 CTA 배경처럼 면적이 넓은 곳은 더 어두운 `accent_surface`
-  (`#B23A1F`) + 밝은 텍스트(`text_on_accent`, `#FFF8F4`)를 쓴다(WCAG AA 대비 확보, 16차 개정)
-* **금지**: decorative gradient, glow, glassmorphism(`backdrop-filter: blur`), 큰 rounded card
+* **컨셉**: Cinematic Editorial Intelligence (4차 리뉴얼, 2026-09-20)
+* **Home과 Workspace의 역할을 분리한다**(가장 중요한 원칙):
+  - **Home**(`pages/1_home.py`): Cinematic Brand Experience — 웅장함/브랜드 존재감/atmospheric
+    depth를 우선한다. `home_page_marker()`가 심어진 동안만 wide container(1600px)가 적용된다.
+  - **Workspace**(Analyze/History/Settings): Functional Intelligence Product — 데이터 가독성이
+    최우선이다. 1200px container, 장식 없음, 3차 리뉴얼 원칙을 그대로 유지한다.
+  - 같은 토큰(색/타이포)을 공유하지만, decoration(gradient/glow/큰 typography)은 Home에만
+    허용한다. Home의 dramatic visual language를 Workspace 데이터 화면까지 확장하지 않는다.
+* **배경**: Flat Black(`#050506`~`#0B0B0D` 3단계) 기반. 이미지/gradient depth는 Home의
+  large-scale atmospheric visual(Hero/Manifesto/Final CTA)에만 허용 — "Flat Black foundation +
+  Controlled Luminous Depth"
+* **Hero Master Asset**: `ui/assets/home/background.png`(+ `background.webp`, 인라인 delivery용
+  25KB 압축본) — 사용자가 확정한 공식 Hero visual. Home Hero에서만 쓰고, 카드/보더/그림자로
+  감싸지 않으며, 다른 section에서 재사용하거나 비슷한 CSS 장식으로 재현하지 않는다. `ui/hero.py`의
+  `render_hero_visual()`이 유일한 렌더 지점이다.
+* **Accent**: Clean vermilion/red-orange(`#F0462C`) — active nav/key action/section index/
+  important highlight/selected state 등 **좁은 면적에만**. 넓은 CTA 배경처럼 면적이 넓은 곳은
+  더 어두운 `accent_surface`(`#CD351D`) + 밝은 텍스트(`text_on_accent`, `#FFF8F4`)를 쓴다
+  (WCAG AA 4.5:1 이상 확인, 4차 리뉴얼). `accent_hot`(`#FF3B1F`)/`accent_soft`(`#FF6542`)는 Home
+  atmosphere 전용 — UI 컴포넌트에는 쓰지 않는다.
+  - **Guardrail**: burnt orange/rust/brown/gold 계열(예: `#B23A1F`, `#A84A20`, `#C05A25`)은 쓰지
+    않는다 — G/B 채널이 높아 "탁한 갈색"으로 보인다는 피드백으로 4차 리뉴얼에서 전면 교정했다.
+    새 accent 값을 고를 때는 R 채널이 확실히 우세하고 브라우저에서 실제 검정 배경 위에 렌더링해
+    확인한다.
+* **Gradient/Glow**: 전면 금지가 아니라 **범위를 제한**한다.
+  - 허용: Home Hero(background.png)/Manifesto/Story의 `.is-dramatic` banner/Final CTA처럼
+    large-scale atmospheric visual. `filter: blur(60px)` 이상 + opacity 0.1~0.35 수준의 diffuse
+    glow만 — "light in space"여야지 "neon gaming UI"처럼 보이면 실패다.
+  - 금지: 버튼/입력/테이블/카드/metric 등 UI 컴포넌트의 gradient·glow. Workspace 전체.
 * **Radius**: 작게 유지(4/6/9px 토큰) — 큰 radius는 SaaS 대시보드 인상을 준다
 * **우선순위**: Grid → Typography → Spacing → Information hierarchy → Data → Color → Decoration
   (Decoration은 항상 마지막)
@@ -332,7 +379,17 @@ Design History일 뿐 지금 코드와 다르다 — 실제 값은 항상 `confi
   페이지별로 임시 여백(`st.write("")` 등)을 추가하는 방식은 금지한다
 * **Iconography**: 이모지 금지. PRD §16-2 상태 기호(○●✓△✕🔒)는 기능 표기이므로 예외
 * **Contrast**: 넓은 accent 면적 위 텍스트는 항상 WCAG AA(4.5:1 이상, 가능하면) 확인 후 확정 —
-  "느낌상 괜찮아 보임"으로 판단하지 않는다(16차 개정 CTA 대비 수정이 실제 사례)
+  "느낌상 괜찮아 보임"으로 판단하지 않는다(16차 개정 CTA 대비 수정, 4차 리뉴얼 accent_surface/
+  text_faint 재검증이 실제 사례)
+* **Sample/Demo 구분**: Home의 Sample Output(§7-11 실제 기능과 무관한 예시 섹션)은 반드시
+  "SAMPLE OUTPUT" 라벨 + `pointer-events:none`으로 실제 기능과 시각적으로 구분한다 — 브라우저
+  프레임/대시보드 mockup처럼 실제 앱 화면을 흉내 내지 않는다(Editorial Product Showcase 형태,
+  `ui/components.sample_showcase()`)
+* **Layout hook**: Home cinematic scene(Hero/Manifesto/Story/Showcase/Final CTA)은
+  `config.theme.scene_marker()`로 실제 `stVerticalBlock`에 CSS `:has()` 훅을 건다. 새 훅을 추가할
+  때는 Streamlit의 실제 `data-testid`(`stColumn`/`stVerticalBlock`/`stElementContainer` 등,
+  버전마다 바뀔 수 있음)를 브라우저 DOM에서 먼저 확인한다 — 과거 `pipeline_wrap_marker()`가
+  존재하지 않는 `column`을 셀렉터로 써서 조용히 무효화돼 있던 사례가 있다(4차 리뉴얼에서 발견/수정)
 
 새 화면/컴포넌트를 만들 때 이 목록과 충돌하면 이 목록이 우선한다. 이 목록 자체를 바꾸는 변경은
 §7 최근 변경 이력에도 함께 기록한다.

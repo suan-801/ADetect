@@ -1,23 +1,29 @@
-"""홈 — Brand Intelligence Platform / Editorial Technology Product (3차 리뉴얼, 2026-09).
+"""홈 — Hero 단일 화면 (2026-09-20 축소).
 
-이전 리비전의 문제(어색한 Hero 여백, blue orb, Hero와 분리된 거대한 rounded 브랜드 입력 카드)를
-교정한다. Hero는 12-column 기준 7:5 grid, 높이는 콘텐츠에 맞춰 자연스럽게(≈560~680px 수준)
-유지하고, 브랜드 입력은 Hero 안의 flat horizontal command bar로 통합한다.
+이전 리비전(4차 리뉴얼)은 Hero → Manifesto → Market → Brand → Creative → Synthesis →
+Sample Output → Final CTA로 이어지는 긴 scroll scene이었으나, 사용자 피드백에 따라 첫
+화면(Hero)만 남기고 그 뒤에 이어지던 Product Story/Sample Output/Final CTA 섹션은
+제거했다. 기능(4단계 IA, STEP1 입력 플로우, Target Insight 구조)은 바뀌지 않는다 —
+바뀌는 것은 Home의 화면 구성뿐이다.
+
+Hero는 LAYER 1 LIVE PRODUCT ENTRY(Brand Input/CTA, 실제로 동작하는 유일한 interactive
+영역)만 남은 상태다.
 """
 from __future__ import annotations
 
 import streamlit as st
 
-from config.theme import command_marker, pipeline_wrap_marker
-from ui.components import cta_section, feature_story, section_header_block
-from ui.hero import render_hero_copy, render_hero_object
-from ui.illustrations import brand_visual, creative_visual, market_visual, synthesis_visual
+from config.theme import command_marker, home_page_marker, scene_marker
+from ui.hero import render_hero_copy, render_hero_visual, render_pipeline_rail
+
+home_page_marker()
 
 
-def _command_bar(key_prefix: str):
+def _command_bar(key_prefix: str, label: str = "START HERE"):
+    """LAYER 1 — Hero의 유일한 실제 interactive 영역(브랜드 입력 → 분석 시작)."""
     with st.container():
         command_marker()
-        st.markdown("<span class='adetect-eyebrow' style='margin-bottom:0.5rem;'>Brand</span>", unsafe_allow_html=True)
+        st.markdown(f"<span class='adetect-command-label'>{label}</span>", unsafe_allow_html=True)
         input_col, btn_col = st.columns([5, 1.3], vertical_alignment="bottom")
         with input_col:
             brand_name = st.text_input(
@@ -44,85 +50,15 @@ def _command_bar(key_prefix: str):
                 st.switch_page("pages/2_analyze.py")
 
 
-# ── SECTION 01 · HERO (12-col: ~7.5 텍스트+입력 / ~4.5 Intelligence Pipeline) ──
-# Visual priority: 1) Hero Headline  2) Brand Input/CTA  3) Intelligence Pipeline.
-# Pipeline은 pipeline_wrap_marker()로 폭을 제한하고 오른쪽에 anchor해 Headline과
-# 경쟁하지 않게 한다(§3 Home 배치 개선).
-st.markdown('<div class="adetect-hero-shell">', unsafe_allow_html=True)
-copy_col, pipeline_col = st.columns([7.5, 4.5], gap="large")
-with copy_col:
-    render_hero_copy()
-    st.write("")
-    _command_bar("hero")
-with pipeline_col:
-    pipeline_wrap_marker()
-    st.markdown("<span class='adetect-eyebrow' style='margin-bottom:0.6rem;'>Intelligence Pipeline</span>", unsafe_allow_html=True)
-    render_hero_object()
-st.markdown("</div>", unsafe_allow_html=True)
-
-# ── SECTION 02 · VALUE PROPOSITION ───────────────────────────────────────
+# ── 01 · HERO SCENE ──────────────────────────────────────────────────────
+# background.png(공식 Hero asset)가 atmosphere + primary visual anchor를 담당한다(§40~48).
+# Visual priority: Headline > background.png > Brand Input > Intelligence Pipeline(§65).
 with st.container():
-    st.markdown('<div class="adetect-section">', unsafe_allow_html=True)
-    section_header_block(
-        "Why ADetect",
-        "파편화된 시장 데이터를<br>하나의 흐름으로.",
-        "검색 트렌드, 경쟁사 프로필, 광고 소재, SNS 운영 현황 — 흩어진 소스를 "
-        "하나의 분석 Workspace로 모으고, 실행 가능한 인사이트로 정리합니다.",
-    )
-    st.markdown("</div>", unsafe_allow_html=True)
-
-# ── SECTION 03~06 · ANALYSIS STORY (4단계 — Target은 독립 단계가 아니라
-#    Synthesis 안의 Target Insight로 설명한다, §4) ─────────────────────────
-stories = [
-    ("01", "MARKET", "시장이 움직이는\n방향부터.", "검색량 추이와 계절성, 카테고리 뉴스와 시장 신호를 모아 "
-     "지금 시장이 커지는지 정체되는지부터 확인합니다.", market_visual, False),
-    ("02", "BRAND", "브랜드와 경쟁사를\n같은 기준에서.", "자사와 경쟁사의 검색량, 홈페이지 메시지, SNS·매체 운영 현황을 "
-     "동일한 기준으로 나란히 비교합니다.", brand_visual, True),
-    ("03", "CREATIVE", "지금 실제로 집행되는\n광고까지.", "Meta Ads Library에 노출 중인 실제 광고 소재를 수집해 "
-     "메시지·표현 방식·운영 기간을 분석합니다.", creative_visual, False),
-    ("04", "SYNTHESIS", "데이터를\n전략으로.", "시장·브랜드·소재 데이터를 연결해 핵심 시장 기회, 브랜드 포지셔닝, "
-     "Target Insight, White Space, Recommended Action을 도출합니다. 근거가 부족한 타겟은 "
-     "추정하지 않고 데이터가 없다고 정직하게 표시합니다.", synthesis_visual, True),
-]
-for num, eyebrow_text, lead, desc, visual_fn, reverse in stories:
+    scene_marker("adetect-hero-scene adetect-bleed")
+    render_hero_visual()
     with st.container():
-        st.markdown('<div class="adetect-section">', unsafe_allow_html=True)
-        feature_story(num, eyebrow_text, lead.replace("\n", "<br>"), desc, visual_fn(), reverse=reverse)
-        st.markdown("</div>", unsafe_allow_html=True)
-
-# ── SECTION 07 · PRODUCT PREVIEW ─────────────────────────────────────────
-with st.container():
-    st.markdown('<div class="adetect-section">', unsafe_allow_html=True)
-    section_header_block("Inside the Workspace", "분석은 탭 하나에서<br>끝까지 이어집니다.",
-                          "수집 → 분석 → 다운로드가 화면 전환 없이 같은 Workspace 안에서 이어집니다.")
-    st.write("")
-    st.markdown(
-        '<div class="adetect-preview-frame">'
-        '<div class="adetect-preview-dots"><span></span><span></span><span></span></div>'
-        '<p class="adetect-context-brand" style="font-size:1.3rem;">메리츠화재</p>'
-        '<p class="adetect-context-meta" style="margin-bottom:1.2rem;"><b>손해보험</b> · 경쟁사 3개</p>'
-        '<div class="adetect-metric-row" style="padding-bottom:1.1rem;">'
-        '<div class="adetect-metric"><div class="adetect-metric-label">검색량 증감(3M)</div>'
-        '<div class="adetect-metric-value">+18<span class="unit">%</span></div>'
-        '<div class="adetect-metric-trend up">▲ 전월 대비 상승</div></div>'
-        '<div class="adetect-metric"><div class="adetect-metric-label">활성 광고 소재</div>'
-        '<div class="adetect-metric-value">42<span class="unit">건</span></div></div>'
-        '<div class="adetect-metric"><div class="adetect-metric-label">뉴스 SOV</div>'
-        '<div class="adetect-metric-value">31<span class="unit">%</span></div></div>'
-        '</div>'
-        '<div class="adetect-insight">'
-        '<div class="adetect-insight-label kind-ai">INSIGHT</div>'
-        '<div class="adetect-insight-title">시장 인사이트</div>'
-        '<p style="color:#8D949E;margin:0;font-size:0.9rem;line-height:1.7;">검색량은 증가하고 있지만 '
-        '경쟁사 대비 브랜드 검색 유입 비중은 낮습니다.</p></div>'
-        '</div>',
-        unsafe_allow_html=True,
-    )
-    st.markdown("</div>", unsafe_allow_html=True)
-
-# ── SECTION 08 · CTA ──────────────────────────────────────────────────────
-with st.container():
-    st.markdown('<div class="adetect-section">', unsafe_allow_html=True)
-    cta_section("분석할 브랜드가 있다면, 바로 시작하세요.")
-    _command_bar("cta")
-    st.markdown("</div>", unsafe_allow_html=True)
+        scene_marker("adetect-hero-content")
+        render_hero_copy()
+        st.write("")
+        _command_bar("hero")
+        render_pipeline_rail()

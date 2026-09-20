@@ -21,7 +21,12 @@
 
 7. **불확실하면 강제로 label을 선택하지 않는다.** `insufficient_data`/`unknown`/`not_available`/`channel_not_found` 등 명시적인 fallback을 쓴다. 특히 연령/성별 등 세그먼트 인구통계처럼 지금 데이터 모델에 없는 근거를 요구하는 값은 임의로 지어내지 않는다 — `build_target_insight()`가 그 기준 구현이다.
 
-8. **Visual guideline** (docs/PROJECT_PLAN.md §8 Active Design Direction에 상세): Flat Black · Orange Accent(좁은 면적) · No decorative gradient · No glow · No glassmorphism · No large rounded card · Grid > Typography > Spacing > Data > Decoration.
+8. **Visual guideline** (docs/PROJECT_PLAN.md §8 Active Design Direction에 상세, 4차 리뉴얼 "Cinematic Editorial Intelligence"): Flat Black · Clean Vermilion Accent(좁은 면적) · No decorative gradient abuse · No UI glow abuse · No glassmorphism · No large rounded card · Grid > Typography > Spacing > Data > Decoration.
+   - **Home과 Workspace의 역할을 구분한다.** Home(`pages/1_home.py`)은 cinematic/editorial(웅장한 typography, large-scale atmospheric gradient/glow 허용)이고, Workspace(Analyze/History/Settings)는 functional/data-dense(장식 없음, 3차 리뉴얼 원칙 유지)다. Home의 dramatic visual language를 Workspace 데이터 화면까지 확장하지 않는다.
+   - Gradient/Glow는 전면 금지가 아니라 Home의 large-scale atmospheric visual(Hero/Manifesto/Final CTA)에만 제한적으로 허용한다 — 버튼/입력/테이블/카드 등 UI 컴포넌트에는 여전히 금지.
+   - **Home Hero는 지정된 `ui/assets/home/background.png`를 visual source of truth로 사용**하며, 임의의 대체 AI visual을 새로 만들거나 다른 section에서 재사용하지 않는다(`ui/hero.py`가 유일한 렌더 지점).
+   - Sample/demo content(Home Sample Output 등)는 반드시 "SAMPLE OUTPUT" 라벨 + 실제 기능과 다른 시각적 처리(예: `pointer-events:none`)로 실제 기능과 명확히 구분한다 — 브라우저 프레임 등 실제 앱 화면을 흉내 내지 않는다.
+   - Orange accent가 burnt orange/rust/brown(예: `#B23A1F` 계열, G/B 채널이 높아 탁하게 보임)으로 보이지 않는지 브라우저에서 실제 검정 배경 위에 렌더링해 확인한다.
 
 9. **넓은 accent 배경 위 텍스트는 항상 대비(contrast)를 확인한다.** "느낌상 괜찮아 보인다"로 판단하지 않는다 — 작은 텍스트 기준 WCAG AA(4.5:1 이상)를 목표로 하고, 필요하면 배경(`accent_surface`)과 강조 인디케이터(`accent`)를 분리한다.
 

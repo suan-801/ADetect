@@ -172,21 +172,6 @@ def analysis_status_index(status_items: list[tuple[str, str]]):
     )
 
 
-def intelligence_pipeline(steps: list[tuple[str, str]]):
-    """IntelligencePipeline 컴포넌트 — Hero 오른쪽 visual. Blue orb 대신 실제 제품 구조(4단계
-    분석 파이프라인: Market/Brand/Creative/Synthesis)를 thin line + number + typography로
-    표현한다. steps: [(번호, 라벨)]."""
-    rows = "".join(
-        f'<div class="adetect-pipeline-step"><div class="adetect-pipeline-num">{_html.escape(num)}</div>'
-        f'<div class="adetect-pipeline-label">{_html.escape(label)}</div></div>'
-        for num, label in steps
-    )
-    st.markdown(
-        f'<div class="adetect-pipeline"><div class="adetect-pipeline-dot"></div>{rows}</div>',
-        unsafe_allow_html=True,
-    )
-
-
 def section_header_block(eyebrow_text: str, title_html: str, desc: str | None = None):
     """Home 등에서 쓰는 섹션 헤더 — eyebrow + Section headline (+ 선택 설명)."""
     desc_html = f'<p class="adetect-body-lg" style="margin-top:1rem;">{desc}</p>' if desc else ""
@@ -196,9 +181,40 @@ def section_header_block(eyebrow_text: str, title_html: str, desc: str | None = 
     )
 
 
-def feature_story(num: str, eyebrow_text: str, lead: str, desc: str, visual_svg: str, reverse: bool = False):
-    """Home §3~6 — 기능 하나를 하나의 story section으로 표현. desktop에서 visual/copy를 번갈아 배치."""
-    st.markdown(f'<div class="adetect-section-eyebrow-num">{_html.escape(num)}</div>', unsafe_allow_html=True)
+def feature_story(
+    num: str,
+    eyebrow_text: str,
+    lead: str,
+    desc: str,
+    visual_html: str,
+    layout: str = "split",
+    reverse: bool = False,
+    num_pos: str = "pos-br",
+    dramatic: bool = False,
+    align_right: bool = False,
+):
+    """Home §3~6 — Market/Brand/Creative/Synthesis 4개 section을 서로 다른 composition으로
+    표현한다(§13 "카드 섹션 템플릿 복제처럼 보이지 않게"). 거대한 배경 숫자(§14)는 항상 깔리고,
+    layout에 따라 두 가지 구성 중 하나를 쓴다:
+    - "split"  — copy/visual을 좌우로 번갈아 배치(Brand/Creative). visual은 얇은 border로
+      감싼 data panel.
+    - "banner" — visual이 전체 폭을 차지하는 편집적 배너(Market/Synthesis). border 없음,
+      `dramatic=True`면 은은한 atmosphere glow를 더한다(§13 04 Synthesis 전용).
+    """
+    st.markdown(f'<span class="adetect-story-num-bg {num_pos}">{_html.escape(num)}</span>', unsafe_allow_html=True)
+
+    if layout == "banner":
+        banner_cls = "adetect-story-visual-banner" + (" is-dramatic" if dramatic else "")
+        st.markdown(f'<div class="{banner_cls}">{visual_html}</div>', unsafe_allow_html=True)
+        copy_cls = "adetect-story-copy" + (" adetect-story-align-right" if align_right else "")
+        st.markdown(
+            f'<div class="{copy_cls}">{eyebrow(eyebrow_text)}'
+            f'<p class="adetect-story-lead">{lead}</p>'
+            f'<p class="adetect-story-desc">{desc}</p></div>',
+            unsafe_allow_html=True,
+        )
+        return
+
     copy_col, visual_col = st.columns([1.05, 1], gap="large")
     if reverse:
         copy_col, visual_col = visual_col, copy_col
@@ -210,7 +226,34 @@ def feature_story(num: str, eyebrow_text: str, lead: str, desc: str, visual_svg:
             unsafe_allow_html=True,
         )
     with visual_col:
-        st.markdown(f'<div class="adetect-story-panel">{visual_svg}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="adetect-story-panel">{visual_html}</div>', unsafe_allow_html=True)
+
+
+def manifesto_scene(eyebrow_text: str, title_html: str, desc: str):
+    """Home §12 Manifesto — "Why ADetect"를 일반 landing section이 아니라 하나의 statement로.
+    실제 렌더링은 `.adetect-manifesto-scene` marker가 심어진 st.container() 안에서 호출한다."""
+    st.markdown(
+        f'{eyebrow(eyebrow_text)}'
+        f'<p class="adetect-manifesto-title">{title_html}</p>'
+        f'<p class="adetect-manifesto-desc">{desc}</p>',
+        unsafe_allow_html=True,
+    )
+
+
+def sample_showcase(stats: list[tuple[str, str, str]], quote_html: str):
+    """Home §15~17 Option A — Editorial Product Showcase. 브라우저 프레임/대시보드 mockup을
+    그리지 않고, "제품 결과가 이렇게 보인다"는 포스터 형태의 큰 타이포그래피로 보여준다.
+    이 함수를 호출하는 컨테이너에는 반드시 `.adetect-showcase-scene` marker(pointer-events:none)를
+    같이 심어 실제 기능처럼 보이지 않게 한다 — 호출부(pages/1_home.py)에서 eyebrow/caption으로
+    "SAMPLE OUTPUT · 실제 분석 결과가 아닙니다"를 명시한다.
+    stats: [(value_html, unit, label)]."""
+    cells = "".join(
+        f'<div><div class="adetect-showcase-stat-value">{value}<span class="unit">{_html.escape(unit)}</span></div>'
+        f'<div class="adetect-showcase-stat-label">{_html.escape(label)}</div></div>'
+        for value, unit, label in stats
+    )
+    st.markdown(f'<div class="adetect-showcase-stats">{cells}</div>', unsafe_allow_html=True)
+    st.markdown(f'<p class="adetect-showcase-quote">{quote_html}</p>', unsafe_allow_html=True)
 
 
 def cta_section(title: str):
