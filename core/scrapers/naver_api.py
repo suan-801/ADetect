@@ -22,7 +22,12 @@ class NaverApiError(RuntimeError):
 
 
 def seeded_random(key: str) -> random.Random:
-    """다른 scraper 모듈에서도 재사용하는 결정론적 목업 난수 헬퍼."""
+    """다른 scraper 모듈에서도 재사용하는 결정론적 목업 난수 헬퍼.
+
+    DO NOT PORT THIS TO PRODUCTION ANALYSIS LOGIC — 이 함수와 이를 사용하는 `_mock_*` 헬퍼는
+    UI skeleton verification/테스트 fixture 전용이다. key 문자열의 해시로 값을 결정하기 때문에
+    같은 입력에 항상 같은 mock을 반환할 뿐, 실제 시장/브랜드 판단 근거가 아니다.
+    """
     seed = int(hashlib.sha256(key.encode("utf-8")).hexdigest(), 16) % (2**32)
     return random.Random(seed)
 

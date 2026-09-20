@@ -20,7 +20,15 @@ home_page_marker()
 
 
 def _command_bar(key_prefix: str, label: str = "START HERE"):
-    """LAYER 1 — Hero의 유일한 실제 interactive 영역(브랜드 입력 → 분석 시작)."""
+    """LAYER 1 — Hero의 유일한 실제 interactive 영역(브랜드 입력 → 분석 시작).
+
+    Home에서 이미 브랜드명(+선택적으로 카테고리/경쟁사)을 입력받았으므로, Analyze의 STEP1
+    입력 화면을 다시 보여주지 않고 곧바로 "AI 추천 확인"(step="confirm")으로 진입한다 —
+    같은 값을 다시 입력하라고 요구하는 중복 스텝을 없앤다. 카테고리/경쟁사를 이 expander에서
+    직접 입력했다면 그 값을 그대로 draft에 담아 AI 추천이 그 값을 덮어쓰지 않게 한다
+    (pages/2_analyze.py의 confirm 스텝이 draft["category"]/draft["competitors_raw"]가 있으면
+    그 값을 우선 사용).
+    """
     with st.container():
         command_marker()
         st.markdown(f"<span class='adetect-command-label'>{label}</span>", unsafe_allow_html=True)
@@ -42,10 +50,12 @@ def _command_bar(key_prefix: str, label: str = "START HERE"):
             if not brand_name.strip():
                 st.error("브랜드명을 입력해주세요.")
             else:
-                st.session_state.prefill_brand = brand_name.strip()
-                st.session_state.prefill_category = st.session_state.get(f"{key_prefix}_category_input", "").strip()
-                st.session_state.prefill_competitors = st.session_state.get(f"{key_prefix}_competitors_input", "").strip()
-                st.session_state.step = "input"
+                st.session_state.draft = {
+                    "brand_name": brand_name.strip(),
+                    "category": st.session_state.get(f"{key_prefix}_category_input", "").strip(),
+                    "competitors_raw": st.session_state.get(f"{key_prefix}_competitors_input", "").strip(),
+                }
+                st.session_state.step = "confirm"
                 st.session_state.session = None
                 st.switch_page("pages/2_analyze.py")
 

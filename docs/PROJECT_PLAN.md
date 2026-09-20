@@ -11,7 +11,7 @@
 |---|---|---|
 | 저장소 뼈대 (폴더 구조, .env, requirements) | ✅ 완료 | 루트 |
 | 디자인 시스템 — Cinematic Editorial Intelligence(4차 리뉴얼, §8 Active Design Direction) | ✅ 완료 | `config/theme.py`, `.streamlit/config.toml` |
-| 홈 화면 — Cinematic Brand Experience(Hero/Manifesto/Story/Sample Output/Final CTA scene 구성) | ✅ 완료 | `pages/1_home.py`, `ui/hero.py`, `ui/components.py` |
+| 홈 화면 — Cinematic Brand Experience(2026-09-20부로 Hero 단일 화면 축소, Manifesto/Story/Sample Output/Final CTA 제거) | ✅ 완료 | `pages/1_home.py`, `ui/hero.py` |
 | STEP 1 브랜드 설정 + AI 추천 확인 화면 | ✅ 완료 — **카테고리/경쟁사 추천 Gemini 실연동**(GEMINI_API_KEY 있으면), 실패해도 목업으로 조용히 폴백. 타겟 입력 필드 없음 | `pages/2_analyze.py`, `core/analyzers/recommender.py` |
 | STEP 2 Workspace **4개 탭** 골격 + 상태 스트립 | ✅ 완료 (16차 개정 — 독립 타겟분석 탭 제거) | `pages/2_analyze.py` |
 | 시장분석 탭 | 🟡 **부분 실연동** — 검색량 추이(DataLab)·뉴스는 NAVER 키 있으면 실동작. `search_seasonality`/`reference_sources`/`market_issues`/`upcoming_changes`(§7-1) 및 다운로드는 아직 미구현 | `ui/market_tab.py`, `core/scrapers/naver_api.py` |
@@ -249,7 +249,28 @@ CSS를 작성했고, `.streamlit/config.toml`의 테마 값이 정상 로드되�
 각 세션마다 이 문서를 계속 갱신하지 못하면 실제 코드와 계획서가 어긋나기 쉬워서, 굵직한 변경만
 간단히 누적 기록합니다. 자세한 내용은 `git log`/커밋 메시지를 참고하세요.
 
-- **2026-09-20**: **4차 리뉴얼 — "Cinematic Editorial Intelligence" (Home 시각 경험 전면 개편)**.
+- **2026-09-20 (3차)**: **Team Parallel Development 기반 정비 — 기능 구현 없이 공통 골격만 정리**.
+  Market/Brand/Creative/Synthesis를 서로 다른 담당자가 병렬 개발할 수 있도록, 실제 분석 로직은
+  건드리지 않고 (1) Home을 Hero 단일 화면으로 축소(Manifesto/Story/Sample Output/Final CTA
+  scene 및 관련 CSS·컴포넌트·`ui/illustrations.py` 전체 삭제 — 더 이상 어디서도 쓰이지 않음),
+  Hero overlay를 완화하고 Intelligence Pipeline을 command bar와 분리된 technical rail 톤으로
+  재정리, Home→Analyze 진입 시 STEP1 입력 화면을 건너뛰고 바로 AI 추천 확인(confirm) 단계로
+  들어가도록 변경(같은 값 재입력 제거), (2) Market/Brand/Synthesis 파일 상단에
+  "IMPLEMENTATION CONTRACT"(필수 입출력/상태/Do not 목록, 담당자 인계용) 추가 + 탭 헤더에
+  `ui/components.prototype_notice()`(신규 공통 컴포넌트)로 실연동 범위를 정직하게 표시,
+  Brand의 홈페이지/SNS 분석 sub-tab에도 SAMPLE 배지 보강 + 광고 운영 매트릭스가 항상
+  seeded_random 기반 placeholder라는 점을 caption으로 명시, (3) `rng_bool()`/
+  `infer_brand_context()`/`seeded_random()`에 "DO NOT PORT TO PRODUCTION" 주석 추가, (4) History
+  화면에서 더 이상 쓰이지 않는 legacy `target_status` 표시 제거 + "지금 저장/복원되는 것은
+  세션 컨텍스트뿐" 안내를 §22 Definition of Done과 함께 명문화, (5) `requirements.txt`의
+  `streamlit>=1.42`를 실제 검증된 `==1.63.0`으로 pin(팀 전원이 같은 CSS 렌더링을 보게 하기
+  위함), (6) 본 문서에 §9 Team Parallel Development 원칙·§10 기능별 Definition of Done 신설,
+  CLAUDE.md에 "Creative=Reference Implementation, Market/Brand/Synthesis=UI skeleton" 가드레일
+  추가, PRD.md §0에 "Current Implementation Status"(개발 진행 상태, 요구사항과 구분) 신설.
+  **분석 알고리즘·새 외부 API 연동·mock 데이터 자체는 전혀 추가하지 않았다** — 이번 세션은
+  문서/공통 컴포넌트/Home 시각/dead code 정리에 한정됨. `pytest tests/test_smoke.py -v` 7개 전체
+  통과, `streamlit run app.py` 기동 후 Home/Workspace 4탭·History·Settings를 브라우저로 확인.
+- **2026-09-20 (2차)**: **4차 리뉴얼 — "Cinematic Editorial Intelligence" (Home 시각 경험 전면 개편)**.
   3차 리뉴얼("Brand Intelligence Platform / Editorial Technology")이 기술적으로는 정돈됐지만
   "잘 만든 SaaS 대시보드"처럼 보인다는 피드백에 따라, Home을 "브랜드 존재감이 있는 Cinematic
   Brand Experience"로 재구성했다. **기능/IA/analyzer·scraper 로직/DB 스키마/Export 로직은 전혀
@@ -350,9 +371,8 @@ CSS를 작성했고, `.streamlit/config.toml`의 테마 값이 정상 로드되�
     최우선이다. 1200px container, 장식 없음, 3차 리뉴얼 원칙을 그대로 유지한다.
   - 같은 토큰(색/타이포)을 공유하지만, decoration(gradient/glow/큰 typography)은 Home에만
     허용한다. Home의 dramatic visual language를 Workspace 데이터 화면까지 확장하지 않는다.
-* **배경**: Flat Black(`#050506`~`#0B0B0D` 3단계) 기반. 이미지/gradient depth는 Home의
-  large-scale atmospheric visual(Hero/Manifesto/Final CTA)에만 허용 — "Flat Black foundation +
-  Controlled Luminous Depth"
+* **배경**: Flat Black(`#050506`~`#0B0B0D` 3단계) 기반. 이미지/gradient depth는 Home Hero의
+  large-scale atmospheric visual에만 허용 — "Flat Black foundation + Controlled Luminous Depth"
 * **Hero Master Asset**: `ui/assets/home/background.png`(+ `background.webp`, 인라인 delivery용
   25KB 압축본) — 사용자가 확정한 공식 Hero visual. Home Hero에서만 쓰고, 카드/보더/그림자로
   감싸지 않으며, 다른 section에서 재사용하거나 비슷한 CSS 장식으로 재현하지 않는다. `ui/hero.py`의
@@ -367,9 +387,9 @@ CSS를 작성했고, `.streamlit/config.toml`의 테마 값이 정상 로드되�
     새 accent 값을 고를 때는 R 채널이 확실히 우세하고 브라우저에서 실제 검정 배경 위에 렌더링해
     확인한다.
 * **Gradient/Glow**: 전면 금지가 아니라 **범위를 제한**한다.
-  - 허용: Home Hero(background.png)/Manifesto/Story의 `.is-dramatic` banner/Final CTA처럼
-    large-scale atmospheric visual. `filter: blur(60px)` 이상 + opacity 0.1~0.35 수준의 diffuse
-    glow만 — "light in space"여야지 "neon gaming UI"처럼 보이면 실패다.
+  - 허용: Home Hero(background.png) 같은 large-scale atmospheric visual. `filter: blur(60px)`
+    이상 + opacity 0.1~0.35 수준의 diffuse glow만 — "light in space"여야지 "neon gaming UI"처럼
+    보이면 실패다.
   - 금지: 버튼/입력/테이블/카드/metric 등 UI 컴포넌트의 gradient·glow. Workspace 전체.
 * **Radius**: 작게 유지(4/6/9px 토큰) — 큰 radius는 SaaS 대시보드 인상을 준다
 * **우선순위**: Grid → Typography → Spacing → Information hierarchy → Data → Color → Decoration
@@ -381,15 +401,74 @@ CSS를 작성했고, `.streamlit/config.toml`의 테마 값이 정상 로드되�
 * **Contrast**: 넓은 accent 면적 위 텍스트는 항상 WCAG AA(4.5:1 이상, 가능하면) 확인 후 확정 —
   "느낌상 괜찮아 보임"으로 판단하지 않는다(16차 개정 CTA 대비 수정, 4차 리뉴얼 accent_surface/
   text_faint 재검증이 실제 사례)
-* **Sample/Demo 구분**: Home의 Sample Output(§7-11 실제 기능과 무관한 예시 섹션)은 반드시
-  "SAMPLE OUTPUT" 라벨 + `pointer-events:none`으로 실제 기능과 시각적으로 구분한다 — 브라우저
-  프레임/대시보드 mockup처럼 실제 앱 화면을 흉내 내지 않는다(Editorial Product Showcase 형태,
-  `ui/components.sample_showcase()`)
-* **Layout hook**: Home cinematic scene(Hero/Manifesto/Story/Showcase/Final CTA)은
-  `config.theme.scene_marker()`로 실제 `stVerticalBlock`에 CSS `:has()` 훅을 건다. 새 훅을 추가할
-  때는 Streamlit의 실제 `data-testid`(`stColumn`/`stVerticalBlock`/`stElementContainer` 등,
-  버전마다 바뀔 수 있음)를 브라우저 DOM에서 먼저 확인한다 — 과거 `pipeline_wrap_marker()`가
-  존재하지 않는 `column`을 셀렉터로 써서 조용히 무효화돼 있던 사례가 있다(4차 리뉴얼에서 발견/수정)
+* **Sample/Demo 구분**: Home에는 더 이상 Sample Output scene이 없다(2026-09-20 Hero-only 축소).
+  Mock 데이터 노출은 이제 전부 Workspace 탭 안에서 일어난다 — `ui/components.sample_data_notice()`
+  (특정 sub-tab의 수치가 샘플임을 알리는 작은 SAMPLE 배지+caption)와 `prototype_notice()`(탭
+  전체가 아직 어디까지 실연동됐는지 알리는 한 줄 caption, §14 참고)를 이 목적에 쓴다 — 큰
+  warning box를 만들지 않는다.
+* **Layout hook**: Home cinematic scene(현재는 Hero뿐)은 `config.theme.scene_marker()`로 실제
+  `stVerticalBlock`에 CSS `:has()` 훅을 건다. 새 훅을 추가할 때는 Streamlit의 실제 `data-testid`
+  (`stColumn`/`stVerticalBlock`/`stElementContainer` 등, 버전마다 바뀔 수 있음)를 브라우저
+  DOM에서 먼저 확인한다 — 과거 `pipeline_wrap_marker()`가 존재하지 않는 `column`을 셀렉터로
+  써서 조용히 무효화돼 있던 사례가 있다(4차 리뉴얼에서 발견/수정)
 
 새 화면/컴포넌트를 만들 때 이 목록과 충돌하면 이 목록이 우선한다. 이 목록 자체를 바꾸는 변경은
 §7 최근 변경 이력에도 함께 기록한다.
+
+---
+
+## 9. Team Parallel Development 원칙
+
+Market/Brand/Creative/Synthesis 4개 Primary Function은 서로 다른 담당자가 각자 브랜치에서
+병렬로 개발할 수 있도록 나뉘어 있다(§3 모듈 분담). Creative가 가장 진행이 앞서 있으므로
+**Creative Analysis(`ui/creative_tab.py`/`core/analyzers/creative_analyzer.py`)를 Reference
+Implementation으로 삼는다** — 새로 합류하는 담당자는 자기 기능을 구현하기 전에 Creative의
+구조를 먼저 읽는다. 단, Creative의 모든 구현 세부사항을 그대로 복사하라는 뜻은 아니다 —
+기능별 데이터/화면은 각자 특성에 맞게 달라질 수 있다.
+
+**공통으로 따라야 할 패턴** (Creative에서 확인 가능):
+- `ui/components.py`의 `tab_header()`/`feature_intro()`/`metric_row()`/`render_insight_card()`/
+  `sample_data_notice()`/`prototype_notice()` — 탭마다 새로 만들지 않는다.
+- 실행 버튼 → `st.status`(또는 `st.spinner`) 진행 표시 → 완료/부분 실패/전체 실패 처리 →
+  `st.rerun()` 흐름.
+- 근거 있는 판단만 `insight/source/evidence/confidence`(§20 아래) 스키마로 감싸 보여준다.
+- 다운로드는 "생성 → 다운로드" 2단계(무거운 산출물도 같은 패턴 안에서 스피너를 보여줄 수 있음).
+
+**여러 담당자가 함께 쓰는 파일이라 변경 전 미리 알려야 하는 것** (§3에서 이미 언급, 여기서
+공식화):
+- Primary tab 순서(`pages/2_analyze.py`의 `st.tabs([...])` — 항상 시장→브랜드→소재→종합)
+- Session context shape(`session` dict의 키 이름 — `*_status`/`*_result` 패턴)
+- Status vocabulary(`미실행`/`진행중`/`완료`/`부분 실패`/`전체 실패`/`취소`/`잠금` — §16-2, 새
+  상태값을 추가하지 않는다)
+- Insight schema(`insight_synthesizer.build_insight()`의 `insight/source/evidence/confidence`)
+- Shared component contract(`ui/components.py`) — 시그니처를 바꾸면 다른 탭이 깨진다
+- Design token(`config/theme.py`의 `COLORS`/`SPACING`/`RADIUS`)
+- Evidence rule(§8 FACT/AI/REC 3단 분류, 근거 없는 판단 금지)
+- Mock transparency rule(§13 Mock을 확정 결과처럼 보여주지 않는다, `sample_data_notice()`/
+  `prototype_notice()`로 항상 표시)
+
+이 중 하나를 바꿔야 하면, 다른 기능 담당자에게 영향을 주는지 먼저 확인하고 진행한다.
+
+---
+
+## 10. 기능별 완료 조건 (Definition of Done)
+
+Market/Brand/Synthesis 담당자가 "이 기능을 다 만들었다"고 판단할 때 공통으로 확인할 체크리스트.
+Creative는 이미 전부 충족한 상태다 — 참고 기준으로 삼을 것.
+
+1. **Mock/sample logic 제거 또는 명시적 fallback 처리** — `seeded_random()` 기반 mock을 실제
+   호출로 교체하거나, 실패 시 `insufficient_data`/`전체 실패`로 정직하게 처리(임의 값으로
+   채우지 않음).
+2. **Actual source connection** — 해당 기능이 필요로 하는 실제 API/스크래핑 연동.
+3. **Error / partial failure** — §11 정책대로 전체 실패/부분 실패를 구분해 처리.
+4. **Result schema** — PRD §7의 필드를 그대로 채움 (없는 필드를 추가해야 하면 PRD 먼저 갱신).
+5. **Evidence** — AI/REC 필드는 `insight/source/evidence/confidence`를 갖춤(§8).
+6. **UI 결과 화면** — Creative 패턴(§9)을 따라 개요/세부 탭 구성.
+7. **Download** — HTML/Excel(필요하면 ZIP)까지, `core/exporters/*.py`에 구현.
+8. **function_run persistence** — `database.db.save_function_run()`을 실제로 호출해 History
+   재진입 시 결과가 복원되게 함(§22, 지금은 어떤 기능도 이걸 호출하지 않는다).
+9. **Smoke test** — `tests/test_smoke.py`에 그 기능의 성공/실패 케이스 추가.
+10. **PRD 갱신** — 실제 구현이 PRD §7/§11과 달라졌으면 PRD.md를 먼저 갱신(CLAUDE.md 규칙 3).
+
+이 기준을 다 채우기 전까지는 그 탭 헤더에 `prototype_notice()`를 유지한다 — 다 채우면
+`prototype_notice()` 호출을 지우고, PRD.md §0의 "Current Implementation Status"도 함께 갱신한다.

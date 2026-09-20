@@ -44,6 +44,10 @@ def test_workspace_has_4_primary_tabs_no_standalone_target():
     assert tab_labels == ["01 시장분석", "02 브랜드분석", "03 소재분석", "04 종합분석"]
     assert not any("타겟" in label for label in tab_labels)
 
+    # Analysis Status Index — 항상 4개 항목(§17), 5번째(구 타겟) 행이 남아있지 않은지 확인.
+    status_html = "\n".join(m.value for m in at.markdown)
+    assert status_html.count("adetect-status-row") == 4
+
 
 def test_full_flow_market_brand_creative_synthesis():
     at = AppTest.from_file(str(PAGES / "2_analyze.py")).run()

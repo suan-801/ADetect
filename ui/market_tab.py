@@ -1,8 +1,25 @@
 """시장분석 탭 — PRD §7-1·§7-11-(1)·§16-2.
 
-★ 담당: 시장분석 파트. 지금은 화면 골격 + 목업 데이터로만 채워져 있습니다.
-실제 구현 시 core/scrapers/naver_api.py의 get_search_volume_trend()/get_news()를
-실제 API 호출로 교체하고, market_issues/upcoming_changes 등 AI 필드를 추가하면 됩니다.
+★ MARKET IMPLEMENTATION CONTRACT (담당: 시장분석 파트)
+
+현재 상태 — 부분 실연동: `get_search_volume_trend()`/`get_news()`는 NAVER_CLIENT_ID/SECRET이
+있으면 이미 실제 API를 호출한다(config/settings.NAVER_DATALAB_MOCK/NAVER_SEARCH_MOCK). 키가
+없으면 결정론적 mock으로 조용히 폴백한다 — "지금 이 탭이 전부 mock"이라고 가정하지 말 것.
+
+Required input: session["brand_name"], session["category"](없으면 brand_name으로 대체)
+Required output(PRD §7-1): trend, news는 완료. search_seasonality/reference_sources/
+market_issues/upcoming_changes(§7-1-a·§7-1-b)는 아직 화면·데이터 모두 없음 — 추가 필요.
+Required states: 완료/부분 실패/전체 실패(§11) — 지금은 NaverApiError만 전체 실패로 처리.
+"검색량은 성공, 뉴스만 실패" 같은 부분 실패 케이스는 아직 없음(§6 참고해 추가 검토).
+
+Reference pattern: `ui/creative_tab.py`/`core/analyzers/creative_analyzer.py` — st.status
+진행 표시, insight_synthesizer.build_insight() 스키마, HTML/Excel 다운로드(생성→다운로드
+2단계) 패턴을 그대로 따르면 된다.
+
+Do not:
+- Workspace 1차 탭 순서(시장→브랜드→소재→종합)를 바꾸지 않는다.
+- source/evidence/confidence 없는 AI 판단을 확정 결과처럼 보여주지 않는다(§8).
+- 근거 없는 수치(세그먼트 인구통계 등)를 새로 지어내지 않는다.
 """
 from __future__ import annotations
 
@@ -11,12 +28,13 @@ import streamlit as st
 
 from config import settings
 from core.scrapers.naver_api import NaverApiError, get_news, get_search_volume_trend
-from ui.components import feature_intro, metric_row, sample_data_notice, status_icon, tab_header
+from ui.components import feature_intro, metric_row, prototype_notice, sample_data_notice, status_icon, tab_header
 
 
 def render(session: dict):
     status = session.get("market_status", "미실행")
     tab_header("MARKET", "시장분석", status_icon(status))
+    prototype_notice("프로토타입 화면 · 검색량 추이·뉴스는 실제 데이터 연동, 계절성/참고자료 등 나머지 지표는 연동 예정")
 
     if status in ("미실행", "전체 실패"):
         feature_intro([
@@ -87,5 +105,5 @@ def render(session: dict):
 
     st.divider()
     c1, c2 = st.columns(2)
-    c1.button("HTML 다운로드 (준비 중)", disabled=True, key="dl_html_market")
-    c2.button("Excel 다운로드 (준비 중)", disabled=True, key="dl_excel_market")
+    c1.button("HTML 다운로드 — 기능 개발 후 제공 예정", disabled=True, key="dl_html_market")
+    c2.button("Excel 다운로드 — 기능 개발 후 제공 예정", disabled=True, key="dl_excel_market")

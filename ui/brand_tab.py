@@ -1,10 +1,32 @@
 """브랜드분석 탭 — PRD §7-3·§7-11-(3)·§16-3. 자사+경쟁사 통합 스키마.
 
-★ 담당: 브랜드분석 파트 (백엔드 포함).
-core/analyzers/brand_analyzer.py의 run_brand_analysis()를 호출해 렌더링합니다.
-지금은 core/scrapers/*가 목업 데이터를 반환하지만(§ config.settings.USE_MOCK_DATA),
-.env에 실제 키(NAVER_*, APIFY_API_TOKEN, GEMINI_API_KEY)를 채우면 scraper 내부 구현만
-바꿔도 이 탭은 그대로 동작하도록 설계했습니다.
+★ BRAND IMPLEMENTATION CONTRACT (담당: 브랜드분석 파트, 백엔드 포함)
+
+현재 상태 — 부분 실연동: `core/analyzers/brand_analyzer.run_brand_analysis()`가 오케스트레이션을
+담당한다. 브랜드 검색량(`naver_api.get_brand_search_volume`)·Meta 광고 요약(`ad_library.
+fetch_meta_ads`)은 키가 있으면 이미 실제 데이터다. `brand_site.crawl_brand_website()`(항상
+목업, `BRAND_SITE_MOCK=True` 고정)·`ad_library.fetch_instagram_profile()`(브랜드명→handle
+해석 문제 미해결)·`brand_analyzer.infer_brand_context()`/AI 해석 문구(아직 Gemini 미연동, 전부
+규칙 기반 템플릿)는 실제 로직으로 교체 필요.
+
+Required input: session["brand_name"], session["competitors"], 선택 수집 옵션 4개
+(collect_instagram/youtube/naver_sa/news).
+Required output(PRD §7-3): run_brand_analysis()의 반환 shape(own/competitors/brand_context/
+comparison_insight)을 바꾸지 말 것 — ui/brand_tab.py가 이 shape을 그대로 렌더링한다.
+Required states: 완료/부분 실패/전체 실패(§11) — 지금은 자사 수집 실패만 전체 실패로 처리한다.
+brand_analyzer._analyze_single_brand()의 `media_operation_matrix_row["naver_sa"/
+"naver_brand_search"/"youtube_channel"]`은 `rng_bool()`(seeded_random 기반)로 항상 채워지며
+API 키 유무와 무관한 UI 스켈레톤 검증용 placeholder다 — 실제 네이버 SA/브랜드검색 운영 여부
+조회로 교체 필요(§16 Guardrail 참고).
+
+Reference pattern: `ui/creative_tab.py`/`core/analyzers/creative_analyzer.py` — Gemini
+실연동 예시는 `core/analyzers/recommender.py`(구조화된 JSON 응답 스키마 + 실패 시 목업 폴백).
+
+Do not:
+- Workspace 1차 탭 순서를 바꾸지 않는다.
+- source/evidence/confidence 없는 AI 판단을 확정 결과처럼 보여주지 않는다(§8).
+- rng_bool()/infer_brand_context() 같은 seeded_random mock 로직을 실제 판단 근거로 재사용하지
+  않는다 — UI 골격 검증용일 뿐이다.
 """
 from __future__ import annotations
 
@@ -15,12 +37,13 @@ from config import settings
 from core.analyzers.brand_analyzer import run_brand_analysis
 from core.scrapers.ad_library import ApifyFetchError
 from core.scrapers.naver_api import NaverApiError
-from ui.components import feature_intro, metric_row, render_insight_card, sample_data_notice, status_icon, tab_header
+from ui.components import feature_intro, metric_row, prototype_notice, render_insight_card, sample_data_notice, status_icon, tab_header
 
 
 def render(session: dict):
     status = session.get("brand_status", "미실행")
     tab_header("BRAND", "브랜드분석", status_icon(status))
+    prototype_notice("프로토타입 화면 · 브랜드 검색량·Meta 광고는 실제 데이터 연동, 홈페이지 분석·Instagram·AI 해석 문구는 연동 예정")
 
     if status in ("미실행", "전체 실패"):
         feature_intro([
@@ -102,6 +125,7 @@ def render(session: dict):
             st.line_chart(own_trend.set_index("date")["search_index"], color="#5AA9E6")
 
     with tabs[2]:
+        sample_data_notice()
         for b in [own, *competitors]:
             label = f"{b['brand']}" + (" (자사)" if b["is_own"] else "")
             with st.expander(label, expanded=b["is_own"]):
@@ -111,6 +135,10 @@ def render(session: dict):
                 render_insight_card("프로모션 해석", b["promotion_interpretation"])
 
     with tabs[3]:
+        st.caption(
+            "Meta Ads 열만 실제 수집 데이터(활성 광고 수 > 0)입니다 — 네이버 SA/브랜드검색/"
+            "YouTube 운영 여부는 아직 실제 조회 로직이 없어 화면 골격 검증용 placeholder입니다."
+        )
         rows = []
         for b in [own, *competitors]:
             m = b["media_operation_matrix_row"]
@@ -126,6 +154,7 @@ def render(session: dict):
         st.dataframe(pd.DataFrame(rows), width="stretch", hide_index=True)
 
     with tabs[4]:
+        sample_data_notice()
         for b in [own, *competitors]:
             ig = b["instagram"]
             label = f"{b['brand']}" + (" (자사)" if b["is_own"] else "")
@@ -145,5 +174,5 @@ def render(session: dict):
 
     st.divider()
     c1, c2 = st.columns(2)
-    c1.button("HTML 다운로드 (준비 중)", disabled=True, key="dl_html_brand")
-    c2.button("Excel 다운로드 (준비 중)", disabled=True, key="dl_excel_brand")
+    c1.button("HTML 다운로드 — 기능 개발 후 제공 예정", disabled=True, key="dl_html_brand")
+    c2.button("Excel 다운로드 — 기능 개발 후 제공 예정", disabled=True, key="dl_excel_brand")

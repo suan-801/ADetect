@@ -1,7 +1,14 @@
 """이력 관리 — PRD §16-6. 세션을 클릭하면 Workspace로 재진입합니다.
 
 카드 grid 대신 row 기반 compact list로 표현합니다 — 최근 분석이 가장 위에 오고,
-브랜드/카테고리/생성일/타겟 상태를 한 줄에서 훑어볼 수 있게 합니다.
+브랜드/카테고리/생성일을 한 줄에서 훑어볼 수 있게 합니다.
+
+지금 저장·복원되는 것은 analysis_session(브랜드/카테고리/경쟁사)뿐이다 — function_run(기능별
+실행 결과)은 `database.db.save_function_run()`이 어디서도 호출되지 않아 실제로 저장되지
+않는다(§7 최근 변경 이력). 그래서 target_status 같은 레거시 컬럼 값은 더 이상 이 화면에
+노출하지 않는다 — Target은 독립 개념이 아니고(§0 16차 개정), 이 컬럼은 과거 세션 호환용으로만
+DB에 남아있다. `save_function_run()`/`list_function_runs()` 인터페이스는 향후 기능별 결과
+복원을 구현할 담당자를 위해 그대로 유지한다.
 """
 from __future__ import annotations
 
@@ -29,7 +36,6 @@ if not sessions:
         unsafe_allow_html=True,
     )
 else:
-    target_status_label = {"not_set": "타겟 미확정", "recommended": "타겟 추천됨", "confirmed": "타겟 확정"}
     for s in sessions:
         competitors = json.loads(s["competitors_json"] or "[]")
         row_col, action_col = st.columns([5, 1], vertical_alignment="center")
@@ -39,8 +45,7 @@ else:
                 '<div class="adetect-row-main">'
                 f'<p class="adetect-row-brand">{html.escape(s["brand_name"])}'
                 f'<span style="color:#667080;font-weight:380;"> · {html.escape(s["category"] or "카테고리 미지정")}</span></p>'
-                f'<p class="adetect-row-meta">경쟁사 {len(competitors)}개 · 생성일 {html.escape(s["created_at"][:19])} · '
-                f'{target_status_label.get(s["target_status"], s["target_status"])}</p>'
+                f'<p class="adetect-row-meta">경쟁사 {len(competitors)}개 · 생성일 {html.escape(s["created_at"][:19])}</p>'
                 "</div></div>",
                 unsafe_allow_html=True,
             )
@@ -54,8 +59,6 @@ else:
                     "market_status": "미실행",
                     "brand_status": "미실행",
                     "creative_status": "미실행",
-                    "target_status": s["target_status"],
-                    "confirmed_target": s["confirmed_target"],
                 }
                 st.session_state.step = "workspace"
                 st.switch_page("pages/2_analyze.py")

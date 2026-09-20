@@ -97,6 +97,18 @@ def sample_data_notice():
     st.caption("지금 보이는 수치/문구는 실제 수집 데이터가 아닌 프로토타입용 샘플입니다.")
 
 
+def prototype_notice(text: str):
+    """탭 헤더 바로 아래에 붙이는 개발 진행 상태 caption — Market/Brand/Synthesis처럼 일부만
+    실연동된 탭에서, 어디까지 실제 데이터고 어디부터 화면 골격뿐인지 작게 알려준다.
+
+    sample_data_notice()가 "지금 보이는 이 숫자가 샘플이다"를 알리는 sub-tab 단위 배지라면,
+    이 함수는 탭 전체 단위로 "이 탭이 지금 어느 정도까지 구현됐는가"를 알리는 한 줄 caption이다
+    — 큰 warning box 대신 작은 metadata로만 노출한다(개발 상태를 사용자에게 과장해서 보여주지
+    않는다는 원칙). Creative처럼 이미 end-to-end로 동작하는 탭에는 붙이지 않는다.
+    """
+    st.caption(text)
+
+
 def metric_row(items: list[tuple[str, str, str | None]]):
     """Metric 컴포넌트 — 전체 폭을 균등 분할하고 vertical divider로 구분합니다.
     items: [(label, value_html, trend)] — trend는 'up'/'down'/'flat'/None."""
@@ -181,80 +193,3 @@ def section_header_block(eyebrow_text: str, title_html: str, desc: str | None = 
     )
 
 
-def feature_story(
-    num: str,
-    eyebrow_text: str,
-    lead: str,
-    desc: str,
-    visual_html: str,
-    layout: str = "split",
-    reverse: bool = False,
-    num_pos: str = "pos-br",
-    dramatic: bool = False,
-    align_right: bool = False,
-):
-    """Home §3~6 — Market/Brand/Creative/Synthesis 4개 section을 서로 다른 composition으로
-    표현한다(§13 "카드 섹션 템플릿 복제처럼 보이지 않게"). 거대한 배경 숫자(§14)는 항상 깔리고,
-    layout에 따라 두 가지 구성 중 하나를 쓴다:
-    - "split"  — copy/visual을 좌우로 번갈아 배치(Brand/Creative). visual은 얇은 border로
-      감싼 data panel.
-    - "banner" — visual이 전체 폭을 차지하는 편집적 배너(Market/Synthesis). border 없음,
-      `dramatic=True`면 은은한 atmosphere glow를 더한다(§13 04 Synthesis 전용).
-    """
-    st.markdown(f'<span class="adetect-story-num-bg {num_pos}">{_html.escape(num)}</span>', unsafe_allow_html=True)
-
-    if layout == "banner":
-        banner_cls = "adetect-story-visual-banner" + (" is-dramatic" if dramatic else "")
-        st.markdown(f'<div class="{banner_cls}">{visual_html}</div>', unsafe_allow_html=True)
-        copy_cls = "adetect-story-copy" + (" adetect-story-align-right" if align_right else "")
-        st.markdown(
-            f'<div class="{copy_cls}">{eyebrow(eyebrow_text)}'
-            f'<p class="adetect-story-lead">{lead}</p>'
-            f'<p class="adetect-story-desc">{desc}</p></div>',
-            unsafe_allow_html=True,
-        )
-        return
-
-    copy_col, visual_col = st.columns([1.05, 1], gap="large")
-    if reverse:
-        copy_col, visual_col = visual_col, copy_col
-    with copy_col:
-        st.markdown(
-            f'<div class="adetect-story-copy">{eyebrow(eyebrow_text)}'
-            f'<p class="adetect-story-lead">{lead}</p>'
-            f'<p class="adetect-story-desc">{desc}</p></div>',
-            unsafe_allow_html=True,
-        )
-    with visual_col:
-        st.markdown(f'<div class="adetect-story-panel">{visual_html}</div>', unsafe_allow_html=True)
-
-
-def manifesto_scene(eyebrow_text: str, title_html: str, desc: str):
-    """Home §12 Manifesto — "Why ADetect"를 일반 landing section이 아니라 하나의 statement로.
-    실제 렌더링은 `.adetect-manifesto-scene` marker가 심어진 st.container() 안에서 호출한다."""
-    st.markdown(
-        f'{eyebrow(eyebrow_text)}'
-        f'<p class="adetect-manifesto-title">{title_html}</p>'
-        f'<p class="adetect-manifesto-desc">{desc}</p>',
-        unsafe_allow_html=True,
-    )
-
-
-def sample_showcase(stats: list[tuple[str, str, str]], quote_html: str):
-    """Home §15~17 Option A — Editorial Product Showcase. 브라우저 프레임/대시보드 mockup을
-    그리지 않고, "제품 결과가 이렇게 보인다"는 포스터 형태의 큰 타이포그래피로 보여준다.
-    이 함수를 호출하는 컨테이너에는 반드시 `.adetect-showcase-scene` marker(pointer-events:none)를
-    같이 심어 실제 기능처럼 보이지 않게 한다 — 호출부(pages/1_home.py)에서 eyebrow/caption으로
-    "SAMPLE OUTPUT · 실제 분석 결과가 아닙니다"를 명시한다.
-    stats: [(value_html, unit, label)]."""
-    cells = "".join(
-        f'<div><div class="adetect-showcase-stat-value">{value}<span class="unit">{_html.escape(unit)}</span></div>'
-        f'<div class="adetect-showcase-stat-label">{_html.escape(label)}</div></div>'
-        for value, unit, label in stats
-    )
-    st.markdown(f'<div class="adetect-showcase-stats">{cells}</div>', unsafe_allow_html=True)
-    st.markdown(f'<p class="adetect-showcase-quote">{quote_html}</p>', unsafe_allow_html=True)
-
-
-def cta_section(title: str):
-    st.markdown(f'<p class="adetect-cta-title">{title}</p>', unsafe_allow_html=True)

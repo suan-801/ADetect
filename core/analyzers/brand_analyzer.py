@@ -16,8 +16,10 @@ from core.scrapers.naver_api import get_brand_search_volume, get_news, seeded_ra
 def infer_brand_context(brand_name: str) -> dict:
     """§7-3-a brand_context — 내부 판단 필드(비노출). 브랜드명만으로 성격을 추정하는 목업.
 
-    실제 연동 시에는 브랜드 홈페이지·뉴스·검색결과를 근거로 Gemini가 판단하되,
-    이 함수의 반환 shape(브랜드 유형/전환 목표 등)은 그대로 유지합니다.
+    DO NOT PORT THIS LOGIC TO PRODUCTION ANALYZER. UI skeleton verification only —
+    브랜드명 해시로 3개 preset 중 하나를 고르는 seeded_random 목업이며, 실제 브랜드 판단
+    근거가 전혀 없다. 실제 연동 시에는 브랜드 홈페이지·뉴스·검색결과를 근거로 Gemini가
+    판단하되, 이 함수의 반환 shape(브랜드 유형/전환 목표 등)은 그대로 유지합니다.
     """
     rng = seeded_random(f"brand_context:{brand_name}")
     presets = [
@@ -104,6 +106,10 @@ def _analyze_single_brand(
 
 
 def rng_bool(brand_name: str, salt: str) -> bool:
+    """DO NOT PORT THIS LOGIC TO PRODUCTION ANALYZER. UI skeleton verification only —
+    media_operation_matrix_row의 네이버 SA/브랜드검색/YouTube 운영 여부는 API 키 유무와
+    무관하게 항상 이 함수로 채워진다(실제 조회 로직 없음). 화면 구조를 미리 보여주기 위한
+    placeholder이며, 실제 운영 여부 판단 근거로 재사용하지 않는다."""
     return seeded_random(f"{brand_name}:{salt}").random() > 0.4
 
 

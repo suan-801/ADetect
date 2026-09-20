@@ -39,6 +39,24 @@
    신규 UI 어디에서도 import/render/생성하지 않는다. `target_recommender.recommend_target()`은
    `seeded_random()` 기반 mock이므로 Target Insight 구현에 재사용하지 않는다.
 
+### 0-1. Current Implementation Status (개발 진행 상태 — 이 문서의 요구사항과는 구분)
+
+이 절은 **제품 요구사항이 아니라 "지금 어디까지 실제로 만들어졌는가"**를 말한다. 요구사항 자체는
+바뀌지 않으며(§7 Output Schema가 여전히 기준), 아래는 그 요구사항을 각 기능이 지금 몇 %
+충족했는지에 대한 스냅샷이다. 정확한 최신 상태는 `docs/PROJECT_PLAN.md` §1 표를 항상 함께 본다
+— 이 표가 실제와 어긋나면 그쪽이 갱신 대상이다.
+
+| 기능 | 상태 | 비고 |
+|---|---|---|
+| **Creative Analysis** | ✅ **Reference Implementation** — end-to-end 완료 | Meta Ads Library 실연동, HTML/Excel/ZIP 다운로드까지 완료. 다른 기능 담당자가 참고할 구조 기준(`docs/PROJECT_PLAN.md` §9) |
+| **Market Analysis** | 🟡 UI/UX skeleton + 부분 실연동 | 검색량 추이·뉴스는 실제 데이터(키 있으면), 계절성/참고자료/이슈 필드·다운로드는 미구현 |
+| **Brand Analysis** | 🟡 UI/UX skeleton + 부분 실연동 | 브랜드 검색량·Meta 광고는 실제 데이터, 홈페이지 크롤링·Instagram·AI 해석 문구는 아직 규칙 기반 mock |
+| **Synthesis Analysis** | 🟡 UI/UX skeleton (Target Insight만 예외) | Target Insight subsection은 근거 기반 실제 로직으로 완료. Executive Summary/Market Signal/Brand Position/Creative Signal/White Space/Recommended Action은 화면 골격뿐 |
+
+**Claude에게**: 이 표의 "🟡 UI/UX skeleton" 기능들을 요청받지 않은 상태에서 실제 분석 알고리즘·새
+외부 API 연동으로 임의로 완성하지 않는다 — 각 기능은 별도 담당자가 개발할 영역이다(신규 요청이
+없는 한 §21-1 등 이 문서의 나머지 요구사항 명세만 참고 자료로 유지하고 구현은 보류한다).
+
 ---
 
 ## 1. 프로젝트 개요

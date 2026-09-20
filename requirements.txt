@@ -1,8 +1,13 @@
 # Phase 0~1(뼈대/프로토타입) 최소 의존성.
 # 실제 수집기(Playwright/Apify/Gemini)는 각 모듈 담당자가 실제 연동을 붙일 때 추가합니다.
 # (PRD §15 기술스택 / §22 로드맵 참고)
-# streamlit>=1.42 — st.navigation(position="top") 공식 API 사용 (Top Navigation 리뉴얼)
-streamlit>=1.42
+# streamlit을 정확한 버전으로 pin — config/theme.py의 CSS는 실제 브라우저 DOM에서 확인한
+# data-testid(stVerticalBlock/stElementContainer/stColumn 등, Streamlit 1.63 기준)에 의존하는
+# :has() 셀렉터가 많다. 이 값은 버전마다 바뀔 수 있어 `>=` 범위로 두면 팀원마다 다른 patch
+# 버전에서 CSS가 조용히 깨질 수 있다 — 여러 담당자가 병렬 개발하는 지금 단계에서는 전원이
+# 같은 렌더링 결과를 보장받는 것이 더 중요하다고 판단해 정확히 pin한다. 버전을 올릴 때는
+# Home/Workspace 전체를 브라우저로 재확인한 뒤 이 줄과 §8 Active Design Direction을 함께 갱신한다.
+streamlit==1.63.0
 python-dotenv>=1.0.1
 pandas>=2.2
 requests>=2.32

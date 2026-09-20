@@ -8,6 +8,11 @@ Target 관련 레거시 코드(ui/target_tab.py, core/analyzers/target_recommend
 DB의 target_status/recommended_target/confirmed_target)는 과거 세션·DB 호환을 위해
 그대로 남겨두되, 이 화면에서는 더 이상 import/render하지 않는다 — 독립 tab·독립
 function_run으로 다시 노출하지 않는다(destructive migration 아님).
+
+Home(`pages/1_home.py`)의 Command Bar는 STEP1 입력 화면(아래 "input" 분기)을 거치지
+않고 `st.session_state.draft`를 직접 채운 뒤 step="confirm"으로 바로 진입한다 — 같은
+브랜드명/카테고리/경쟁사를 두 번 입력하게 하지 않기 위해서다. Top Navigation의 "Analyze"
+링크로 직접 들어온 경우에만 아래 "input" 분기가 실제로 보인다.
 """
 from __future__ import annotations
 
