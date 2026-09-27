@@ -1,125 +1,126 @@
-# 2026-09-27 설정 기준 (아래 모든 과거 설명보다 우선)
+# SETUP_GUIDE — API 설정·키 발급·확인·오류 해결
 
-- 화면은 `홈 · 프로젝트 · 설정` 3개 메뉴다. 프로젝트 안에서 `자료 수집 → 자료 확인·다운로드 → 이력` 순서로 쓴다.
-- 키가 없는 자료 종류는 목업으로 바뀌지 않는다. 해당 자료가 `설정 필요`/미수집으로 남고, 유료(Apify/Gemini) 키 누락은 `토큰 부족. 개발자에게 문의해주세요`로 표시된다. 가상 자료는 `ADETECT_SAMPLE_MODE=true`일 때만 사용된다.
-- 저장 경로·한도 환경변수: `ADETECT_DB_PATH`, `ADETECT_EXPORT_DIR`, `ADETECT_EVIDENCE_DIR`, `ADETECT_BACKUP_DIR`, `ADETECT_STORAGE_MAX_BYTES`, `ADETECT_DB_MAX_BYTES` 등 (`.env.example` 참고).
-- 다른 PC·네트워크로 옮기는 방법은 README '다른 PC로 옮기기'를 따른다. 클라우드 배포 설정은 현재 범위가 아니다.
+키는 프로젝트 폴더의 `.env`에만 넣습니다(`.gitignore` 등록). 코드·커밋·스크린샷·보고서에 키를 넣지 마세요.
+앱은 키 값을 화면·산출물에 표시하지 않고, 파일 생성 직전에 키가 섞였는지 검사합니다.
 
----
+```powershell
+Copy-Item .env.example .env
+notepad .env
+```
 
-# 2026-09-26 설정 변경 안내 (아래 과거 설명보다 우선)
+`.env`를 고친 뒤에는 앱을 다시 실행합니다. 설정 화면의 'API 연동 상태'는 키가 **입력되어 있는지**만 보여줍니다. 권한·잔액·실제 수집 성공 여부는 수집 결과에서 확인합니다.
 
-새 자료 수집 화면은 유료 기능 기본 ON입니다. .env에 Apify/Gemini 키가 없으면 '토큰 부족. 개발자에게 문의해주세요'를 표시하고 해당 소스를 미수집으로 남깁니다. 입력 확인 화면에서는 API를 호출하지 않습니다. SAMPLE은 ADETECT_SAMPLE_MODE=true로 명시해야 하며, 실사용 중 키 누락을 목업으로 대체하지 않습니다.
+신규 프로젝트의 AI 초안은 `GEMINI_API_KEY`가 있을 때 사용자가 다음 버튼으로 요청합니다. 검색 근거가 있는 후보도 공식 여부는 직접 확인해야 합니다. 키 없음·실패 시 직접 입력으로 계속 진행할 수 있습니다.
 
-개인 PC 서버 주소는 127.0.0.1입니다. SQLite와 storage/exports, storage/evidence를 같은 PC에 저장합니다. 기본 보관 한도와 백업 방법은 README를 참고하세요. 다운로드 요청 기록은 파일 생성과 별도이며 실제 디스크 저장 완료를 의미하지 않습니다.
+## 자료 종류별 필요한 키
 
-네이버 검색 추이는 NAVER API HUB에서 완료된 최근 36개월을 월간 단위로 요청합니다. 검색어에 따라 일부 월만 제공될 수 있으며 그 달들을 0으로 바꾸지 않습니다. 실제 값이 없는 경우 피크·저점 확정을 하지 않습니다.
-
----
-
-# SETUP_GUIDE
-
-API 키 발급 및 환경 준비 가이드입니다. 이 문서가 단일 기준(single source of truth)이며,
-다른 문서/스크립트는 이 내용을 복붙하지 않고 그때그때 이 문서를 참조합니다 (PRD §23).
-
-## 이미 발급받은 키가 있다면 — 빠른 참고표
-
-다른 사람에게 값을 전달받았거나 이미 발급된 키가 있다면, 아래처럼 `.env`에 넣으면 됩니다
-(발급 자체가 필요하면 각 항목의 상세 절차로 건너뛰세요).
-
-| 받은 값 | `.env` 변수명 | 비고 |
+| 자료 | 변수 | 비용 |
 |---|---|---|
-| 네이버 오픈API Client ID / Secret | `NAVER_CLIENT_ID` / `NAVER_CLIENT_SECRET` | 아래 "2." 항목 참고 |
-| 네이버 검색광고 License Key / Secret Key / Customer ID | `NAVER_AD_API_KEY` / `NAVER_AD_SECRET_KEY` / `NAVER_AD_CUSTOMER_ID` | 아래 "3." 항목 참고 — DataLab과 별개 계정 |
-| Apify API Token | `APIFY_API_TOKEN` | 아래 "4." 항목 참고 |
-| Google Gemini API Key | `GEMINI_API_KEY` | 아래 "5." 항목 참고 |
+| 검색 관심도 추이, 관련 뉴스 | `NAVER_CLIENT_ID`, `NAVER_CLIENT_SECRET` | 무료(호출량 제한 있음) |
+| 월간 검색량 | `NAVER_AD_API_KEY`, `NAVER_AD_SECRET_KEY`, `NAVER_AD_CUSTOMER_ID` | 무료 |
+| Meta 광고 소재 | `APIFY_API_TOKEN` (+ 선택 `APIFY_META_ADS_ACTOR`) | 유료 (Apify 사용량 과금) |
+| Instagram | `APIFY_API_TOKEN` | 유료 (Apify 사용량 과금) |
+| 검색 화면 AI 보완 판독 | `GEMINI_API_KEY` (+ 선택 `GEMINI_MODEL`) | 유료 (Gemini 사용량 과금) |
+| YouTube | `YOUTUBE_API_KEY` | 무료(할당량 제한) |
+| 공식 페이지, 네이버 검색 화면 | 키 없음 — Playwright Chromium 설치 필요 | 무료 |
 
-절차:
+키가 없는 자료는 수집 탭에서 '선택 불가: API 키 미설정'으로 표시되고 요청하지 않습니다. 유료 자료(Apify·Gemini) 키가 없으면 `토큰 부족. 개발자에게 문의해주세요`가 표시됩니다. 키가 없다는 이유로 가상 자료를 대신 쓰지 않습니다(SAMPLE은 `ADETECT_SAMPLE_MODE=true`로 명시할 때만).
 
-```bash
-cp .env.example .env   # 아직 .env가 없다면
+## 1. 네이버 API HUB (검색 추이·뉴스)
+
+1. https://console.ncloud.com → NAVER API HUB → Application 등록
+2. 사용 API로 **Data Lab · 검색어트렌드**와 **NAVER 검색 · 뉴스**를 모두 추가
+3. 발급된 Client ID / Client Secret을 `NAVER_CLIENT_ID` / `NAVER_CLIENT_SECRET`에 입력
+
+앱이 쓰는 주소와 인증 헤더(흔한 예제의 `openapi.naver.com` 방식과 다름):
+- 검색어트렌드: `POST https://naverapihub.apigw.ntruss.com/search-trend/v1/search`
+- 뉴스: `GET https://naverapihub.apigw.ntruss.com/search/v1/news`
+- 헤더: `X-NCP-APIGW-API-KEY-ID`(Client ID), `X-NCP-APIGW-API-KEY`(Client Secret)
+
+검색 추이는 자사·경쟁사 검색어 묶음을 한 요청(최대 5개 주제, 주제당 최대 20개 검색어)으로 보냅니다.
+
+## 2. 네이버 검색광고 API (월간 검색량)
+
+데이터랩과 별도 계정입니다.
+1. https://searchad.naver.com 광고주 계정 생성(광고 집행 없이도 가능)
+2. 도구 → API 사용 관리에서 API License Key / Secret Key 발급, Customer ID 확인
+3. `NAVER_AD_API_KEY` / `NAVER_AD_SECRET_KEY` / `NAVER_AD_CUSTOMER_ID`에 입력
+
+요청마다 HMAC 서명을 붙여 `https://api.naver.com/keywordstool`을 호출합니다. 값이 `< 10`이면 그대로 보존하며 0으로 바꾸지 않습니다.
+
+## 3. Apify (Meta 광고·Instagram, 유료)
+
+1. https://apify.com → Settings → Integrations에서 API Token 발급 → `APIFY_API_TOKEN`
+2. 사용 액터
+   - Meta 광고: `APIFY_META_ADS_ACTOR` (기본 `curious_coder/facebook-ads-library-scraper`). 대여형 액터는 별도 요금이 붙을 수 있으니 Apify 콘솔에서 확인하세요.
+   - Instagram: `apify/instagram-profile-scraper` (코드에 고정)
+3. 프로젝트 설정에 입력한 계정·페이지만 조회합니다.
+   - Instagram: `@handle` 또는 `https://www.instagram.com/handle`
+   - Meta: facebook.com/ads/library에서 브랜드 페이지의 '모든 광고 보기' 주소 (`view_all_page_id=숫자` 포함)
+
+유료 기능 토글이 OFF이면 호출하지 않습니다.
+
+## 4. Google Gemini (설정 초안·광고 판독·뉴스 근거 요약, 유료)
+
+1. https://aistudio.google.com 에서 API 키 발급 → `GEMINI_API_KEY`
+2. 모델은 `GEMINI_MODEL`(기본 `gemini-flash-latest`)
+
+광고 판독 기능에서는 직접 추출이 부족한 검색 광고 영역 캡처만 판독합니다. 수집 탭의 '광고 영역 AI 보완 판독' 체크를 끄거나 유료 기능을 끄면 호출하지 않습니다.
+
+## 5. YouTube Data API v3
+
+1. Google Cloud 콘솔에서 YouTube Data API v3 활성화 → API 키 발급 → `YOUTUBE_API_KEY`
+2. 프로젝트 설정의 공식 YouTube 채널에 `UC`로 시작하는 채널 ID 또는 `@handle` 입력
+
+## 6. Playwright (공식 페이지·검색 화면 캡처)
+
+```powershell
+.venv\Scripts\python.exe -m playwright install chromium
 ```
 
-`.env` 파일을 열어 해당 줄에 값을 붙여넣고 저장하면 끝입니다. 키를 채운 서비스만 실제로 수집되고, 비어 있는 서비스의 자료는
-미수집 상태로 안내됩니다(SAMPLE 모드가 아니면 목업으로 대체하지 않음) — 모든 키를 한 번에 채울 필요는 없습니다. `GEMINI_MODEL`/`APIFY_META_ADS_ACTOR`/
-`ADETECT_DB_PATH`는 선택 항목이며 비워두면 기본값을 씁니다(`.env.example` 하단 주석 참고).
+## 7. 저장·실행 관련 변수 (선택)
 
-`.env`는 `.gitignore`에 등록돼 있어 커밋되지 않습니다 — 절대 직접 커밋하거나 코드/로그에
-값을 그대로 출력하지 마세요(맨 아래 "시크릿 관리 원칙" 참고).
+| 변수 | 기본값 | 설명 |
+|---|---|---|
+| `ADETECT_SAMPLE_MODE` | `false` | `true`면 외부 요청 없이 가상 자료 (화면에 SAMPLE 표시) |
+| `ADETECT_DB_PATH` | `storage/adetect.db` | SQLite 위치 |
+| `ADETECT_EXPORT_DIR` | `storage/exports` | HTML/Excel/ZIP |
+| `ADETECT_EXPORT_MAX_RUNS` / `ADETECT_EXPORT_MAX_BYTES` | 20 / 5GB | 산출물 보관 한도 |
+| `ADETECT_EVIDENCE_DIR` / `ADETECT_EVIDENCE_MAX_BYTES` | `storage/evidence` / 5GB | 원본 파일 |
+| `ADETECT_BACKUP_DIR` | `storage/backups` | DB 백업 |
+| `ADETECT_STORAGE_MAX_BYTES` / `ADETECT_DB_MAX_BYTES` | 5GB / 500MB | 저장 공간 사용률 기준 |
 
-## 키 없이 화면만 확인하려면
+`ADETECT_DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `ADETECT_STORAGE_BUCKET`은 검증되지 않은 원격 저장 코드용입니다. 설정하면 앱이 원격 모드로 바뀌므로 로컬 사용에서는 비워 둡니다.
 
-`.env`에 `ADETECT_SAMPLE_MODE=true`를 넣고 앱을 재시작하면 외부 API 호출 없이 SAMPLE 자료로 전체 화면을 확인할 수 있습니다. SAMPLE이 아닐 때 키가 비어 있으면 해당 자료는 수집되지 않고 상태로 안내됩니다(목업으로 대체하지 않음).
+## 8. 키 동작 확인
 
-## 1. .env 파일 준비
+1. 설정 화면에서 필요한 키가 '키 설정됨'인지 확인
+2. 테스트용 프로젝트를 만들고 무료 자료(검색 추이·월간 검색량·관련 뉴스)만 선택해 수집
+3. 자료 수집 탭의 '최근 수집에서 실패·건너뜀' 목록과 결과 탭의 상태 문구 확인
+4. 유료 자료는 필요한 브랜드 하나만 선택해 소량으로 먼저 확인
 
-```bash
-cp .env.example .env
-```
+운영 DB와 분리하려면 README의 SAMPLE 실행처럼 `ADETECT_DB_PATH` 등을 별도 경로로 지정해 실행합니다.
 
-`.env`는 git에 올라가지 않습니다(.gitignore). 절대 커밋하지 마세요.
+## 9. 오류 해결
 
-## 2. 네이버 오픈API (DataLab 검색량 / 뉴스 검색) — NAVER Cloud Platform 콘솔 (PRD §21-8)
+| 화면 문구 | 의미 / 조치 |
+|---|---|
+| `토큰 부족. 개발자에게 문의해주세요` | 유료 API 키 없음 또는 인증·잔액 문제(401/402 등). 키와 계정 잔액 확인 |
+| `수집 실패 — 연결 상태·권한·수집 대상 주소를 확인해주세요.` | 네트워크·방화벽·권한·주소 문제. 토큰 부족과 다름 |
+| `선택 불가: API 키 미설정` | 해당 자료의 키가 `.env`에 없음 |
+| `선택 불가: 입력한 계정·페이지 없음` | 프로젝트 설정에 계정·페이지가 없음 |
+| `view_all_page_id가 있는 페이지별 Ads Library URL을 입력하세요.` | Meta 주소 형식 확인 |
+| `UC로 시작하는 채널 ID 또는 @handle을 입력하세요.` | YouTube 채널 입력 형식 확인 |
+| 검색 화면 `판독 불가` | 캡처 실패·차단·광고 영역 식별 실패. Chromium 설치 확인 후 재수집. 광고 미노출이 아님 |
+| 저장 공간 상한 | 설정 > 저장 공간 관리에서 정리 |
+| 계속 SAMPLE 자료만 나옴 | 실행 창에 `ADETECT_SAMPLE_MODE=true`가 남아 있음. 새 PowerShell 창에서 실행 |
 
-★ developers.naver.com(구 네이버 오픈API 개발자센터)은 2027-06-30 종료 예정이라, 신규 등록은
-**NAVER Cloud Platform(NCP) 콘솔**에서 합니다.
+## 10. AI 설정 초안과 뉴스 근거 요약
 
-1. https://console.ncloud.com 접속 → 로그인 → NAVER API HUB → Application 등록
-2. 사용 API: **"NAVER 검색 · 뉴스"** + **"Data Lab · 검색어트렌드"** 둘 다 체크 (쇼핑인사이트는 아직 사용처가 없어 선택)
-3. 발급받은 Client ID / Client Secret을 `.env`의 `NAVER_CLIENT_ID` / `NAVER_CLIENT_SECRET`에 입력
+두 기능 모두 `.env`의 `GEMINI_API_KEY`와 `GEMINI_MODEL`을 사용합니다. 설정 변경 후 서버를 재시작하세요.
 
-**왜 이 방식인가**: DataLab 검색어트렌드 API는 `keywordGroups`로 브랜드명 표기 변형을 한 번에
-합산 조회할 수 있어(PRD §7-9), 표기가 여러 개인 브랜드명 검색량 집계에 필수입니다.
-
-**실제 호출 엔드포인트가 흔한 예제와 다릅니다**: 검색어트렌드는
-`POST https://naverapihub.apigw.ntruss.com/search-trend/v1/search`, 뉴스 검색은
-`GET https://naverapihub.apigw.ntruss.com/search/v1/news`이며, 인증 헤더는
-`X-NCP-APIGW-API-KEY-ID`(Client ID) / `X-NCP-APIGW-API-KEY`(Client Secret)입니다. 인터넷에 많이
-도는 예제의 `openapi.naver.com` + `X-Naver-Client-Id` 방식은 developers.naver.com 시절 것이라
-NCP 콘솔에서 발급받은 키로는 401이 납니다(2026-09-13 실계정으로 직접 확인).
-
-## 3. 네이버 검색광고(키워드도구) API — DataLab과 별도 계정 (PRD §21-10)
-
-1. https://searchad.naver.com 광고주 계정 생성 (광고 집행 목적이 아니어도 계정 자체는 필요)
-2. [도구] → [API 사용 관리]에서 License Key(=API Key) / Secret Key 발급, Customer ID 확인
-3. `.env`의 `NAVER_AD_API_KEY` / `NAVER_AD_SECRET_KEY` / `NAVER_AD_CUSTOMER_ID`에 입력
-
-**왜 별도 계정인가**: DataLab은 상대 검색지수만 주기 때문에, 절대 검색량(최근 30일 PC/모바일)은
-이 API로만 얻을 수 있습니다. 요청마다 HMAC 서명이 필요해 DataLab보다 연동이 한 단계 더 복잡합니다.
-
-## 4. Apify (Meta Ads Library / Instagram 프로필)
-
-1. https://apify.com 가입 → Settings → Integrations에서 API Token 발급
-2. `.env`의 `APIFY_API_TOKEN`에 입력
-3. 사용 액터: `curious_coder/facebook-ads-library-scraper` (Meta Ads Library, 실연동 확인됨 — §21-11. 광고 1건당 $0.00075 과금, 별도 구독료 없음). Instagram 프로필은 `apify/instagram-profile-scraper` 액터가 있지만 브랜드명→handle 해석 문제로 아직 목업(§7-10)
-
-**왜 프록시를 안 쓰는가**: Apify가 자체 프록시/큐로 스크래핑을 대행하므로 우리 쪽에서 별도
-Residential Proxy를 구매하지 않습니다 (PRD §21-1).
-
-## 5. Google Gemini (멀티모달 분석)
-
-1. https://aistudio.google.com 에서 API 키 발급
-2. `.env`의 `GEMINI_API_KEY`에 입력
-
-## 시크릿 관리 원칙 (PRD §19-2)
-
-- API 키는 `.env` 또는 Secret Manager에서만 관리 — 코드/커밋/로그에 절대 노출 금지
-- 로그에 키가 출력되지 않도록 마스킹
-- 산출물(HTML/Excel/ZIP)에 키가 포함되지 않도록 내보내기 직전 검사
-
-
-## 2026-09-26 추가 설정
-
-- YouTube 선택 수집: Google Cloud에서 YouTube Data API v3를 활성화하고 `YOUTUBE_API_KEY`를 설정합니다.
-  프로젝트 설정의 '공식 YouTube 채널'에 채널 ID(`UC...`) 또는 `@handle`을 입력합니다. 계정을 브랜드명으로 추측하지 않습니다.
-- Instagram: 프로젝트 설정의 '공식 Instagram 계정'에 handle/URL을 입력하거나 공식 홈페이지의 Instagram 링크를 사용합니다.
-  `apify/instagram-profile-scraper`를 호출하므로 Apify 권한과 과금 설정을 확인합니다.
-- 네이버 캡처: `python -m playwright install chromium` 설치가 필요합니다. 차단·DOM 미감지는 미확인으로 기록합니다.
-- 명시적 오프라인 분석: `ADETECT_SAMPLE_MODE=true`를 설정한 뒤 앱을 재시작합니다.
-- 파일 보관: `ADETECT_EXPORT_MAX_RUNS=20`, `ADETECT_EXPORT_MAX_BYTES=5368709120`이 기본입니다.
-
-구현 근거 문서: [Naver DataLab](https://developers.naver.com/docs/serviceapi/datalab/search/search.md),
-[Instagram 입력](https://apify.com/apify/instagram-profile-scraper/input-schema),
-[YouTube 채널 조회](https://developers.google.com/youtube/v3/docs/channels/list),
-[Playwright Page](https://playwright.dev/python/docs/api/class-page).
-키 설정 여부가 연동 성공을 보장하지 않으며 실제 권한과 사이트별 응답은 별도 수용 검증이 필요합니다.
+- 설정 초안: Google Search 도구를 지원하는 모델이 필요합니다. 검색 요청 1회 + 구조화 요청 1회이며 공식 홈페이지 연결 링크를 확인할 수 있습니다. 근거가 없는 주소는 자동으로 채우지 않습니다. 성공 결과는 24시간 재사용합니다.
+- 뉴스 요약: 구조화 응답을 지원하는 모델이 필요합니다. 최신 최대 30건을 15건씩 최대 2회 요청합니다. 기사 전문을 수집하지 않으며 제목·발췌의 인용 근거만 정리합니다.
+- SAMPLE에서는 실제 AI 요청을 하지 않습니다. 유료 기능 OFF이면 뉴스 요약을 실행할 수 없습니다. 설정 마법사의 AI 제안은 별도 선택란으로 끌 수 있습니다.
+- API 키가 없거나 모델이 검색 기능을 지원하지 않거나 실패하면 직접 입력으로 진행할 수 있습니다. 실패 응답은 캐시하지 않습니다.
+- 실제 비용은 사용 모델과 Google 계정 조건에 따라 달라집니다. 자동 테스트는 모의 응답을 쓰며, 실계정 검증은 별도로 진행해야 합니다.

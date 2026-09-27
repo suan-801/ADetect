@@ -1,47 +1,34 @@
 # 작업 지침
 
-1. **답변/보고는 한국어.** 코드/식별자/커밋 메시지 등은 필요한 경우 영어를 그대로 사용해도 되지만, 사용자에게 설명하는 텍스트는 한국어를 사용한다.
+1. **답변·보고는 한국어.** 코드·식별자·커밋 메시지는 영어를 써도 된다.
 
-2. **PRD.md를 Product Behavior의 source of truth로 취급한다. 현재 최신 기준은 PRD.md §0 18차 개정(프로젝트형 자료 수집 MVP, 2026-09-27)이다.** 화면·데이터 스키마·게이트 조건에 대해 기억(과거 세션)과 PRD.md가 다르면 PRD.md를 따르고, PRD.md 상단의 최신 개정 절부터 확인한다 — 개정 절은 그 아래 본문과 이전 개정(17차·16차)보다 항상 우선한다.
+2. **기준 문서**: 제품 동작·데이터 규칙은 `PRD.md`, 설치·사용은 `README.md`, API 설정은 `docs/SETUP_GUIDE.md`, 구조·검증은 `docs/PROJECT_PLAN.md`. 코드와 문서가 다르면 같은 변경에서 맞춘다. 문서에는 현재 동작만 쓰고, 과거 사양을 "아래보다 우선" 식으로 쌓지 않는다(과거 내용은 Git 이력).
 
-3. **아래 항목이 바뀌면 같은 커밋에서 반드시 PRD.md / README.md / docs/PROJECT_PLAN.md를 함께 확인·갱신한다**:
-   - 자료 종류(현재 8개 — `core/projects.SOURCES`)와 프로젝트 흐름
-   - User Flow (게이트 조건, 탭 순서/개수)
-   - Output schema (18차 `schema_version=3` 결과, §8 FACT/AI/REC 분류)
-   - Gate dependency (어떤 기능이 완료돼야 다음이 열리는지)
-   - Export 구조 (17차 §0-10의 01_수집정보~11_이전수집대비 시트, HTML 리포트 구조)
-   - UI navigation (상단 네비게이션, 프로젝트 내부 탭 목록)
-   - 저장·보관 정책 (`core/retention.py` 한도·정리 규칙, 로컬/원격 저장 방식)
-   코드만 고치고 문서를 과거 구조로 남겨두지 않는다 — 문서가 실제와 어긋나면 다음 세션이 옛 구조를 다시 만들 위험이 있다.
+3. **현재 제품**: 개인 PC용 프로젝트형 자료 수집 도구. 흐름은 `프로젝트 → 자료 수집 → 자료 확인·다운로드 → 이력`, 상단 메뉴는 홈·프로젝트·설정(`app_pages/`). 브랜드는 자사 1개 + 경쟁사 최대 4개, 자료 종류는 8개.
+   - 과거 Market/Brand/Creative/Synthesis 4단계 화면, Target·포지셔닝·전략 추천, 포함/확인 필요/제외 분류 UI를 다시 만들지 않는다.
+   - `LEGACY` 주석이 있는 파일은 새 화면에 연결하지 않는다.
+   - 화면 폴더를 `pages/`로 되돌리지 않는다(Streamlit 자동 페이지 탐색과 충돌).
 
-4. **현재 사용자-facing 흐름은 `프로젝트 → 자료 수집 → 자료 확인·다운로드 → 이력`이다** (`pages/2_analyze.py` → `ui/project_workspace.py`, 데이터 흐름 `core/projects.py`·`core/project_jobs.py`). 사용자는 **8개 독립 자료 종류**(검색 관심도 추이, 월간 검색량·연관 검색어, 관련 뉴스, 공식 페이지, 네이버 검색 화면, Meta 광고, Instagram, YouTube)를 선택해 수집하며, 선택하지 않은 종류는 호출하지 않는다.
-   - **Market/Brand/Creative/Synthesis는 신규 화면의 독립 단계가 아니다.** 레거시 호환(과거 세션·v2 결과 읽기) 또는 자료 종류별 내부 분류(`SOURCES`의 세 번째 값, `run_stage`)로만 남아 있다. 4단계 탭 구조를 다시 만들지 않는다.
-   - **Target은 신규 UI에서 사용하지 않는다.** `ui/target_tab.py`/`core/analyzers/target_recommender.py`와 DB의 `target_status`/`recommended_target`/`confirmed_target` 컬럼은 과거 세션 호환용으로만 남아 있으며 import/render/생성하지 않는다 — `recommend_target()`은 `seeded_random()` 기반 mock이므로 재사용 금지.
-   - 레거시 UI 파일(`pages/3_history.py`, `ui/facts_workspace.py`, `ui/{market,brand,creative,synthesis,target}_tab.py`, `ui/analysis_shared.py`, `ui/job_control.py`)은 상단에 `LEGACY` 주석이 있다. 새 화면에 다시 연결하지 않는다.
+4. **데이터 규칙** (상세는 PRD):
+   - 검색 추이는 브랜드별 검색어 묶음을 한 요청으로 비교한다. 별도 요청 지수를 섞거나 합산하지 않고, 누락 월을 0으로 만들지 않는다.
+   - 검색량 합계는 정확히 일치한 표기만 더하고 `<10`·미제공·실패를 0으로 바꾸지 않는다.
+   - 뉴스 결과 좁히기는 뉴스 제목·발췌문에만 적용하고 제외가 우선한다. 원본은 보관한다.
+   - 화면·다운로드는 같은 선택·필터·수집 버전 규칙을 쓴다. 표에 내부 ID를 노출하지 않는다.
+   - 입력·결과 구조를 바꾸면 버전(`input_version`, `schema_version`)과 이전 데이터·백업 읽기를 함께 처리한다. 수집 당시 입력 사본은 바꾸지 않는다.
 
-5. **Mock/random 데이터를 실제 분석 결과처럼 사용자에게 노출하지 않는다.** 과거 소구포인트(appeal_tags) 기능이 이 원칙을 어긴 사례였다 — `seeded_random()`으로 태그를 뽑아놓고 화면에는 확정 분석 결과처럼 보여줬다. 완전히 제거했고 재도입 조건은 PRD.md의 해당 절(Appeal Point 재도입 조건) 참고. 새 기능을 붙일 때도 "이 숫자/라벨이 실제로 무엇에서 나왔는가"를 먼저 확인한다.
+5. **수집값을 지어내지 않는다.** Mock·random 값을 실제 결과처럼 보여주지 않는다. SAMPLE은 `ADETECT_SAMPLE_MODE=true`일 때만 쓰고 화면·산출물에 표시한다. 키 누락을 SAMPLE로 대신하지 않는다. 불확실하면 미제공·판독 불가·미관측 같은 상태로 남긴다. 계정을 브랜드명으로 추측하지 않는다.
 
-6. **AI classification은 `source`/`evidence`/`confidence`가 없으면 확정 결과처럼 표시하지 않는다** (§8 FACT/AI/REC 스키마). `insight_synthesizer.build_insight()`가 만드는 shape을 그대로 따른다.
+6. **AI 결과**는 근거(출처·근거 문구·신뢰도·판독 방식)와 함께 저장하고 직접 수집한 값과 구분한다. 성과·타깃·전략 추정, 화면에 없는 URL 생성은 하지 않는다. 단순 URL 파싱 같은 작업에 AI를 쓰지 않는다.
 
-7. **불확실하면 강제로 label을 선택하지 않는다.** `insufficient_data`/`unknown`/`not_available`/`channel_not_found` 등 명시적인 fallback을 쓴다. 특히 연령/성별 등 세그먼트 인구통계처럼 지금 데이터 모델에 없는 근거를 요구하는 값은 임의로 지어내지 않는다 — `build_target_insight()`가 그 기준 구현이다.
+7. **유료 API**: 유료 기능은 기본 ON이다. 키 누락 또는 확인된 인증·잔액 문제에만 `토큰 부족. 개발자에게 문의해주세요`를 표시한다. 개발·검증 중 Apify·Gemini 실호출은 사용자 승인 없이 하지 않는다(대상·범위·비용 상한을 먼저 제안). API 키를 출력하거나 보고서·스크린샷·Git에 넣지 않는다.
 
-8. **Visual guideline** (docs/PROJECT_PLAN.md §8 Active Design Direction에 상세, 4차 리뉴얼 "Cinematic Editorial Intelligence"): Flat Black · Clean Vermilion Accent(좁은 면적) · No decorative gradient abuse · No UI glow abuse · No glassmorphism · No large rounded card · Grid > Typography > Spacing > Data > Decoration.
-   - **Home과 Workspace의 역할을 구분한다.** Home(`pages/1_home.py`)은 cinematic/editorial(웅장한 typography, large-scale atmospheric gradient/glow 허용)이고, Workspace(프로젝트/설정)는 functional/data-dense(장식 없음, 3차 리뉴얼 원칙 유지)다. Home의 dramatic visual language를 Workspace 데이터 화면까지 확장하지 않는다.
-   - **Home은 2026-09-20부로 Hero 단일 화면이다.** 과거의 Manifesto/Product Story(Market·Brand·Creative·Synthesis 4개 section)/Sample Output/Final CTA scene은 전부 제거했다 — 다시 추가하지 않는다. Home의 유일한 실제 interactive 영역은 Hero 안의 Brand Input + CTA뿐이다.
-   - Gradient/Glow는 전면 금지가 아니라 Home Hero의 large-scale atmospheric visual에만 제한적으로 허용한다 — 버튼/입력/테이블/카드 등 UI 컴포넌트에는 여전히 금지.
-   - **Home Hero는 지정된 `ui/assets/home/background.png`를 visual source of truth로 사용**하며, 임의의 대체 AI visual을 새로 만들거나 다른 section에서 재사용하지 않는다(`ui/hero.py`가 유일한 렌더 지점).
-   - Orange accent가 burnt orange/rust/brown(예: `#B23A1F` 계열, G/B 채널이 높아 탁하게 보임)으로 보이지 않는지 브라우저에서 실제 검정 배경 위에 렌더링해 확인한다.
+8. **저장**: 로컬 SQLite(`storage/adetect.db`)와 로컬 폴더가 기본이다. 원격 DB·Storage 어댑터와 클라우드 배포는 검증 전이며 요청 없이 배포 설정을 추가하지 않는다. 실제 사용자 DB와 파일을 테스트 목적으로 지우거나 바꾸지 않는다. 테스트·수동 확인은 별도 경로(`ADETECT_DB_PATH` 등)를 쓴다.
 
-9. **넓은 accent 배경 위 텍스트는 항상 대비(contrast)를 확인한다.** "느낌상 괜찮아 보인다"로 판단하지 않는다 — 작은 텍스트 기준 WCAG AA(4.5:1 이상)를 목표로 하고, 필요하면 배경(`accent_surface`)과 강조 인디케이터(`accent`)를 분리한다.
+9. **디자인**: Flat Black · 좁은 면적의 Vermilion 강조 · 그리드 > 타이포 > 여백 > 데이터 > 장식.
+   - Home(`app_pages/1_home.py`, `ui/hero.py`, `ui/assets/home/background.png`)은 Hero 단일 화면을 유지한다. 대형 그라데이션·글로우는 Home Hero에만 허용한다.
+   - 프로젝트·설정 화면은 기능 중심: 본문보다 조금 밝은 중성 회색 입력칸, 얇은 경계선, 흰 입력칸·큰 둥근 카드·그림자·글로우 금지. 색은 `config/theme.py` 토큰으로 관리한다.
+   - 색을 바꾸면 실제 브라우저에서 검정 배경 위 대비를 확인한다(작은 글자 WCAG AA 4.5:1 이상).
 
-10. **코드 수정 후 검증 필수**: `pytest tests/test_smoke.py -v`와 `pytest tests -q` 통과, `python -m compileall core database ui pages app.py`, `streamlit run app.py` 정상 기동, 주요 화면(Home/프로젝트/변경한 탭/설정)의 Smoke flow 확인. API 키가 없는 상태와 명시적 SAMPLE 모드(`ADETECT_SAMPLE_MODE=true`)에서도 UI가 깨지지 않아야 하며, SAMPLE 데이터는 화면과 산출물에 SAMPLE임을 명시한다. 실사용 중 키 누락을 SAMPLE로 대체하지 않는다.
-   - 테스트는 `tests/conftest.py`가 임시 DB·exports·evidence 경로를 쓰므로 실제 `storage/adetect.db`를 건드리지 않는다. 브라우저 수동 스모크는 `ADETECT_DB_PATH`·`ADETECT_EXPORT_DIR`·`ADETECT_EVIDENCE_DIR`를 별도 경로로 지정해 운영 DB와 분리한다 (README '테스트 DB 분리').
-   - 실제 DB의 프로젝트·세션은 사용자 요청 없이 삭제하지 않는다. 삭제·정리 전에는 DB 백업(설정 > DB 백업)을 먼저 안내한다.
+10. **검증**: 수정 후 `pytest tests/test_smoke.py -v`, `pytest tests -q`, `python -m compileall core database ui app_pages app.py`를 실행하고, 변경한 화면을 실제 Streamlit 서버에서 확인한다. 키가 없어도, SAMPLE에서도 화면이 깨지지 않아야 한다. 백그라운드 수집 워커·캐시·동시성 제어는 앱 기능이므로 유지한다.
 
-11. **유료 기능은 기본 ON이다.** Apify/Gemini는 수집·요약 버튼을 눌렀을 때만 호출하고, 키 누락 또는 확인된 인증/잔액 부족에만 정확히 `토큰 부족. 개발자에게 문의해주세요`를 표시한다. 네트워크 실패·일반 속도 제한을 토큰 부족으로 단정하지 않는다.
-
-12. **저장은 로컬 SQLite(`storage/adetect.db`)와 로컬 파일(`storage/exports`, `storage/evidence`)이 기본이다.** 원격 DB/Storage 어댑터(`database/remote.py`, `core/storage.py`)와 클라우드 배포는 아직 검증 전이므로 완료로 표시하지 않는다. 현재 운영 방식은 로컬 실행 후 프로젝트 폴더를 zip으로 다른 PC·네트워크에 옮기는 것이며(README '다른 PC로 옮기기'), 사용자가 요청하기 전까지 배포 설정(Streamlit Cloud·Supabase 등)을 추가하지 않는다. 저장 공간 표시·정리·보유 상태·원본 보호는 `core/retention.py`의 `usage`/`summary`/`cleanup`/`availability`/`pin`을 그대로 쓴다.
-
-13. **요청받지 않은 분석 알고리즘·새 외부 API 연동을 Claude가 임의로 구현하지 않는다.** 18차 범위는 팩트 수집·확인·내보내기이며 타깃 추정·포지셔닝·전략 추천·점유율 해석은 제외다. **Mock data(예: `seeded_random()`, `rng_bool()`, `infer_brand_context()`)는 layout verification/테스트 fixture용이지 production business logic reference가 아니다** — 실제 구현 시 그대로 옮기지 않는다.
-
-14. **Git은 `main` 단일 브랜치로 운영한다** (2026-09-27 사용자 결정). feature 브랜치를 새로 만들지 않고 `main`에 직접 커밋·push한다. 과거 `feature/*` 브랜치는 main에 모두 병합된 뒤 삭제했다.
+11. **Git**: `main` 단일 브랜치. 커밋·push는 사용자가 요청할 때만 한다.

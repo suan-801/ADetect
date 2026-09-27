@@ -1,5 +1,5 @@
 # LEGACY — 현재 런타임(app.py 네비게이션·신규 화면)에서 import/실행하지 않는다. (2026-09-27 검색 확인, PRD §0 18차 개정)
-# 신규 UI: pages/2_analyze.py → ui/project_workspace.py
+# 신규 UI: app_pages/2_analyze.py → ui/project_workspace.py
 # 신규 데이터 흐름: core/projects.py, core/project_jobs.py
 # 사용 금지 이유: 세션 단위 구 이력 화면(analysis_session 전체 목록·기능별 function_run). app.py의 st.navigation에 등록되어 있지 않다. 프로젝트별 이력·보유 상태는 ui/project_workspace.py의 '이력' 탭이 담당한다.
 # 새 화면에 다시 연결하지 말 것. 기존 데이터 호환 검토 전까지 삭제하지 않고 보존한다.
@@ -92,4 +92,4 @@ else:
                 st.session_state.session["creative_meta_overrides"] = {n:v["meta_page"] for n,v in saved_inputs.get("sources", {}).items() if v.get("meta_page")}
                 restore_results(st.session_state.session)
                 st.session_state.step = "workspace"
-                st.switch_page("pages/2_analyze.py")
+                st.switch_page("app_pages/2_analyze.py")

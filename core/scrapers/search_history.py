@@ -15,7 +15,10 @@ def period_bounds(months=36, today=None):
 
 
 @source_cache("monthly_history_v2")
-def fetch_history(keyword, months=36):
+def fetch_history(keyword, months=36, keywords=None):
+    terms=list(dict.fromkeys(keywords if keywords is not None else [keyword]))
+    if not terms or len(terms)>20 or any(not isinstance(t,str) or not t.strip() for t in terms):
+        raise ValueError("주제어별 검색어는 1~20개가 필요합니다.")
     start, end = period_bounds(months)
     if settings.SAMPLE_MODE:
         # Explicit fixture, never used merely because a credential is absent.
@@ -29,13 +32,61 @@ def fetch_history(keyword, months=36):
             raise ValueError("네이버 검색 추이 키 미설정")
         response = requests.post("https://naverapihub.apigw.ntruss.com/search-trend/v1/search",
             headers={"X-NCP-APIGW-API-KEY-ID":settings.NAVER_CLIENT_ID,"X-NCP-APIGW-API-KEY":settings.NAVER_CLIENT_SECRET},
-            json={"startDate":start,"endDate":end,"timeUnit":"month","keywordGroups":[{"groupName":keyword,"keywords":[keyword]}]}, timeout=20)
+            json={"startDate":start,"endDate":end,"timeUnit":"month","keywordGroups":[{"groupName":keyword,"keywords":terms}]}, timeout=20)
         response.raise_for_status()
         groups = response.json().get("results", [])
         rows = [{"date":v["period"],"search_index":v["ratio"]} for v in (groups[0].get("data",[]) if groups else [])]
-    return {"keyword":keyword,"start":start,"end":end,"rows":rows,"sample":settings.SAMPLE_MODE,
+    return {"keyword":keyword,"keywords":terms,"grouped":keywords is not None,"start":start,"end":end,"rows":rows,"sample":settings.SAMPLE_MODE,
             "source_url":"https://datalab.naver.com/keyword/trendSearch.naver",
-            "note":"검색어별 36개월 내 최고 월=100. 서로 다른 검색어의 지수를 절대 규모로 비교할 수 없습니다. 미제공 월은 0으로 채우지 않습니다."}
+            "note":"이 주제어 묶음의 36개월 내 최고 월=100인 상대지수이며 검색 횟수가 아닙니다. 별도 요청한 주제어끼리 절대 규모 비교는 불가합니다. 미제공 월은 0으로 채우지 않습니다."}
+
+
+@source_cache("brand_comparison_v1")
+def fetch_comparison(groups, months=36):
+    """자사·경쟁사 검색어 묶음을 한 요청(최대 5개 주제)으로 조회한다.
+
+    같은 요청 안에서는 모든 주제가 같은 기준(요청 전체 최고 월=100)을 쓰므로 브랜드끼리 비교할 수 있다.
+    표기별 지수를 더하지 않고, 누락 월을 0으로 채우지 않는다. 응답의 모든 주제를 그대로 보존한다.
+    """
+    if not 1 <= len(groups) <= 5:
+        raise ValueError("검색 추이 비교는 1~5개 브랜드만 한 요청으로 조회할 수 있습니다.")
+    for g in groups:
+        if not g.get("terms") or len(g["terms"]) > 20:
+            raise ValueError(f"{g.get('name')} 검색어 묶음은 1~20개가 필요합니다.")
+    start, end = period_bounds(months)
+    request = {"startDate": start, "endDate": end, "timeUnit": "month",
+               "keywordGroups": [{"groupName": g["name"], "keywords": list(g["terms"])} for g in groups]}
+    if settings.SAMPLE_MODE:
+        # 명시적 SAMPLE 전용 고정값. 키가 없다는 이유로 쓰지 않는다.
+        y, m = map(int, start[:7].split("-"))
+        results = []
+        for n, g in enumerate(groups):
+            data = []
+            for i in range(months):
+                offset = y*12+m-1+i
+                data.append({"period": f"{offset//12:04d}-{offset%12+1:02d}-01", "ratio": round([20,30,55,60,40,25,15,20,50,70,45,30][offset%12] * (1 - n*0.18) + (100 if n == 0 and i == months-5 else 0) * 0.3, 3)})
+            results.append({"title": g["name"], "keywords": g["terms"], "data": data})
+        top = max(v["ratio"] for r in results for v in r["data"])
+        for r in results:  # 실제 응답처럼 요청 전체 최고 월을 100으로 맞춘다.
+            for v in r["data"]:
+                v["ratio"] = round(v["ratio"] * 100 / top, 3)
+    else:
+        if settings.NAVER_DATALAB_MOCK:
+            raise ValueError("네이버 검색 추이 키 미설정")
+        response = requests.post("https://naverapihub.apigw.ntruss.com/search-trend/v1/search",
+            headers={"X-NCP-APIGW-API-KEY-ID":settings.NAVER_CLIENT_ID,"X-NCP-APIGW-API-KEY":settings.NAVER_CLIENT_SECRET},
+            json=request, timeout=20)
+        response.raise_for_status()
+        results = response.json().get("results", [])
+    series = []
+    for n, g in enumerate(groups):
+        # 응답 순서는 요청 순서를 따른다. 제목이 다르면 해당 주제를 미제공으로 둔다(다른 브랜드 값으로 채우지 않음).
+        item = results[n] if n < len(results) and results[n].get("title", g["name"]) == g["name"] else next((r for r in results if r.get("title") == g["name"]), None)
+        rows = [{"date": v["period"], "search_index": v["ratio"]} for v in (item or {}).get("data", [])]
+        series.append({"brand_id": g["id"], "name": g["name"], "terms": list(g["terms"]), "rows": rows, "provided": item is not None})
+    return {"request": request, "start": start, "end": end, "series": series, "sample": settings.SAMPLE_MODE,
+            "source_url": "https://datalab.naver.com/keyword/trendSearch.naver",
+            "note": "한 요청 안의 전체 최고 월=100인 상대지수입니다. 검색 횟수가 아니며, 미제공 월은 0이 아닙니다."}
 
 
 def summarize_history(series):

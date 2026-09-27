@@ -1,188 +1,114 @@
 # ADetect
 
-브랜드 전체 또는 특정 상품·캠페인의 1차 자료를 프로젝트별로 수집하고 출처·원본과 함께 정리하는 앱입니다. 제품 동작은 [PRD §0 18차 개정](PRD.md)이 기준입니다.
+브랜드(자사 1개 + 경쟁사 최대 4개)의 공개 자료를 프로젝트별로 수집하고, 출처·수집 시각·원본과 함께 확인·다운로드하는 개인 PC용 앱입니다.
+제품 동작과 데이터 규칙은 [PRD.md](PRD.md), API 키 설정은 [docs/SETUP_GUIDE.md](docs/SETUP_GUIDE.md), 코드 구조와 검증 기준은 [docs/PROJECT_PLAN.md](docs/PROJECT_PLAN.md)를 봅니다.
+
+신규 프로젝트는 브랜드명부터 4단계로 설정합니다. AI 초안은 검색 근거가 있는 주소·검색어·경쟁사 후보를 채우며, 사용자 확인 후 저장합니다. 기존 프로젝트 설정은 한 화면에서 수정합니다.
+
+## 설치와 실행 (Windows PowerShell, 프로젝트 폴더에서)
+
+```powershell
+python --version                      # 3.12 이상 (개발 PC 3.14)
+python -m venv .venv
+.venv\Scripts\python.exe -m pip install -r requirements.txt
+.venv\Scripts\python.exe -m playwright install chromium   # 공식 페이지·검색 화면 캡처용
+Copy-Item .env.example .env           # .env가 없을 때만. 키 입력은 SETUP_GUIDE 참고
+.venv\Scripts\python.exe -m streamlit run app.py
+```
+
+브라우저에서 http://127.0.0.1:8501 을 엽니다. 앱은 이 PC에서만 접속됩니다. `.env`를 고친 뒤에는 앱을 다시 실행해야 반영됩니다.
+
+**키 없이 화면만 확인 (SAMPLE)** — 외부 요청 없이 가상 자료를 쓰며 화면에 SAMPLE이 표시됩니다. 운영 DB와 섞이지 않게 별도 경로를 씁니다. 이 설정은 해당 PowerShell 창에만 남으므로 실사용은 새 창에서 실행하세요.
+
+```powershell
+$env:ADETECT_SAMPLE_MODE="true"
+$env:ADETECT_DB_PATH="storage/smoke/adetect_smoke.db"
+$env:ADETECT_EXPORT_DIR="storage/smoke/exports"
+$env:ADETECT_EVIDENCE_DIR="storage/smoke/evidence"
+.venv\Scripts\python.exe -m streamlit run app.py
+```
+
+## 사용 흐름
+
+1. **홈**에서 브랜드명을 입력하면 프로젝트 설정으로 이동합니다. 기존 프로젝트는 상단 **프로젝트** 메뉴에서 엽니다.
+2. **프로젝트 설정**: 신규는 브랜드명 → 자사 정보 → 경쟁사 → 최종 확인 순서로 진행하고, 기존 설정은 한 화면에서 수정합니다.
+   - 조사 브랜드 및 경쟁사: 브랜드명, 검색어 묶음(예: `한샘, 한셈, 한샘리하우스`, 최대 20개), 공식 URL(여러 개), Instagram·YouTube·Meta 광고 라이브러리 주소, 캠페인 상세 URL, UTM 분석 대상 URL. 경쟁사는 최대 4개.
+   - 시장 관심 검색어: 시장 조사용 검색어(예: `인테리어, 리모델링`). 브랜드 합계에는 들어가지 않습니다.
+   - 뉴스 검색 설정: 뉴스 검색어(기존 편집에서는 시장 검색어 가져오기·후보 추가 지원), '뉴스 결과 좁히기'(꼭 들어갈 문구 / 빼고 싶은 문구).
+3. **자료 수집**: 수집할 자료를 고르고(기본 자료 선택 / 전체 선택 / 전체 해제) '선택 자료 수집'을 누릅니다. 추가 자료와 유료 SNS는 수집할 브랜드를 따로 고릅니다. 유료 기능(Meta·Instagram·검색 화면 AI 보완 판독)은 기본 ON이며, 토글을 끄면 선택할 수 없습니다.
+4. **자료 확인·다운로드**: 브랜드 비교 요약 → 검색 추이 → 뉴스 핵심 내용·수치 요약 → 종류별 상세 자료 → 검색 화면과 광고 관측 → UTM 구조 → 다운로드 → 추가 정보를 찾아보세요. 표의 '다운로드' 체크로 파일에 넣을 자료를 고르고 HTML/Excel/ZIP을 만듭니다. 이전 시점 자료는 '이전에 수집한 자료 보기'에서 고릅니다.
+5. **이력**: 수집 기록별 보유 상태(결과·원본 모두 있음 / 결과만 있음 / 이력만 있음), 원본 보호, 프로젝트 백업.
+
+뉴스 결과 좁히기는 받은 기사 중 표시할 기사를 고르는 조건입니다. 제목·발췌문에만 적용되고 원본은 보관되므로 조건을 바꾸면 추가 요청 없이 다시 보입니다.
+
+## 이전 버전 프로젝트
+
+- 기존 프로젝트는 자사 1개 프로젝트로 열립니다. 이전의 포함·제외 문구는 뉴스 결과 좁히기로 옮겨지며, 설정을 한 번 저장하면 새 구조로 저장됩니다.
+- **경쟁사 비교 검색 추이**와 **브랜드 검색량 합계**는 새 방식으로 수집해야 나옵니다. 이전 검색 추이·검색량 결과는 이력에서 볼 수 있지만 비교 차트에 합치지 않습니다.
+- 이전 화면에서 직접 '제외'로 표시한 자료는 기본 다운로드 선택에서 빠진 상태로 유지됩니다.
+
+## 저장·백업·정리
+
+| 대상 | 위치 | 정책 |
+|---|---|---|
+| 입력·결과·다운로드 기록 | `storage/adetect.db` | 자동 삭제 없음 |
+| HTML/Excel/ZIP | `storage/exports` | 최근 20개 실행·5GB |
+| 캡처·이미지 원본 | `storage/evidence` | 5GB까지 |
+| DB 백업 | `storage/backups` | 설정 > DB 백업 |
+
+- 저장 공간 사용률은 프로젝트 상단과 설정에 표시됩니다. 80% 이상이면 경고하고, 설정 > 저장 공간 관리에서 정리 후보를 확인한 뒤 정리합니다.
+- **DB 백업**: 설정 > `DB 백업 만들기` → `보관 완료!` 팝업의 `바로 확인하기`로 폴더를 엽니다. 원본까지 보존하려면 앱을 종료하고 `storage` 폴더 전체를 복사합니다.
+- **프로젝트 백업**: 이력 탭 > 프로젝트 백업. 복원은 프로젝트 목록 > 백업에서 새 프로젝트 복원 (기존 프로젝트를 덮어쓰지 않음).
+- **프로젝트 삭제**: 프로젝트 목록에서 행 왼쪽을 체크 → `선택 N개 삭제` → 확인 팝업(영향 범위·DB 백업 확인).
+- 자동 테스트는 임시 DB를 쓰므로 `storage/adetect.db`를 건드리지 않습니다.
+
+## 다른 PC로 옮기기 (zip)
+
+클라우드 배포는 지원하지 않습니다. 프로젝트 폴더를 zip으로 옮겨 새 PC에서 위 '설치와 실행'을 다시 합니다.
+
+- 빼기: `.venv/`(PC마다 새로 만듦), `__pycache__/`, `.pytest_cache/`, `storage/temp/`, `storage/smoke/`
+- `.env`: API 키가 들어 있습니다. 본인 PC로 옮길 때만 넣습니다.
+- `storage/`: 기존 프로젝트·원본까지 옮기려면 **앱을 종료한 뒤** 포함합니다. 프로젝트 하나만 옮길 때는 프로젝트 백업 ZIP을 쓰면 됩니다.
+- 방화벽이 네이버·Apify·Gemini 요청을 막으면 해당 자료는 '수집 실패'로 기록됩니다(토큰 부족으로 표시하지 않음).
+
+## 문제 해결
+
+- **계속 SAMPLE 자료만 나옴**: 실행한 PowerShell 창에 `ADETECT_SAMPLE_MODE=true`가 남아 있습니다. 창을 닫고 새 창에서 실행하세요. 설정 > 현재 모드에서 확인할 수 있습니다.
+- **`python`을 찾을 수 없음**: `py -3 -m venv .venv`로 가상환경을 만듭니다.
+- **8501 포트 사용 중**: `... -m streamlit run app.py --server.port 8502`
+- **검색 화면이 '판독 불가'**: 캡처 실패·차단·광고 영역 식별 실패입니다. `playwright install chromium` 설치 여부를 확인하고 다시 수집하세요. 광고가 없다는 뜻이 아닙니다.
+
+## 검증 명령
+
+```powershell
+.venv\Scripts\python.exe -m pytest tests/test_smoke.py -v
+.venv\Scripts\python.exe -m pytest tests -q
+.venv\Scripts\python.exe -m compileall core database ui app_pages app.py
+```
 
 ## 폴더 구성
 
 | 위치 | 내용 |
 |---|---|
-| 루트 | `app.py`(진입점), `README.md`, `PRD.md`(제품 기준), `CLAUDE.md`/`AGENTS.md`(작업 지침), `requirements.txt`, `.env.example` |
-| `pages/`, `ui/` | 화면 (`ui/project_workspace.py`가 프로젝트 화면, 레거시 UI는 파일 상단 `LEGACY` 표시) |
-| `core/`, `database/`, `config/` | 수집·저장·내보내기 로직, SQLite, 설정 |
-| `tests/` | 자동 테스트 (임시 DB 사용) |
-| `docs/` | `PROJECT_PLAN.md`, `SETUP_GUIDE.md`(API 키 발급), 개발일지(pptx), 과거 계획서. `docs/design_reference/`는 외부 사이트 참고 이미지로 git에 올리지 않음 |
-| `adetect_reference/` | 기존 워크스페이스에서 가져온 참고 코드 (PRD §4) |
-| `storage/` (git 제외) | `adetect.db`, `exports/`, `evidence/`, `backups/`, `smoke/`(수동 테스트 DB), `temp/`(스크린샷·로그·테스트 DB·임시 산출물) |
+| `app.py` | 진입점(상단 메뉴·전역 스타일) |
+| `app_pages/` | 홈·프로젝트·설정 화면 (`pages/`라는 이름은 Streamlit 자동 페이지 탐색과 충돌해 쓰지 않음) |
+| `ui/` | 프로젝트 화면(`project_workspace.py`), 저장 공간 화면, 공용 컴포넌트. 상단에 `LEGACY` 표시가 있는 파일은 사용하지 않는 과거 화면 |
+| `core/` | 수집·비교·필터·UTM·내보내기·저장 로직 |
+| `database/`, `config/` | SQLite 연결, 설정·테마 |
+| `tests/` | 자동 테스트 |
+| `docs/` | 설정 가이드, 구조·검증 기준, 개발일지 |
+| `adetect_reference/` | 이전 워크스페이스의 참고 코드 |
+| `storage/` (git 제외) | DB, 산출물, 원본, 백업, 임시 파일 |
 
-## 실행
+## 신규 프로젝트 설정과 뉴스 요약
 
-```powershell
-.venv\Scripts\python.exe -m pip install -r requirements.txt
-.venv\Scripts\python.exe -m playwright install chromium
-.venv\Scripts\python.exe -m streamlit run app.py
-```
+1. 브랜드명과 조사 범위를 입력합니다. AI 초안은 기본 선택이며 Gemini 호출 비용이 발생할 수 있습니다. 직접 입력하려면 선택을 해제합니다.
+2. 검색어 묶음·공식 주소·SNS 후보를 확인합니다. AI가 찾지 못한 주소는 직접 입력하거나 비워 둡니다.
+3. 경쟁사를 선택하거나 건너뜁니다. 최대 4개이며 실제 비교 목적에 맞는지 확인합니다.
+4. 시장 관심 검색어·뉴스 검색어·필터·유료 기능을 확인하고 프로젝트를 만듭니다. 이후 자료 수집 탭에서 별도로 실행합니다.
 
-127.0.0.1에서만 접속합니다. API 키는 `.env`에 설정하고 앱을 재시작하세요. 유료 기능은 기본 ON이며, 입력 과정에서 자동 호출하지 않고 수집/요약 버튼으로 실행합니다. 토큰 누락 시 `토큰 부족. 개발자에게 문의해주세요`를 표시합니다. 키 누락을 SAMPLE로 대체하지 않습니다.
+이전 단계로 이동해도 제출한 입력은 유지됩니다. 미저장 초안은 현재 브라우저 세션 안에서만 유지됩니다. 기존 프로젝트는 한 화면에서 수정합니다.
 
-외부 요청 없는 SAMPLE 검증:
+뉴스 결과의 **수집한 뉴스 요약하기**는 제목·발췌에서 핵심 문구와 수치를 선정합니다(최신 최대 30건, 최대 5개 근거). 기사 전문 요약이나 사실 검증은 아닙니다. 수집 없이 저장된 뉴스로 실행할 수 있고, 필터·버전이 바뀌면 그 조건에 맞는 요약을 다시 요청해야 합니다. 원문 링크와 함께 확인하세요.
 
-```powershell
-$env:ADETECT_SAMPLE_MODE="true"
-.venv\Scripts\python.exe -m streamlit run app.py
-```
-
-실수집은 `ADETECT_SAMPLE_MODE=false`로 재시작합니다. 상세 설정은 [docs/SETUP_GUIDE.md](docs/SETUP_GUIDE.md)를 참고하세요.
-
-## 사용 흐름
-
-1. 홈에서 브랜드명을 입력하거나 프로젝트 목록에서 프로젝트를 만듭니다. 예: `한샘 — 리하우스 조사`, `메리츠화재 — TM 채용`. 쓰지 않는 프로젝트는 목록에서 보관·보관 해제하고, 지울 프로젝트는 행 왼쪽 체크 → `선택 N개 삭제` → 확인 팝업(영향 범위·DB 백업 확인)으로 삭제합니다.
-2. 브랜드/캠페인 검색어, 일반 검색어, 공식 URL(자사몰·스마트스토어·브랜드스토어 등 여러 개), 캠페인 상세 URL, 공식 계정, Meta 광고 라이브러리 주소(`view_all_page_id=` 포함)를 입력합니다. 각 칸에 연한 예시가 표시됩니다.
-3. 8개 자료 종류 중 필요한 항목만 선택해 수집합니다. 기존 자료는 날짜·건수로 표시하며 체크 해제해도 삭제되지 않습니다.
-4. 자료 확인·다운로드는 자료 종류별 최근 성공 버전을 자동으로 사용하고 종류·수집일·건수만 한 줄로 보여줍니다. 과거 버전은 `다른 시점 선택`을 열었을 때만 고릅니다. 수집일이 섞이면 화면과 파일에 날짜 혼합을 표시합니다. 포함/확인 필요/제외와 파일 선택은 따로 지정합니다.
-5. 선택한 자료로 HTML/Excel/ZIP을 만듭니다. `01_수집정보`는 프로젝트명·검색어·공식 페이지·자료별 수집 시각·캐시·SAMPLE·유료 기능을 읽기 쉬운 `항목/값` 행으로 보여줍니다(API 키 미표시, 빈 값은 `미입력`).
-6. 이력 탭은 각 수집 기록을 `결과·원본 모두 있음` / `결과만 있음 (일부 원본 없음)` / `이력만 있음`으로 표시하고, 없는 원본 목록·`이 시점 결과 열기`·`원본 보호`를 제공합니다.
-7. 프로젝트 백업은 원본과 입력을 포함한 검증 가능한 ZIP으로 만들며, 복원은 기존 프로젝트를 덮어쓰지 않고 새 프로젝트로 가져옵니다.
-
-기본 자료 선택은 검색 추이·검색량·뉴스·지정 공식 페이지입니다. 유료 기능은 기본 ON이며 키가 없을 때 `토큰 부족. 개발자에게 문의해주세요`가 표시됩니다.
-
-## 팩트 중심 범위
-
-- 완료된 36개월의 검색 추이, 월별 평균과 연도별 피크·저점. 검색어별 상대지수이며 서로 다른 검색어의 절대 규모 비교는 불가합니다. 누락 월은 0이 아닙니다.
-- 검색량·관련 뉴스·공식 페이지·SNS 최근 게시물·Meta 광고 원문·이미지/영상·연결 URL.
-- 홈페이지 캡처와 이미지 원본을 보존합니다. 이미지 속 문구 OCR은 아직 제공하지 않으며 원본에서 조건을 확인해야 합니다.
-- Meta 최대 20건/페이지, 뉴스 최대 100건/검색어, SNS 최근 최대 5건. 전체 광고량·전체 기사량을 의미하지 않습니다.
-- 타깃 추정·포지셔닝·전략 추천·광고/뉴스 점유율은 새 화면/내보내기에서 제외했습니다. 기존 분석 모듈은 과거 호환용입니다.
-
-## 저장·다운로드 이력
-
-| 대상 | 기본 위치 | 보관 정책 |
-|---|---|---|
-| 입력·결과·다운로드 요청 | storage/adetect.db | SQLite 영속 저장, 자동 삭제 없음 |
-| HTML/Excel/ZIP | storage/exports | 최근 20개 실행·총 5GB LRU |
-| 캡처·이미지·영상 | storage/evidence | 내용 해시로 중복 제거, 총 5GB 초과 시 추가 저장 중단 |
-
-환경변수 `ADETECT_DB_PATH`, `ADETECT_EXPORT_DIR`, `ADETECT_EXPORT_MAX_RUNS`, `ADETECT_EXPORT_MAX_BYTES`, `ADETECT_EVIDENCE_DIR`, `ADETECT_EVIDENCE_MAX_BYTES`로 조절합니다. 현재 로컬 MVP는 별도 서버 없이 이 PC가 실행·보관 서버 역할을 합니다. 원격 DB·Storage 코드는 배포 검증 전 준비 상태이며 자동으로 활성화되지 않습니다.
-
-다운로드 버튼을 누르면 요청 이벤트를 남깁니다. 파일 생성 이력과 구분하며 브라우저 저장 완료까지 확인한 기록은 아닙니다. 파일이 만료되어도 실행·요청 이력은 남고, 결과를 복원해 다시 생성할 수 있습니다. 원본 재포함에는 원본 폴더도 필요합니다. 백업은 앱 종료 후 DB·exports·evidence를 함께 복사하세요.
-
-### 저장 공간 관리
-
-프로젝트 화면 상단과 설정 화면에 파일·DB 사용량, 전체 한도, 사용률을 표시합니다. 80% 이상이면 경고, 90% 이상이면 정리 안내가 나오며, 저장 부족으로 수집·파일 생성이 막히면 `저장 공간 정리로 이동` 버튼이 나옵니다.
-
-설정 > 저장 공간 관리: `정리 후보 보기`(종류·파일명·예상 용량, 삭제 없음) → 동의 체크 → `정리 실행`. 실행 결과와 삭제 항목, 사용량 변화를 표시합니다. 최근 성공 결과와 그 원본, 현재 연 프로젝트 결과의 원본, 수집 중 작업, 보호(pin)한 원본은 후보에서 제외됩니다.
-
-### 백업과 과거 테스트 데이터
-
-- 설정 > `DB 백업 만들기`: `storage/backups/adetect_<시각>.db`로 SQLite 사본을 만들고 `보관 완료!` 팝업의 `바로 확인하기`로 폴더를 엽니다(기존 백업을 덮어쓰지 않음). 원본까지 보존하려면 앱을 종료한 뒤 `storage/evidence`, `storage/exports`도 함께 복사하세요.
-- 수동 백업(앱 종료 후): `New-Item -ItemType Directory -Force storage/backups; Copy-Item storage/adetect.db storage/backups/adetect_manual.db`
-- 프로젝트 목록: 프로젝트를 `수집 이력 없음`/`SAMPLE 자료만 있음`/`실수집 자료 포함`/`구분 불가 (만료 기록만 있음)`으로 구분해 보여줍니다(저장된 사실 기준, 테스트 여부 추정 없음). 삭제는 목록에서 체크한 프로젝트 단위로만, 확인 팝업에서 영향 범위를 보고 백업 확인을 체크한 뒤 가능합니다. 앱은 기존 프로젝트를 자동 삭제하지 않습니다.
-
-### 테스트 DB 분리
-
-`pytest`는 `tests/conftest.py`가 임시 DB·exports·evidence를 쓰므로 운영 DB(`storage/adetect.db`)를 건드리지 않습니다. 브라우저로 수동 스모크 테스트를 할 때는 별도 경로를 지정해 운영 데이터와 섞이지 않게 하세요.
-
-```powershell
-$env:ADETECT_SAMPLE_MODE="true"
-$env:ADETECT_DB_PATH="storage/smoke/adetect_smoke.db"
-$env:ADETECT_EXPORT_DIR="storage/smoke/exports"
-$env:ADETECT_EVIDENCE_DIR="storage/smoke/evidence"
-.venv\Scripts\python.exe -m streamlit run app.py
-```
-
-개별 원본 최대 25MB, 랜딩 이미지 최대 6MB/12개, ZIP 원본 합계 최대 250MB입니다. 누락 사유는 패키지에 표시합니다. 비밀 키는 결과·내보내기에 포함하지 않습니다.
-
-## 다른 PC로 옮기기 (zip)
-
-현재는 로컬 실행이 기준입니다. 다른 PC·네트워크에서 쓰려면 프로젝트 폴더를 zip으로 옮깁니다. 클라우드 배포 설정은 이번 범위에 포함하지 않습니다.
-
-**zip에서 뺄 것**: `.venv/`(PC마다 새로 만들어야 함), `__pycache__/`, `.pytest_cache/`, `storage/temp/`, `storage/smoke/`
-
-**상황에 따라 판단할 것**
-- `.env`: API 키가 들어 있습니다. 본인 PC로만 옮길 때만 포함하고, 다른 사람에게 줄 때는 빼고 `.env.example`로 새로 만듭니다.
-- `storage/`(adetect.db, evidence, exports, backups): 기존 프로젝트와 원본까지 가져가려면 **앱을 종료한 뒤** 폴더째 포함합니다. 빼면 새 PC에서 빈 상태로 시작합니다. 프로젝트 하나만 옮길 때는 이력 탭의 '프로젝트 백업' ZIP → 새 PC의 '백업에서 새 프로젝트 복원'을 써도 됩니다.
-
-### zip을 받은 뒤 할 일 (Windows PowerShell, 압축 푼 ADetect 폴더에서)
-
-**1. Python 확인** — 3.12 이상 (개발 PC는 3.14). 없으면 python.org에서 설치하고 "Add python.exe to PATH"를 체크합니다.
-
-```powershell
-python --version
-```
-
-**2. 가상환경 만들기와 패키지 설치** — `.venv`는 zip에 넣지 않으므로 PC마다 새로 만듭니다. `Activate.ps1`을 쓰지 않고 `.venv\Scripts\python.exe`를 직접 부르면 실행 정책(ExecutionPolicy) 오류를 피할 수 있습니다.
-
-```powershell
-python -m venv .venv
-.venv\Scripts\python.exe -m pip install --upgrade pip
-.venv\Scripts\python.exe -m pip install -r requirements.txt
-.venv\Scripts\python.exe -m playwright install chromium
-```
-
-`playwright install`은 공식 페이지 캡처·네이버 검색 화면에만 필요합니다. 회사망에서 다운로드가 막혀도 나머지 자료 수집은 동작합니다.
-
-**3. `.env` 준비** — `.env`를 zip에 넣어 왔다면 이 단계를 건너뜁니다.
-
-```powershell
-Copy-Item .env.example .env
-notepad .env
-```
-
-| 변수 | 필요할 때 | 발급 안내 |
-|---|---|---|
-| `NAVER_CLIENT_ID`, `NAVER_CLIENT_SECRET` | 검색 관심도 추이·관련 뉴스 | docs/SETUP_GUIDE.md 2절 |
-| `NAVER_AD_API_KEY`, `NAVER_AD_SECRET_KEY`, `NAVER_AD_CUSTOMER_ID` | 월간 검색량·연관 검색어 | 3절 |
-| `APIFY_API_TOKEN` | Meta 광고·Instagram (유료) | 4절 |
-| `GEMINI_API_KEY` | 근거 요약 (유료) | 5절 |
-| `YOUTUBE_API_KEY` | YouTube 공식 채널 | 하단 추가 설정 |
-| `ADETECT_SAMPLE_MODE` | `true`면 외부 호출 없이 SAMPLE 자료, `false`면 실수집 | — |
-
-- 키가 없는 자료는 수집되지 않고 상태로 안내됩니다(Apify/Gemini는 `토큰 부족. 개발자에게 문의해주세요`).
-- 저장 위치를 바꾸려면 `ADETECT_DB_PATH`, `ADETECT_EXPORT_DIR`, `ADETECT_EVIDENCE_DIR`를 설정합니다. 비워두면 `storage/` 아래를 씁니다.
-- `.env`를 고친 뒤에는 앱을 재시작해야 반영됩니다.
-
-**4. 먼저 SAMPLE 모드로 화면 확인** — 실제 데이터와 섞이지 않게 별도 DB를 씁니다. 이 설정은 이 PowerShell 창에서만 유효합니다.
-
-```powershell
-$env:ADETECT_SAMPLE_MODE="true"
-$env:ADETECT_DB_PATH="storage/smoke/adetect_smoke.db"
-$env:ADETECT_EXPORT_DIR="storage/smoke/exports"
-$env:ADETECT_EVIDENCE_DIR="storage/smoke/evidence"
-.venv\Scripts\python.exe -m streamlit run app.py
-```
-
-브라우저에서 http://127.0.0.1:8501 을 열어 홈 → 프로젝트 생성 → 기본 자료 수집 → 자료 확인·다운로드 → HTML 생성까지 확인한 뒤, 터미널에서 `Ctrl+C`로 종료합니다.
-
-**5. 실사용 실행** — 새 PowerShell 창을 열고 (4번의 임시 설정이 남지 않도록), `.env`의 `ADETECT_SAMPLE_MODE=false`를 확인한 뒤:
-
-```powershell
-.venv\Scripts\python.exe -m streamlit run app.py
-```
-
-**6. (선택) 자동 테스트** — 실제 API나 운영 DB를 쓰지 않습니다.
-
-```powershell
-.venv\Scripts\python.exe -m pytest tests -q
-```
-
-**문제가 생겼을 때**
-- `python`을 찾을 수 없음: Python 설치 시 PATH 추가를 확인하거나 `py -3 -m venv .venv`로 만듭니다.
-- 8501 포트가 사용 중: `.venv\Scripts\python.exe -m streamlit run app.py --server.port 8502`
-- 앱은 127.0.0.1에서만 열립니다(그 PC의 브라우저에서만 접속). 회사·외부 네트워크의 방화벽·프록시가 네이버/Apify/Gemini 호출을 막으면 해당 자료가 `실패`로 기록되며, 토큰 부족으로 표시하지 않습니다.
-
-## 검증
-
-```powershell
-.venv\Scripts\python.exe -m pytest tests/test_smoke.py -v
-.venv\Scripts\python.exe -m pytest tests -q
-.venv\Scripts\python.exe -m compileall core database ui pages app.py
-```
-
-자동 테스트는 실제 계정 호출 없이 실행합니다. 3년 실데이터는 무료 네이버 API로 검증하며, 검색량이 적어 일부 월만 제공되는 사례도 처리합니다. Meta/Instagram/Gemini 유료 실검증은 별도 승인 후 진행합니다.
-
-2026-09-27 검증: 자동 테스트 28개 통과. 프로젝트 생성·자료 선택·유료 기본 ON·뉴스 URL 중복 통합·입력 스냅샷을 확인했습니다. 실제 브라우저(SAMPLE 모드)에서 홈 → 프로젝트 설정 → 기본 자료 수집 → 수집 완료 자동 갱신 → 자료 선택 → HTML 생성·다운로드까지 확인했습니다. 기존 실수집 검증 기록은 보존하며 유료 API는 호출하지 않았습니다.
-
-2026-09-27 18차 보완 검증: 자동 테스트 41개 통과(smoke 11개 포함), compileall 통과. 분리된 SAMPLE DB로 실제 브라우저에서 프로젝트 생성 → 기본 자료 수집 → 확인·다운로드 최근 버전 자동 선택·`다른 시점 선택` → 이력 3단계 표시(결과·원본 모두 있음/결과만 있음/이력만 있음) → 설정 저장 공간 표시·정리 후보 보기·동의 전 실행 버튼 비활성·정리 실행 결과 표시 → HTML 01_수집정보 행 표시를 확인했다. 운영 DB(`storage/adetect.db`, 세션 86개)는 변경하지 않았다.
-
-## 현재 미구현·별도 검증 필요
-
-클라우드 배포(Streamlit Community Cloud·Supabase 등)는 현재 범위에서 제외했습니다 — 로컬 실행 후 zip으로 다른 PC에 옮겨 씁니다. 원격 DB·Storage 코드(`database/remote.py`, `core/storage.py`)는 미검증 준비 상태입니다. 클라우드 인증·다중 사용자·signed URL·자동 백업·분산 작업 큐, 유료 Meta/Instagram/Gemini 실계정 호출, 이미지 OCR과 전략·타깃·포지셔닝 해석은 이번 구현에 포함하지 않았습니다.
+요약은 원본과 별도로 로컬 DB에 보관되고 백업·복원 및 선택 자료 다운로드에 포함됩니다. AI 실계정 응답 품질과 과금은 별도 소량 검증이 필요하며 자동 테스트는 실제 유료 API를 호출하지 않습니다.

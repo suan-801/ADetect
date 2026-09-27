@@ -1,7 +1,7 @@
 """ADetect — Streamlit 진입점. `streamlit run app.py`로 실행합니다.
 
 전체 구조는 PRD §3(디렉터리)·§15(기술스택)·§16(화면 구성)을 따릅니다.
-이 파일은 페이지 라우팅과 전역 스타일 주입만 담당하고, 실제 화면 로직은 pages/*.py에 있습니다.
+이 파일은 페이지 라우팅과 전역 스타일 주입만 담당하고, 실제 화면 로직은 app_pages/*.py (Streamlit의 pages/ 자동 탐색을 피하려고 폴더명을 app_pages로 둔다)에 있습니다.
 아이콘은 이모지 대신 Streamlit 내장 Material Symbols(선 아이콘, `:material/...:`)만 사용합니다.
 
 Navigation은 sidebar가 아니라 공식 `st.navigation(position="top")` API로 구현합니다
@@ -12,7 +12,7 @@ from pathlib import Path
 import streamlit as st
 
 from config.settings import APP_NAME
-from config.theme import inject_global_css
+from config.theme import inject_global_css, inject_workspace_css
 from database.db import init_db
 
 st.set_page_config(
@@ -28,9 +28,12 @@ _LOGO_PATH = Path(__file__).resolve().parent / "ui" / "assets" / "logo.svg"
 if _LOGO_PATH.exists():
     st.logo(str(_LOGO_PATH), size="medium")
 
-home = st.Page("pages/1_home.py", title="홈", icon=None, default=True)
-analyze = st.Page("pages/2_analyze.py", title="프로젝트", icon=None, url_path="analyze")
-settings_page = st.Page("pages/4_settings.py", title="설정", icon=None, url_path="settings")
+home = st.Page("app_pages/1_home.py", title="홈", icon=None, default=True)
+analyze = st.Page("app_pages/2_analyze.py", title="프로젝트", icon=None, url_path="analyze")
+settings_page = st.Page("app_pages/4_settings.py", title="설정", icon=None, url_path="settings")
 
 nav = st.navigation([home, analyze, settings_page], position="top")
+if nav != home:
+    # 프로젝트·설정 화면 전용 입력·섹션 스타일. Home Hero에는 적용하지 않는다.
+    inject_workspace_css()
 nav.run()

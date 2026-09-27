@@ -36,9 +36,9 @@ COLORS = {
     "text_dim": "#A0A3AA",
     "text_faint": "#797C84",
     # 입력칸 — 배경(bg)과 구분되도록 한 단계 밝게. placeholder는 입력칸 위 대비 4.8:1.
-    "input_bg": "#191C21",
-    "input_border": "#33373E",
-    "placeholder": "#878A92",
+    "input_bg": "#1F2228",
+    "input_border": "#3C414A",
+    "placeholder": "#8E929A",
     # Primary brand accent — clean vermilion/red-orange. 좁은 면적에만: active nav, key action,
     # section index, important highlight, key data point, selected state.
     "accent": "#F0462C",
@@ -269,7 +269,7 @@ a[data-testid="stTopNavLink"][aria-current="page"]::after {{
 /* ══════════════════════════════════════════════════════════════════════════
    HOME — Cinematic Brand Experience (4차 리뉴얼). Workspace(Analyze/History/
    Settings)는 이 블록의 영향을 받지 않는다 — 모두 .adetect-home-page-marker가
-   심어진 페이지(pages/1_home.py)에서만 매칭되는 :has() 셀렉터로 격리했다.
+   심어진 페이지(app_pages/1_home.py)에서만 매칭되는 :has() 셀렉터로 격리했다.
    ══════════════════════════════════════════════════════════════════════════ */
 
 /* Home 전용 wide container — Workspace의 1200px 규칙은 그대로 두고 Home만 완화.
@@ -467,7 +467,7 @@ div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .
 }}
 div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .adetect-cta-row-marker) [data-testid="stElementContainer"] {{ width: auto; }}
 
-/* ── Brand Context Header (Workspace 상단, pages/2_analyze.py) ─────────────
+/* ── Brand Context Header (Workspace 상단, app_pages/2_analyze.py) ─────────────
    좌: 브랜드/카테고리/타겟. 우: Analysis Status vertical index. */
 .adetect-context-block {{ padding-right: 1rem; }}
 .adetect-context-brand {{ font-size: clamp(1.4rem, 1rem + 1vw, 1.9rem); font-weight: 600; color: {COLORS['text']}; letter-spacing: -0.015em; margin: 0; }}
@@ -654,7 +654,7 @@ glass_marker = command_marker
 
 
 def home_page_marker():
-    """pages/1_home.py 최상단에서 한 번 호출합니다 — 이 마커가 존재하는 동안만
+    """app_pages/1_home.py 최상단에서 한 번 호출합니다 — 이 마커가 존재하는 동안만
     `[data-testid="stMainBlockContainer"]`의 wide-container 규칙이 적용되어 Home만 Workspace의
     1200px 규칙에서 벗어납니다(§21 Home/Workspace 역할 분리)."""
     st.markdown('<div class="adetect-home-page-marker"></div>', unsafe_allow_html=True)
@@ -705,3 +705,19 @@ def section_title(label: str, title: str, status_text: str = ""):
         f'<div class="adetect-section-title"><h3>{title}</h3>{status_html}</div>',
         unsafe_allow_html=True,
     )
+
+
+def inject_workspace_css():
+    """프로젝트·설정(Workspace) 전용. 흰 입력칸 대신 본문보다 조금 밝은 중성 회색, 얇은 경계선으로 영역을 구분한다.
+    큰 카드·그림자·그라데이션·글로우는 쓰지 않는다."""
+    st.markdown(f"""<style>
+    [data-testid="stTextInput"] input, [data-testid="stTextArea"] textarea, [data-testid="stNumberInput"] input {{
+        background:{COLORS['input_bg']} !important; color:{COLORS['text']} !important; border:1px solid {COLORS['input_border']} !important; }}
+    [data-testid="stTextInput"] input:focus, [data-testid="stTextArea"] textarea:focus {{
+        background:{COLORS['input_bg']} !important; border:1px solid {COLORS['accent']} !important; box-shadow:0 0 0 1px {COLORS['accent']} !important; }}
+    [data-testid="stWidgetLabel"] p {{ color:{COLORS['text']} !important; font-weight:560 !important; }}
+    [data-testid="stHeading"] h3 {{ border-top:1px solid {COLORS['border']}; padding-top:1.1rem; margin-top:0.9rem; font-size:1.05rem !important; }}
+    [data-testid="stExpander"] details {{ border:1px solid {COLORS['border']} !important; border-radius:{RADIUS['sm']} !important; background:transparent !important; }}
+    .adetect-section {{ border-top:1px solid {COLORS['border']}; padding-top:1.1rem; margin:1.4rem 0 0.4rem; color:{COLORS['text']};
+        font-size:1.05rem; font-weight:650; letter-spacing:-0.01em; }}
+    </style>""", unsafe_allow_html=True)

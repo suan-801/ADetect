@@ -54,7 +54,7 @@ def _command_bar(key_prefix: str, label: str = "START HERE"):
                     "category": st.session_state.get(f"{key_prefix}_category_input", "").strip(),
                 }
                 st.session_state.step = "config"
-                st.switch_page("pages/2_analyze.py")
+                st.switch_page("app_pages/2_analyze.py")
 
 
 # ── 01 · HERO SCENE ──────────────────────────────────────────────────────

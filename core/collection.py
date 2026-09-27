@@ -62,11 +62,13 @@ def record(kind, brand, source_url, text, **metadata):
 
 
 def relevance(item, session):
-    if not session.get("campaign"):
-        return "포함", "브랜드 전체 조사"
+    """레거시 v2/v3 결과 전용 분류. 새 프로젝트 흐름(v4)은 분류하지 않고 뉴스 필터만 쓴다."""
     text=(item.get("text","")+" "+item.get("title","")).casefold()
+    # 제외 문구는 조사 대상 입력 여부와 무관하게 먼저 확인한다.
     if any(w.casefold() in text for w in session.get("exclude_terms",[]) if w):
         return "제외", "설정한 제외 문구와 일치"
+    if not session.get("campaign"):
+        return "포함", "브랜드 전체 조사"
     target=session.get("sources",{}).get(session["brand_name"],{})
     landing=target.get("detail_url") or target.get("homepage")
     if landing and item.get("landing_url"):
@@ -126,11 +128,21 @@ def run_stage(stage, session, retry=False):
         from core.scrapers.search_history import fetch_history,summarize_history
         from core.scrapers.naver_api import get_news
         from core.scrapers.naver_ad_api import fetch_keyword_stats
+        grouped=session.get("keyword_mode")=="brand_group"
+        if grouped:
+            topic_queries=[(session["brand_name"]+" · 브랜드 묶음",groups["브랜드/캠페인"])] if groups["브랜드/캠페인"] else []
+            topic_queries += [(q,[q]) for q in groups["일반"]]
+            for topic,terms in topic_queries:
+                def grouped_history(label=topic,aliases=terms):
+                    series=fetch_history(label,keywords=aliases)
+                    return {"series":series,"seasonality":summarize_history(series),"records":[]}
+                collect("trend:"+topic,topic+" · 3년 상대지수",grouped_history,None if settings.SAMPLE_MODE or not settings.NAVER_DATALAB_MOCK else "검색 추이 API 키 미설정")
         for keyword in all_queries:
             def history(k=keyword):
                 series=fetch_history(k)
                 return {"series":series,"seasonality":summarize_history(series),"records":[]}
-            collect("trend:"+keyword,keyword+" · 3년 검색 추이",history, None if settings.SAMPLE_MODE or not settings.NAVER_DATALAB_MOCK else "검색 추이 API 키 미설정")
+            if not grouped:
+                collect("trend:"+keyword,keyword+" · 3년 검색 추이",history, None if settings.SAMPLE_MODE or not settings.NAVER_DATALAB_MOCK else "검색 추이 API 키 미설정")
             def volume(k=keyword):
                 if settings.SAMPLE_MODE:
                     rows=[{"keyword":k,"monthly_pc_display":"SAMPLE","monthly_mobile_display":"SAMPLE"}]
@@ -145,11 +157,16 @@ def run_stage(stage, session, retry=False):
                         note="조회 시점 API 월간 검색량. '<10'은 0이 아닙니다. 중복·연관어를 합산하지 않습니다."))
                 return {"records":result,"message":"일치 검색어 미제공" if not exact else ""}
             collect("volume:"+keyword,keyword+" · 검색량",volume, None if settings.SAMPLE_MODE or not settings.NAVER_AD_MOCK else "검색광고 API 키 미설정")
-            if options["news"]:
+            if options["news"] and "news_keywords" not in session:
                 def news(k=keyword):
                     rows=get_news(k,scope="market",limit=100)
                     return {"records":[record("뉴스",session["brand_name"],n["url"],n["title"]+"\n"+n["summary"],keyword=k,published_at=n.get("published_at"),note="뉴스 API 발췌문·최대 100건 표본. 기사 주장의 진위 확인은 별도.") for n in rows]}
                 collect("news:"+keyword,keyword+" · 뉴스",news,None if settings.SAMPLE_MODE or not settings.NAVER_SEARCH_MOCK else "네이버 뉴스 API 키 미설정")
+        if options["news"] and "news_keywords" in session:
+            for keyword in session["news_keywords"]:
+                def selected_news(k=keyword):
+                    return {"records":[record("뉴스",session["brand_name"],n["url"],n["title"]+"\n"+n["summary"],keyword=k,published_at=n.get("published_at"),note="뉴스 API 제목·발췌 표본. 원문 확인 필요.") for n in get_news(k,scope="market",limit=100)]}
+                collect("news:"+keyword,keyword+" · 뉴스",selected_news,None if settings.SAMPLE_MODE or not settings.NAVER_SEARCH_MOCK else "네이버 뉴스 API 키 미설정")
     elif stage=="brand":
         from core.scrapers.brand_site import crawl_brand_website
         from core.evidence_store import capture_website,save_bytes

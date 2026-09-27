@@ -119,26 +119,25 @@ def test_collection_info_rows_are_readable_and_shared_by_html_and_excel():
     next(h for h in snapshots if h["source"] == "trend")["result"]["parts"] ={"trend:한샘": {"label": "t", "state": "완료", "series": {"keyword": "한샘", "start": "2023-09-01", "end": "2026-08-31", "rows": []}}}
     result = projects.selection_result(project, snapshots, [])
     assert result["inputs"]["date_mixed"] is True
-    rows = facts_report.collection_info_rows(result)
+    rows = facts_report.collection_info_v4(result)
     values = {r["항목"]: r["값"] for r in rows}
-    assert values["프로젝트명"] == "한샘 조사" and values["브랜드명"] == "한샘"
-    assert values["조사 대상"] == "미입력" and values["공식 Instagram"] == "미입력"
-    assert values["브랜드/캠페인 검색어"] == "한샘" and values["일반 검색어"] == "인테리어"
-    assert "api_key" not in values["공식 페이지"] and "SECRET123" not in str(rows)
-    assert values["공식 페이지"].startswith("https://hanssem.example/landing")
-    assert "관련 뉴스" in values["선택한 자료 종류"] and "검색 관심도 추이" in values["선택한 자료 종류"]
-    assert values["검색 추이 기간"] == "2023-09-01 ~ 2026-08-31"
+    assert values["프로젝트명"] == "한샘 조사" and values["자사 · 한샘 검색어 묶음"] == "한샘"
+    assert values["조사 대상"] == "미입력" and values["한샘 Instagram"] == "미입력"
+    assert values["시장 관심 검색어"] == "인테리어"
+    assert "api_key" not in values["한샘 공식 URL 1"] and "SECRET123" not in str(rows)
+    assert values["한샘 공식 URL 1"].startswith("https://hanssem.example/landing")
+    assert "수집 시각 · 관련 뉴스" in values and "수집 시각 · 검색 관심도 추이" in values
     assert "24시간 캐시 허용" in values["캐시 사용 여부"] and "기록 없음" in values["캐시 사용 여부"]
     assert values["SAMPLE 여부"] == "실수집 자료" and values["유료 기능"] == "ON"
     assert "날짜 혼합 안내" in values
     assert not any(isinstance(v, (dict, list)) or str(v).startswith("{") for v in values.values()), "JSON 덤프 금지"
 
     html = facts_report.report_html(project, result)
-    assert "날짜 혼합" in html and '<a href="https://hanssem.example/landing' in html and "SECRET123" not in html
-    sheet = load_workbook(BytesIO(facts_report.excel(result)))["01_수집정보"]
+    assert '<a href="https://hanssem.example/landing' in html and "SECRET123" not in html
+    sheet = load_workbook(BytesIO(facts_report.excel(result)))["17_수집조건"]
     excel_rows = [(r[0].value, r[1].value) for r in sheet.iter_rows(min_row=2)]
-    assert excel_rows == [(r["항목"], r["값"]) for r in rows]
-    link = next(r[1] for r in sheet.iter_rows(min_row=2) if r[0].value == "공식 페이지")
+    assert excel_rows == [(r["항목"], r["값"]) for r in rows], "HTML·Excel 공통 표"
+    link = next(r[1] for r in sheet.iter_rows(min_row=2) if r[0].value == "한샘 공식 URL 1")
     assert link.hyperlink is not None
 
 

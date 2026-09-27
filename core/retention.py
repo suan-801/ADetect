@@ -148,6 +148,7 @@ def cleanup(dry_run=True, protect_project=None, only=None):
                     tombstone={'schema_version':3,'source':source,'status':row['status'],'expired':True,'collected_at':row['created_at'],'records':[],'parts':{},'sample_sources':value.get('sample_sources',[])}
                     conn.execute("UPDATE function_run SET result_json=? WHERE id=?",(json.dumps(tombstone),row['id']))
                     conn.execute("DELETE FROM project_review WHERE run_id=?",(row['id'],))
+                    conn.execute("DELETE FROM project_digest WHERE run_id=? OR run_id LIKE ?",(row['id'],row['id']+":%"))
         blobs={(b['name'],b['kind']):dict(b) for b in conn.execute("SELECT * FROM stored_blob WHERE expired=0")}
         if not storage.remote():
             # 메타데이터가 없는 기존 파일도 미리보기에 동일하게 보여야 실행 결과와 목록이 일치한다.

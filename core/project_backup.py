@@ -19,6 +19,11 @@ def make(pid):
     project={k:v for k,v in project.items() if k in (*projects.INPUTS,'name')}
     histories=projects.histories(pid)
     for h in histories: h['result']['records']=projects.review_rows(h)
+    with get_conn() as conn:
+        projects.schema(conn)
+        for h in histories:
+            digest = conn.execute('SELECT fingerprint,data FROM project_digest WHERE run_id=?', (h['run_id'],)).fetchone()
+            if digest: h['news_digest'] = dict(digest)
     entries={'project.json':json.dumps({'schema_version':3,'project':project,'histories':histories,'exports':projects.exports(pid)},ensure_ascii=False).encode()}
     missing=[]
     for h in histories:
@@ -110,6 +115,9 @@ def restore(packages):
         for h in payload['histories']:
             rid=uuid.uuid4().hex
             conn.execute("INSERT INTO function_run(id,session_id,function_type,status,result_json,created_at) VALUES(?,?,?,?,?,?)",(rid,pid,h['source'],h['result']['status'],json.dumps(h['result'],ensure_ascii=False),h['created']))
+            if h.get('news_digest'):
+                d = h['news_digest']
+                conn.execute('INSERT INTO project_digest VALUES(?,?,?)', (rid,d['fingerprint'],d['data']))
         for e in payload.get('exports',[]):
             conn.execute("INSERT INTO project_export VALUES(?,?,?,?)",(uuid.uuid4().hex,pid,e['manifest'],e['created']))
     return pid

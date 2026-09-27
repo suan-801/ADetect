@@ -59,11 +59,14 @@ def test_download_requests_persist_without_render_side_effect():
 def test_missing_paid_token_ui_defaults_on_without_api_calls():
     from pathlib import Path
     from streamlit.testing.v1 import AppTest
-    page=Path(__file__).resolve().parents[1]/"pages/2_analyze.py"
+    page=Path(__file__).resolve().parents[1]/"app_pages/2_analyze.py"
     at=AppTest.from_file(str(page)).run()
     at.text_input(key="new_brand").set_value("A").run()
     at.button(key="new_project").click().run()
-    at.button(key="save_project").click().run()
+    for label in ("초안 준비하고 다음", "자사 정보 확인하고 다음", "선택한 경쟁사 확인 / 건너뛰기"):
+        next(b for b in at.button if b.label == label).click().run()
+    next(c for c in at.checkbox if c.label == "브랜드·검색어·주소 후보를 확인했습니다").check()
+    next(b for b in at.button if b.label == "확인하고 프로젝트 만들기").click().run()
     assert not at.exception
     assert at.toggle(key="collection_paid").value is True
 

@@ -1,5 +1,5 @@
 # LEGACY — 현재 런타임(app.py 네비게이션·신규 화면)에서 import/실행하지 않는다. (2026-09-27 검색 확인, PRD §0 18차 개정)
-# 신규 UI: pages/2_analyze.py → ui/project_workspace.py
+# 신규 UI: app_pages/2_analyze.py → ui/project_workspace.py
 # 신규 데이터 흐름: core/projects.py, core/project_jobs.py
 # 사용 금지 이유: 16차 개정의 소재분석 탭(과거 Reference Implementation). 18차에서는 Meta 광고를 자료 종류 'meta'로 core/project_jobs.py를 통해 수집한다. 상태/다운로드 패턴 참고용으로만 남긴다.
 # 새 화면에 다시 연결하지 말 것. 기존 데이터 호환 검토 전까지 삭제하지 않고 보존한다.

@@ -26,12 +26,16 @@ def cancel(pid):
     if event: event.set()
 
 
-def submit(project, sources, force=False, retry=False):
+def submit(project, sources, force=False, retry=False, options=None):
+    """options: {source: {"brands": [brand_id...], "ai_read": bool}}. 선택하지 않은 자료 종류는 호출하지 않는다."""
     from core.retention import ensure_capacity
     ensure_capacity()
     sources=[s for s in dict.fromkeys(sources) if s in projects.SOURCES]
     if not sources: raise ValueError("수집할 자료를 선택해주세요.")
-    snapshot=copy.deepcopy(project)
+    # 수집 당시 입력 사본(v4). 이후 프로젝트 설정을 바꿔도 이 사본은 바뀌지 않는다.
+    snapshot=projects.project_inputs(project)
+    snapshot["id"]=project["id"]
+    options=copy.deepcopy(options or {})
     with LOCK:
         if any(t["state"] in ("대기","수집 중") for t in tasks(project["id"])):
             raise ValueError("이 프로젝트는 이미 수집 중입니다.")
@@ -40,13 +44,14 @@ def submit(project, sources, force=False, retry=False):
         with get_conn() as conn:
             for source in sources:
                 tid=uuid.uuid4().hex
-                conn.execute("INSERT INTO project_task VALUES(?,?,?,?,?,?,?,?)",(tid,project["id"],source,"대기",json.dumps({k:snapshot.get(k) for k in projects.INPUTS},ensure_ascii=False),projects.now(),OWNER,None))
+                conn.execute("INSERT INTO project_task VALUES(?,?,?,?,?,?,?,?)",(tid,project["id"],source,"대기",json.dumps({**projects.to_storage(snapshot),"options":options.get(source,{})},ensure_ascii=False),projects.now(),OWNER,None))
                 attempts.append((tid,source))
-        POOL.submit(execute,snapshot,attempts,event,force,retry)
+        POOL.submit(execute,snapshot,attempts,event,force,retry,options)
 
 
-def execute(project,attempts,event,force,retry):
-    from core.collection import run_stage, error_message
+def execute(project,attempts,event,force,retry,options=None):
+    from core.collection import error_message
+    from core.project_sources import collect
     from core import jobs
     jobs._local.job={"cancel":event,"force":force,"partial":{}}
     try:
@@ -55,14 +60,11 @@ def execute(project,attempts,event,force,retry):
                 finish(tid,"중단"); continue
             finish(tid,"수집 중")
             inputs=copy.deepcopy(project)
-            inputs["source_selection"]=[source]
-            inputs["collection_options"]={k:k==source for k in ("website","news","instagram","youtube","search_capture","meta")}
-            stage=projects.SOURCES[source][2]
             # Source caches already preserve successful requests during retries.
             try:
                 from core.retention import ensure_capacity
                 ensure_capacity()
-                value=projects.normalize(run_stage(stage,inputs),source,inputs)
+                value=collect(source,inputs,(options or {}).get(source,{}))
                 previous=next((i for i in projects.histories(project["id"]) if i["source"]==source and projects.available(i)),None)
                 value["changes"]=changes(previous["result"] if previous else {},value)
                 # 소스별 캐시 적중 여부는 기록하지 않으므로 실행 시 정책만 남긴다.
@@ -72,7 +74,7 @@ def execute(project,attempts,event,force,retry):
             except jobs.AnalysisCancelled:
                 finish(tid,"중단")
             except Exception as exc:
-                value={"schema_version":3,"source":source,"status":"실패","records":[],"parts":{},"inputs":{k:inputs.get(k) for k in projects.INPUTS},"errors":[error_message(exc)],"collected_at":projects.now()}
+                value={"schema_version":4,"source":source,"status":"실패","records":[],"parts":{},"inputs":projects.to_storage(inputs),"errors":[error_message(exc)],"collected_at":projects.now()}
                 rid=save_function_run(project["id"],source,"실패",value)
                 finish(tid,"실패",rid)
     finally:

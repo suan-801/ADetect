@@ -4,7 +4,7 @@ import streamlit as st
 from core import retention
 from core.retention import human
 
-SETTINGS_PAGE = "pages/4_settings.py"
+SETTINGS_PAGE = "app_pages/4_settings.py"
 
 
 def _go_settings(key):

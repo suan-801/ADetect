@@ -1,5 +1,5 @@
 # LEGACY — 현재 런타임(app.py 네비게이션·신규 화면)에서 import/실행하지 않는다. (2026-09-27 검색 확인, PRD §0 18차 개정)
-# 신규 UI: pages/2_analyze.py → ui/project_workspace.py
+# 신규 UI: app_pages/2_analyze.py → ui/project_workspace.py
 # 신규 데이터 흐름: core/projects.py, core/project_jobs.py
 # 사용 금지 이유: 레거시 분석 탭(market/brand/synthesis) 전용 공통 렌더러. 신규 화면에서 import하지 않는다.
 # 새 화면에 다시 연결하지 말 것. 기존 데이터 호환 검토 전까지 삭제하지 않고 보존한다.
