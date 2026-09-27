@@ -19,20 +19,34 @@ def save_bytes(data, extension, source_url=""):
     folder=root()
     folder.mkdir(parents=True,exist_ok=True)
     filename=hashlib.sha256(data).hexdigest()+"."+extension
+    from core import storage
+    from core.retention import register, ensure_capacity
+    if storage.remote():
+        if storage.get('evidence',filename) is None:
+            ensure_capacity(len(data))
+            storage.put('evidence',filename,data)
+        register(filename,'evidence',len(data))
+        return {"filename":filename,"bytes":len(data),"source_url":source_url,"sha256":filename.split('.')[0]}
     path=folder/filename
     limit=int(os.getenv("ADETECT_EVIDENCE_MAX_BYTES",str(5*1024**3)))
     if not path.exists():
+        ensure_capacity(len(data))
         used=sum(p.stat().st_size for p in folder.iterdir() if p.is_file())
         if used+len(data)>limit:
             raise ValueError("원본 보관 용량 초과")
         temporary=path.with_suffix(".tmp")
         temporary.write_bytes(data)
         temporary.replace(path)
+    register(filename,'evidence',len(data))
     return {"filename":filename,"bytes":len(data),"source_url":source_url,"sha256":filename.split('.')[0]}
 
 
 def read_bytes(asset):
     filename=asset.get("filename","")
+    from core import storage
+    if storage.remote():
+        data=storage.get('evidence',filename)
+        return data if data is not None and hashlib.sha256(data).hexdigest()==asset.get('sha256') else None
     path=(root()/filename).resolve()
     if path.parent != root() or not path.is_file():
         return None
@@ -63,7 +77,7 @@ def fetch_asset(url, maximum=25*1024**2):
     raise ValueError("리디렉션 한도 초과")
 
 
-def capture_website(url):
+def capture_website(url, save_images=True):
     from playwright.sync_api import sync_playwright
     from core.jobs import checkpoint
     validate_public_url(url)
@@ -99,7 +113,7 @@ def capture_website(url):
             links=page.locator("a[href]").evaluate_all("els => els.map(e=>({text:e.innerText,url:e.href})).filter(e=>e.text.trim())")
             warnings=[]
             candidates=list(dict.fromkeys(i["url"] for i in images if i["width"]>=300 and i["height"]>=150))
-            for image in candidates[:12]:
+            for image in candidates[:12] if save_images else []:
                 checkpoint("랜딩 이미지 원본 저장 중")
                 try:
                     response=image_responses.get(image)

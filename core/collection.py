@@ -18,8 +18,8 @@ def words(value):
 
 
 def query_groups(session):
-    own=session.get("brand_keywords") or session.get("variants",{}).get(session["brand_name"]) or [session["brand_name"]]
-    general=session.get("general_keywords") or session.get("generic_keywords") or ([session["category"]] if session.get("category") else [])
+    own=session.get("brand_keywords", session.get("variants",{}).get(session["brand_name"]) or [session["brand_name"]])
+    general=session.get("general_keywords", session.get("generic_keywords") or ([session["category"]] if session.get("category") else []))
     return {"브랜드/캠페인":list(dict.fromkeys(own)),"일반":list(dict.fromkeys(general))}
 
 
@@ -92,6 +92,10 @@ def run_stage(stage, session, retry=False):
     old=session.get(stage+"_result",{}) if retry else {}
     parts={}
     def collect(key, label, fn, blocked=None):
+        selected=session.get("source_selection")
+        source={"trend":"trend","volume":"volume","news":"news","site":"website","search":"search_capture","instagram":"instagram","youtube":"youtube","meta":"meta"}.get(key.split(':')[0])
+        if selected is not None and source not in selected:
+            return
         checkpoint(label,{"schema_version":2,"parts":parts,"records":[r for p in parts.values() for r in p.get("records",[])]})
         if blocked:
             parts[key]={"label":label,"state":"미수집","message":blocked,"records":[]}
@@ -117,7 +121,7 @@ def run_stage(stage, session, retry=False):
             def history(k=keyword):
                 series=fetch_history(k)
                 return {"series":series,"seasonality":summarize_history(series),"records":[]}
-            collect("trend:"+keyword,keyword+" · 3년 검색 추이",history)
+            collect("trend:"+keyword,keyword+" · 3년 검색 추이",history, None if settings.SAMPLE_MODE or not settings.NAVER_DATALAB_MOCK else "검색 추이 API 키 미설정")
             def volume(k=keyword):
                 if settings.SAMPLE_MODE:
                     rows=[{"keyword":k,"monthly_pc_display":"SAMPLE","monthly_mobile_display":"SAMPLE"}]
@@ -151,7 +155,7 @@ def run_stage(stage, session, retry=False):
                     if settings.SAMPLE_MODE:
                         return {"records":[record("홈페이지",b,u or "https://example.com","SAMPLE 페이지 원문",coverage="SAMPLE — 실제 사이트 미수집",assets=[])]}
                     data=crawl_brand_website(b,u)
-                    captured=capture_website(u)
+                    captured=capture_website(u, save_images=session.get("save_images",True))
                     return {"records":[record("홈페이지",b,captured["source_url"],captured["visible_text"],
                         raw_copy_snippets=data["raw_copy_snippets"],assets=captured["assets"],links=captured["links"],coverage=captured["coverage"],
                         image_count=captured["image_count"],warnings=captured["warnings"],note="페이지에 기재된 내용입니다. 혜택의 실제 이행 여부는 검증하지 않았습니다.")],
@@ -211,7 +215,7 @@ def run_stage(stage, session, retry=False):
                         assets=[]
                         note="Meta 요청당 최대 20건 표본. 전체 광고 수·성과가 아닙니다."
                         asset_url=ad.get("image_url")
-                        if asset_url and not settings.SAMPLE_MODE:
+                        if asset_url and not settings.SAMPLE_MODE and session.get("save_ad_assets",True):
                             try:
                                 assets.append(fetch_asset(asset_url))
                             except Exception:

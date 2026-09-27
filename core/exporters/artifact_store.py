@@ -31,6 +31,8 @@ def check_secrets(data):
 
 
 def save_artifact(run_id, function, extension, data):
+    from core import storage
+    from core.retention import ensure_capacity, register
     if extension not in ("html","xlsx","zip"):
         raise ValueError("Unsupported extension")
     if not run_id:
@@ -43,7 +45,10 @@ def save_artifact(run_id, function, extension, data):
     root().mkdir(parents=True,exist_ok=True)
     aid = uuid.uuid4().hex
     filename = aid+"."+extension
-    _path(filename).write_bytes(data)
+    ensure_capacity(len(data))
+    if storage.remote(): storage.put('exports',filename,data)
+    else: _path(filename).write_bytes(data)
+    register(filename,'exports',len(data))
     now=time.time()
     with get_conn() as conn:
         _schema(conn)
@@ -56,7 +61,9 @@ def save_artifact(run_id, function, extension, data):
             size += row["size"]
             if len(retained_runs)>int(os.getenv("ADETECT_EXPORT_MAX_RUNS","20")) or size>maximum:
                 path=_path(row["filename"])
-                path.unlink(missing_ok=True)
+                if storage.remote(): storage.delete('exports',row['filename'])
+                else: path.unlink(missing_ok=True)
+                conn.execute("UPDATE stored_blob SET expired=1 WHERE name=? AND kind='exports'",(row['filename'],))
                 conn.execute("UPDATE artifact SET expired=1 WHERE id=?",(row["id"],))
     return aid
 
@@ -68,18 +75,20 @@ def list_artifacts(run_id):
 
 
 def read_artifact(aid, touch=True):
+    from core import storage
     with get_conn() as conn:
         _schema(conn)
         row=conn.execute("SELECT * FROM artifact WHERE id=?",(aid,)).fetchone()
         if not row or row["expired"]:
             return None
         path=_path(row["filename"])
-        if not path.is_file():
+        data=storage.get('exports',row['filename']) if storage.remote() else path.read_bytes() if path.is_file() else None
+        if data is None:
             conn.execute("UPDATE artifact SET expired=1 WHERE id=?",(aid,))
             return None
         if touch:
             conn.execute("UPDATE artifact SET accessed=? WHERE id=?",(time.time(),aid))
-        return path.read_bytes()
+        return data
 
 
 def touch_artifact(aid):
@@ -93,7 +102,8 @@ def record_download(aid):
     with get_conn() as conn:
         _schema(conn)
         row=conn.execute("SELECT filename FROM artifact WHERE id=? AND expired=0",(aid,)).fetchone()
-        if row and _path(row["filename"]).is_file():
+        from core import storage
+        if row and (storage.remote() or _path(row["filename"]).is_file()):
             now=time.time()
             conn.execute("INSERT INTO download_event VALUES (?,?,?)",(uuid.uuid4().hex,aid,now))
             conn.execute("UPDATE artifact SET accessed=? WHERE id=?",(now,aid))

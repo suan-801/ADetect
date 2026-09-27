@@ -61,11 +61,11 @@ def test_missing_paid_token_ui_defaults_on_without_api_calls():
     from streamlit.testing.v1 import AppTest
     page=Path(__file__).resolve().parents[1]/"pages/2_analyze.py"
     at=AppTest.from_file(str(page)).run()
-    at.text_input(key="input_brand_name").set_value("A").run()
-    at.button(key="btn_step1_next").click().run()
+    at.text_input(key="new_brand").set_value("A").run()
+    at.button(key="new_project").click().run()
+    at.button(key="save_project").click().run()
     assert not at.exception
-    assert at.toggle(key="confirm_paid").value is True
-    assert any(TOKEN_MESSAGE in warning.value for warning in at.warning)
+    assert at.toggle(key="collection_paid").value is True
 
 
 def test_fact_package_contains_originals_and_safe_excel(tmp_path,monkeypatch):

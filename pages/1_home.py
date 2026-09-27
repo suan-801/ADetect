@@ -3,8 +3,8 @@
 이전 리비전(4차 리뉴얼)은 Hero → Manifesto → Market → Brand → Creative → Synthesis →
 Sample Output → Final CTA로 이어지는 긴 scroll scene이었으나, 사용자 피드백에 따라 첫
 화면(Hero)만 남기고 그 뒤에 이어지던 Product Story/Sample Output/Final CTA 섹션은
-제거했다. 기능(4단계 IA, STEP1 입력 플로우, Target Insight 구조)은 바뀌지 않는다 —
-바뀌는 것은 Home의 화면 구성뿐이다.
+제거했다. 화면 구성만 바뀌며 제품 흐름(PRD §0 18차: 프로젝트 → 수집 → 확인·다운로드)은
+Analyze 페이지가 담당한다.
 
 Hero는 LAYER 1 LIVE PRODUCT ENTRY(Brand Input/CTA, 실제로 동작하는 유일한 interactive
 영역)만 남은 상태다.
@@ -20,14 +20,13 @@ home_page_marker()
 
 
 def _command_bar(key_prefix: str, label: str = "START HERE"):
-    """LAYER 1 — Hero의 유일한 실제 interactive 영역(브랜드 입력 → 분석 시작).
+    """LAYER 1 — Hero의 유일한 실제 interactive 영역(브랜드 입력 → 프로젝트 만들기).
 
-    Home에서 이미 브랜드명(+선택적으로 카테고리/경쟁사)을 입력받았으므로, Analyze의 STEP1
-    입력 화면을 다시 보여주지 않고 곧바로 "AI 추천 확인"(step="confirm")으로 진입한다 —
-    같은 값을 다시 입력하라고 요구하는 중복 스텝을 없앤다. 카테고리/경쟁사를 이 expander에서
-    직접 입력했다면 그 값을 그대로 draft에 담아 AI 추천이 그 값을 덮어쓰지 않게 한다
-    (pages/2_analyze.py의 confirm 스텝이 draft["category"]/draft["competitors_raw"]가 있으면
-    그 값을 우선 사용).
+    Home에서 브랜드명(+선택적으로 관심 주제)을 입력받았으므로 프로젝트 목록을 거치지 않고
+    바로 프로젝트 설정 화면(step="config")으로 진입한다 — 같은 값을 다시 입력하라고 요구하는
+    중복 스텝을 없앤다. draft["brand_name"]/draft["category"]를 ui/project_workspace._config가
+    초기값으로 사용한다. 함께 조사할 브랜드(경쟁사)는 18차 개정의 프로젝트 단위(브랜드 1개)에
+    없는 입력이므로 화면에 두지 않는다.
     """
     with st.container():
         command_marker()
@@ -40,11 +39,8 @@ def _command_bar(key_prefix: str, label: str = "START HERE"):
         with btn_col:
             start = st.button("자료 수집 시작 →", type="primary", key=f"{key_prefix}_start_btn", width="stretch")
 
-        with st.expander("+ 관심 주제 · 함께 조사할 브랜드 설정"):
-            category = st.text_input("카테고리", placeholder="예: TM 채용 (선택)", key=f"{key_prefix}_category_input")
-            competitors = st.text_input(
-                "경쟁사", placeholder="쉼표로 구분 (선택)", key=f"{key_prefix}_competitors_input"
-            )
+        with st.expander("+ 관심 주제 설정"):
+            category = st.text_input("관심 주제", placeholder="예: TM 채용 (선택)", key=f"{key_prefix}_category_input")
 
         if start:
             if not brand_name.strip():
@@ -56,10 +52,8 @@ def _command_bar(key_prefix: str, label: str = "START HERE"):
                 st.session_state.draft = {
                     "brand_name": brand_name.strip(),
                     "category": st.session_state.get(f"{key_prefix}_category_input", "").strip(),
-                    "competitors_raw": st.session_state.get(f"{key_prefix}_competitors_input", "").strip(),
                 }
-                st.session_state.step = "confirm"
-                st.session_state.session = None
+                st.session_state.step = "config"
                 st.switch_page("pages/2_analyze.py")
 
 

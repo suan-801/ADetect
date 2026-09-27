@@ -4,7 +4,7 @@ import json
 from datetime import datetime, timezone
 from database.db import save_function_run, list_function_runs
 
-FUNCTIONS = ("market", "brand", "creative", "synthesis", "collection")
+FUNCTIONS = ("market", "brand", "creative", "synthesis", "collection", "trend", "volume", "news", "website", "search_capture", "meta", "instagram", "youtube")
 
 
 def persist_result(session, function, result):

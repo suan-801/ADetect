@@ -6,6 +6,7 @@ Phase 0~1 스켈레톤 단계에서는 데모/이력 화면이 동작하는 정�
 import json
 import sqlite3
 import uuid
+import os
 from pathlib import Path
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -40,6 +41,11 @@ CREATE TABLE IF NOT EXISTS function_run (
 
 @contextmanager
 def get_conn():
+    if os.getenv("ADETECT_DATABASE_URL"):
+        from database.remote import connection
+        with connection(_SCHEMA) as conn:
+            yield conn
+        return
     Path(DB_PATH).parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(DB_PATH, timeout=30)
     conn.row_factory = sqlite3.Row
@@ -50,6 +56,9 @@ def get_conn():
     try:
         yield conn
         conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
     finally:
         conn.close()
 

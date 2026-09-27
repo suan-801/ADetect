@@ -52,7 +52,7 @@ def store_cache(key, result):
     with get_conn() as conn:
         conn.execute("CREATE TABLE IF NOT EXISTS result_cache (cache_key TEXT PRIMARY KEY, result_json TEXT, expires REAL)")
         conn.execute("DELETE FROM result_cache WHERE expires<?", (time.time(),))
-        conn.execute("INSERT OR REPLACE INTO result_cache VALUES (?,?,?)",(key,json.dumps(result,ensure_ascii=False),time.time()+86400))
+        conn.execute("INSERT INTO result_cache VALUES (?,?,?) ON CONFLICT(cache_key) DO UPDATE SET result_json=excluded.result_json,expires=excluded.expires",(key,json.dumps(result,ensure_ascii=False),time.time()+86400))
 
 
 def submit(session, function, runner, inputs, force=False):

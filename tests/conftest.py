@@ -28,7 +28,11 @@ def isolated_database(tmp_path, monkeypatch):
     from config import settings
     monkeypatch.setattr(settings,"SAMPLE_MODE",False)
     monkeypatch.setattr(db, "DB_PATH", str(tmp_path / "test.db"))
+    # core.retention은 settings.DB_PATH와 evidence 폴더 크기로 저장 예산을 계산한다.
+    # 임시 경로로 묶어두지 않으면 테스트가 이 PC의 실제 보관량에 따라 흔들린다.
+    monkeypatch.setattr(settings,"DB_PATH",str(tmp_path / "test.db"))
     monkeypatch.setenv("ADETECT_EXPORT_DIR",str(tmp_path / "exports"))
+    monkeypatch.setenv("ADETECT_EVIDENCE_DIR",str(tmp_path / "evidence"))
     yield
     from core.jobs import _jobs
     for job in list(_jobs.values()):

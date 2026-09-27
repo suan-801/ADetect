@@ -12,7 +12,7 @@ from core.exporters.artifact_store import check_secrets
 def report_tables(result):
     parts=result.get("parts",{})
     records=result.get("records",[])
-    return {
+    tables = {
         "01_수집정보":[{"상태":result.get("status"),"수집시각":result.get("collected_at"),"SAMPLE":bool(result.get("sample_sources")),"조회조건":result.get("inputs",{})}],
         "02_자료목록":[{"자료ID":r["id"],"종류":r["kind"],"브랜드":r["brand"],"확인상태":r.get("review"),"선정근거":r.get("review_reason"),"출처":r["source_url"],"원문":r["text"],"수집시각":r["collected_at"],"SAMPLE":r.get("sample",False)} for r in records],
         "03_검색추이":[{"검색어":p["series"]["keyword"],"월":r["date"],"상대지수":r["search_index"]} for p in parts.values() if p.get("series") for r in p["series"]["rows"]],
@@ -25,6 +25,9 @@ def report_tables(result):
         "10_근거요약":[result["summary"]] if result.get("summary") else [],
         "11_이전수집대비":result.get("changes",[]),
     }
+    if result.get('schema_version')==3:
+        tables={k:v for k,v in tables.items() if v or k=='01_수집정보'}
+    return tables
 
 
 def scalar(value):

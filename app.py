@@ -28,10 +28,9 @@ _LOGO_PATH = Path(__file__).resolve().parent / "ui" / "assets" / "logo.svg"
 if _LOGO_PATH.exists():
     st.logo(str(_LOGO_PATH), size="medium")
 
-home = st.Page("pages/1_home.py", title="Home", icon=None, default=True)
-analyze = st.Page("pages/2_analyze.py", title="Analyze", icon=None)
-history = st.Page("pages/3_history.py", title="History", icon=None)
-settings_page = st.Page("pages/4_settings.py", title="Settings", icon=None)
+home = st.Page("pages/1_home.py", title="홈", icon=None, default=True)
+analyze = st.Page("pages/2_analyze.py", title="프로젝트", icon=None, url_path="analyze")
+settings_page = st.Page("pages/4_settings.py", title="설정", icon=None, url_path="settings")
 
-nav = st.navigation([home, analyze, history, settings_page], position="top")
+nav = st.navigation([home, analyze, settings_page], position="top")
 nav.run()
