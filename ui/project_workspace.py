@@ -5,9 +5,10 @@ import streamlit as st
 import pandas as pd
 
 from config import settings
-from core import projects, project_jobs
+from core import projects, project_jobs, retention
 from core.collection import words, paid_problem, TOKEN_MESSAGE
 from core.exporters import facts_report, artifact_store
+from ui.storage_panel import usage_bar, capacity_error
 
 
 def _reset():
@@ -140,23 +141,67 @@ def _collect(project, history):
             project_jobs.submit(project, selected, force=force)
             st.rerun()
         except ValueError as exc:
-            st.error(str(exc))
+            capacity_error(exc, "collect_capacity_go")
+    latest = {}
+    for h in history:
+        latest.setdefault(h["source"], h)
+    full = [projects.SOURCES[s][0] for s, h in latest.items()
+            if retention.is_capacity_error(json.dumps([h["result"].get("errors", []), [p.get("message", "") for p in h["result"].get("parts", {}).values()]], ensure_ascii=False))]
+    if full and not busy:
+        st.warning("최근 수집 중 저장 공간 부족으로 원본 저장 또는 수집이 중단된 자료가 있습니다: " + ", ".join(full))
+        capacity_error(retention.CapacityError(retention.CAPACITY_MESSAGE), "collect_capacity_recent_go")
+
+
+def _versions(available):
+    """자료 종류별 성공 버전 (최신순). history는 이미 최신순이다."""
+    by_source = {}
+    for h in available:
+        by_source.setdefault(h["source"], []).append(h)
+    return {s: by_source[s] for s in projects.SOURCES if s in by_source}
+
+
+def _open_version(pid, item):
+    """이력 탭의 '이 시점 결과 열기' — 위젯 생성 전에 상태를 바꿀 수 있도록 on_click 콜백으로만 호출한다."""
+    st.session_state["version_" + pid + item["source"]] = item["run_id"]
+    chosen = st.session_state.get("result_sources_" + pid)
+    if chosen is not None and item["source"] not in chosen:
+        st.session_state["result_sources_" + pid] = chosen + [item["source"]]
+    st.session_state.opened_version = projects.SOURCES[item["source"]][0] + " · " + item["created"][:16].replace("T", " ")
 
 
 def _result(project, history):
-    available = [h for h in history if projects.available(h)]
-    if not available:
+    pid = project["id"]
+    by_source = _versions([h for h in history if projects.available(h)])
+    if not by_source:
         st.info("자료를 수집하면 확인하고 다운로드할 수 있습니다.")
         return
-    sources = st.multiselect("확인할 자료 종류", list(dict.fromkeys(h["source"] for h in available)), default=list(dict.fromkeys(h["source"] for h in available)), format_func=lambda s: projects.SOURCES[s][0], key="result_sources")
+    order = list(by_source)
+    source_key = "result_sources_" + pid
+    if source_key not in st.session_state or any(s not in order for s in st.session_state[source_key]):
+        st.session_state[source_key] = [s for s in st.session_state.get(source_key, order) if s in order] or order
     snapshots = []
-    for source in sources:
-        versions = [h for h in available if h["source"] == source]
-        selected_run = st.selectbox(projects.SOURCES[source][0] + " 수집 버전", [h["run_id"] for h in versions], format_func=lambda rid, rows=versions: next(h["created"][:19] + " · " + h["result"]["status"] for h in rows if h["run_id"] == rid), key="version_" + source)
-        snapshots.append(next(h for h in versions if h["run_id"] == selected_run))
+    for source in [s for s in order if s in st.session_state[source_key]]:
+        versions = by_source[source]
+        key = "version_" + pid + source
+        if key in st.session_state and st.session_state[key] not in [h["run_id"] for h in versions]:
+            del st.session_state[key]
+        # 다른 시점을 고르지 않았으면 최근 성공 결과를 그대로 쓴다.
+        snapshots.append(next((h for h in versions if h["run_id"] == st.session_state.get(key)), versions[0]))
+    if st.session_state.get("opened_version"):
+        st.success("이력에서 연 결과: " + st.session_state.pop("opened_version"))
+    st.caption("  ·  ".join(f"{projects.SOURCES[i['source']][0]} {i['created'][:10]} {len(i['result'].get('records', []))}건"
+                            + ("" if i is by_source[i["source"]][0] else " (다른 시점)") for i in snapshots) or "선택한 자료 종류가 없습니다.")
+    with st.expander("다른 시점 선택", expanded=False):
+        st.multiselect("확인할 자료 종류", order, format_func=lambda s: projects.SOURCES[s][0], key=source_key)
+        for source in [s for s in order if s in st.session_state[source_key]]:
+            versions = by_source[source]
+            st.selectbox(projects.SOURCES[source][0] + " 수집 버전", [h["run_id"] for h in versions], key="version_" + pid + source,
+                         format_func=lambda rid, rows=versions: next(h["created"][:19].replace("T", " ") + " · " + h["result"]["status"] + " · " + str(len(h["result"].get("records", []))) + "건" + (" · 최근" if h is rows[0] else "") for h in rows if h["run_id"] == rid))
+    dates = projects.collection_dates(snapshots)
+    if len(dates) > 1:
+        st.warning("날짜 혼합 — 선택한 자료의 수집일이 서로 다릅니다 (" + ", ".join(dates) + "). 다운로드 파일에도 이 안내가 기록됩니다.")
     rows = [row for item in snapshots for row in projects.review_rows(item)]
-    st.caption(f"자료 {len(rows)}건. 확인 상태와 다운로드 대상을 분리해서 관리합니다.")
-    search = st.text_input("자료 검색", key="project_record_search")
+    search = st.text_input("자료 검색", key="project_record_search", placeholder=f"자료 {len(rows)}건 · 확인 상태와 다운로드 대상은 따로 관리합니다")
     visible = [r for r in rows if not search or search.casefold() in str(r).casefold()]
     frame = pd.DataFrame([{"선택": r["selection_id"] in st.session_state.get("download_selection", []), "자료ID": r["selection_id"], "종류": r["kind"], "내용": r["text"][:180], "확인 상태": r.get("review", "확인 필요"), "출처": r["source_url"]} for r in visible])
     if not frame.empty:
@@ -178,7 +223,8 @@ def _result(project, history):
             st.rerun()
     selected_ids = st.session_state.get("download_selection", [])
     result = projects.selection_result(project, snapshots, selected_ids)
-    st.caption(f"현재 다운로드 선택 {len(result['records'])}건. 제외 자료는 기본적으로 포함하지 않습니다.")
+    st.caption(f"현재 다운로드 선택 {len(result['records'])}건. 제외 자료는 기본적으로 포함하지 않습니다."
+               + (" 수집일이 다른 자료가 섞여 있습니다 (" + ", ".join(dates) + ")." if len(dates) > 1 else ""))
     _download(project, result)
 
 
@@ -196,7 +242,7 @@ def _download(project, result):
                     st.session_state["artifact_" + artifact_id] = data
                     st.session_state["last_artifact_" + ext] = (signature, artifact_id)
                 except (ValueError, OSError) as exc:
-                    st.error(str(exc))
+                    capacity_error(exc, "download_capacity_go_" + ext)
             saved = st.session_state.get("last_artifact_" + ext)
             data = st.session_state.get("artifact_" + saved[1]) if saved and saved[0] == signature else None
             if data:
@@ -205,10 +251,53 @@ def _download(project, result):
                 st.caption("선택이 바뀌었습니다. 다시 생성해주세요.")
 
 
+AVAILABILITY_GUIDE = {
+    "결과·원본 모두 있음": "저장된 결과를 열 수 있고, 원본을 포함한 HTML/Excel/ZIP을 다시 만들 수 있습니다.",
+    "결과만 있음 (일부 원본 없음)": "결과를 열고 다운로드 파일을 다시 만들 수 있습니다. 만료되었거나 없는 원본은 ZIP에 포함되지 않으며 원본_보관안내.txt에 사유가 남습니다.",
+    "이력만 있음": "당시 결과를 복원할 수 없습니다 (정리로 결과 상세가 만료되었거나 수집에 실패한 기록). 프로젝트 백업 ZIP이 있으면 프로젝트 목록의 '백업에서 새 프로젝트 복원'으로 가져오거나, 자료 수집 탭에서 새로 수집하세요. 새 수집은 복원이 아니라 새 시점의 자료입니다.",
+}
+
+
+def _availability(history):
+    """보유 상태는 core.retention.availability_detail 결과를 그대로 쓴다. 원본 해시 확인 비용 때문에 실행별로 캐시한다."""
+    cache = st.session_state.setdefault("availability_cache", {})
+    output = {}
+    for h in history:
+        key = h["run_id"] + ("#expired" if h["result"].get("expired") else "")
+        if key not in cache:
+            cache[key] = retention.availability_detail(h["result"])
+        output[h["run_id"]] = cache[key]
+    return output
+
+
 def _history(project, history):
     st.caption("결과 복원과 다운로드 파일 재생성은 외부 API를 호출하지 않습니다. 새로 수집하면 별도 시점의 이력이 생성됩니다.")
     if history:
-        st.dataframe([{"자료": projects.SOURCES[h["source"]][0], "수집 시각": h["created"], "상태": h["result"]["status"], "보관": "이력만 있음" if h["result"].get("expired") else "결과 있음"} for h in history], hide_index=True)
+        details = _availability(history)
+        st.dataframe([{"자료": projects.SOURCES[h["source"]][0], "수집 시각": h["created"][:19].replace("T", " "), "상태": h["result"]["status"],
+                       "보유 상태": details[h["run_id"]][0], "없는 원본": len(details[h["run_id"]][1]) or ""} for h in history], hide_index=True)
+        counts = {}
+        for state, _ in details.values():
+            counts[state] = counts.get(state, 0) + 1
+        st.caption(" · ".join(f"{k} {v}건" for k, v in counts.items()))
+        choice = st.selectbox("이력 선택", [h["run_id"] for h in history], key="history_choice_" + project["id"],
+                              format_func=lambda rid: next(projects.SOURCES[h["source"]][0] + " · " + h["created"][:16].replace("T", " ") + " · " + details[rid][0] for h in history if h["run_id"] == rid))
+        item = next(h for h in history if h["run_id"] == choice)
+        state, missing = details[choice]
+        (st.info if state == "결과·원본 모두 있음" else st.warning)(state + " — " + AVAILABILITY_GUIDE[state])
+        if state != "이력만 있음" and projects.available(item):
+            st.button("이 시점 결과 열기", key="open_version_" + choice, on_click=_open_version, args=(project["id"], item),
+                      help="자료 확인·다운로드 탭에서 이 수집 버전을 사용합니다.")
+        if missing:
+            st.caption(f"없는 원본 {len(missing)}개 — 원문 링크에서 다시 확인할 수 있습니다.")
+            st.dataframe(missing, hide_index=True, column_config={"원문 링크": st.column_config.LinkColumn()})
+        names = sorted({a["filename"] for r in item["result"].get("records", []) for a in r.get("assets", [])} - {m["파일명"] for m in missing})
+        if names:
+            protected = retention.pinned(names)
+            st.caption(f"이 시점의 보유 원본 {len(names)}개 중 보호 {len(protected)}개. 보호한 원본은 저장 공간 정리 후보에서 제외됩니다.")
+            if st.button("원본 보호 해제" if len(protected) == len(names) else "원본 보호", key="pin_" + choice):
+                retention.pin(names, len(protected) != len(names))
+                st.rerun()
     with st.expander("프로젝트 백업"):
         st.caption("입력·결과·확인 상태·보유 원본을 포함합니다. API 키는 포함하지 않습니다.")
         if st.button("백업 만들기", key="make_backup"):
@@ -263,6 +352,7 @@ def render():
         st.write("필요한 자료 선택 → 수집 → 자료 확인·다운로드 순서로 사용합니다. 체크 해제는 저장된 자료를 삭제하지 않습니다.")
     if settings.SAMPLE_MODE:
         st.warning("SAMPLE — 실제 수집 자료가 아닙니다.")
+    usage_bar("project_usage")
     history = projects.histories(pid)
     tabs = st.tabs(["자료 수집", "자료 확인·다운로드", "이력"])
     with tabs[0]:

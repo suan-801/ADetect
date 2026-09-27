@@ -65,6 +65,8 @@ def execute(project,attempts,event,force,retry):
                 value=projects.normalize(run_stage(stage,inputs),source,inputs)
                 previous=next((i for i in projects.histories(project["id"]) if i["source"]==source and projects.available(i)),None)
                 value["changes"]=changes(previous["result"] if previous else {},value)
+                # 소스별 캐시 적중 여부는 기록하지 않으므로 실행 시 정책만 남긴다.
+                value["cache_policy"]="캐시 미사용 (새로 수집)" if force else "24시간 캐시 허용"
                 rid=save_function_run(project["id"],source,value["status"],value)
                 finish(tid,value["status"],rid)
             except jobs.AnalysisCancelled:

@@ -14,7 +14,21 @@
 
 검증 기록 (2026-09-27): 자동 테스트 28개 통과. 프로젝트 생성·자료 선택·유료 기본 ON·뉴스 URL 중복 통합·입력 스냅샷을 확인했다. 실제 Chromium(SAMPLE 모드)에서 홈 → 프로젝트 설정 → 기본 자료 4종 수집 → 완료 시 자동 갱신 → 표에서 자료 선택 → HTML 생성·다운로드(8.6KB)까지 확인했다. 이전 무료 NAVER·지정 랜딩 실수집 기록은 보존하며 유료 API는 호출하지 않았다.
 
-화면에 아직 연결하지 않은 코드: `core/retention`의 cleanup/usage/availability/pin, `pages/3_history.py`와 레거시 `ui/*_tab.py`. 저장 상한 도달 시 정리 UI가 없어 오류 안내만 나온다 — 다음 단계 후보다.
+### 18차 보완 (2026-09-27) — PRD §0-2
+
+- 저장 공간: 프로젝트 상단·설정에 파일/DB 사용량·전체 한도·사용률 표시, 80% 경고·90% 강한 경고와 정리 화면 이동. 저장 상한 오류(`core.retention.CapacityError`)는 정리 안내로 연결.
+- 설정 > 저장 공간 관리: 정리 후보 보기(종류·파일명·예상 용량) → 동의 → 정리 실행(미리보기에서 본 후보만 삭제) → 결과·사용량 전후 표시. 최근 성공 결과·현재 프로젝트 원본·진행 중·`.tmp`·pin 원본 제외.
+- 이력 탭: `core.retention.availability()` 3단계 그대로 표시, 상태별 안내, 없는 원본 목록, 이 시점 결과 열기, 원본 보호(pin).
+- 확인·다운로드 탭: 최근 성공 버전 자동 선택 + 한 줄 요약, `다른 시점 선택` expander 안에만 버전 selectbox, 날짜 혼합 경고(화면·HTML·01_수집정보).
+- 01_수집정보: JSON 덤프 제거, `collection_info_rows()` 공통 `항목/값` 행(HTML 링크·Excel 하이퍼링크, 비밀값 미표시, `미입력`).
+- 설정: DB 백업(`core/db_backup.py`, `storage/backups/`), 프로젝트 구분(수집 이력 없음/SAMPLE 자료만/실수집 포함)과 프로젝트 단위 삭제(영향 범위·백업 확인·이름 재입력). 기존 DB 세션은 자동 삭제하지 않는다.
+- 레거시 UI(`pages/3_history.py`, `ui/facts_workspace.py`, `ui/*_tab.py`, `ui/analysis_shared.py`, `ui/job_control.py`)는 런타임 import 없음을 확인하고 `LEGACY` 주석을 추가했다. 삭제는 보류(후보로만 보고).
+- 테스트 DB 분리: pytest는 임시 경로, 수동 스모크는 `ADETECT_DB_PATH`/`ADETECT_EXPORT_DIR`/`ADETECT_EVIDENCE_DIR` 별도 지정(README).
+- Git: `main` 단일 브랜치 운영. feature 브랜치는 병합 후 정리.
+
+2026-09-27 18차 보완 검증: 자동 테스트 41개 통과(smoke 11개 포함), compileall 통과. 분리된 SAMPLE DB로 실제 브라우저에서 프로젝트 생성 → 기본 자료 수집 → 확인·다운로드 최근 버전 자동 선택·`다른 시점 선택` → 이력 3단계 표시(결과·원본 모두 있음/결과만 있음/이력만 있음) → 설정 저장 공간 표시·정리 후보 보기·동의 전 실행 버튼 비활성·정리 실행 결과 표시 → HTML 01_수집정보 행 표시를 확인했다. 운영 DB(`storage/adetect.db`, 세션 86개)는 변경하지 않았다.
+
+남은 후보: 수동 원본 폴더 백업 자동화, 캐시 적중 여부의 자료별 기록, 레거시 UI 삭제 결정.
 
 남은 외부 수용 검증: 무료 클라우드의 브라우저·지속 저장·비공개 접근, 원격 DB/Storage, 유료 실계정 Meta/Instagram/Gemini, 사이트별 누락·유료 잔액 오류 검증. 이미지 OCR은 범위 밖이며 원본을 보존한다. 외부 공개/다중 사용자 인증은 개인 PC 범위 밖이다.
 
@@ -59,7 +73,7 @@ app.py (라우팅 + 전역 CSS)
  │     └─ ui/brand_tab.py       │  각 탭은 session(dict)을 받아 그리고,
  │     └─ ui/creative_tab.py    │  core/analyzers/*.py 를 호출해 결과를 채움
  │     └─ ui/synthesis_tab.py  ─┘  (Target Insight는 synthesis_tab 안의 subsection)
- └─ pages/3_history.py    — SQLite 이력 조회
+ └─ pages/3_history.py    — [LEGACY] 구 세션 이력 (네비게이션 미등록)
  └─ pages/4_settings.py   — API 키 상태 확인
 
 core/scrapers/*   — 실제 수집 (서비스별 config.settings.*_MOCK 플래그에 따라 개별적으로 mock↔실연동 전환)

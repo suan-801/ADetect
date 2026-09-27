@@ -20,7 +20,7 @@ def save_bytes(data, extension, source_url=""):
     folder.mkdir(parents=True,exist_ok=True)
     filename=hashlib.sha256(data).hexdigest()+"."+extension
     from core import storage
-    from core.retention import register, ensure_capacity
+    from core.retention import register, ensure_capacity, CapacityError
     if storage.remote():
         if storage.get('evidence',filename) is None:
             ensure_capacity(len(data))
@@ -33,7 +33,7 @@ def save_bytes(data, extension, source_url=""):
         ensure_capacity(len(data))
         used=sum(p.stat().st_size for p in folder.iterdir() if p.is_file())
         if used+len(data)>limit:
-            raise ValueError("원본 보관 용량 초과")
+            raise CapacityError("원본 보관 용량 초과 — 설정 > 저장 공간 관리에서 정리 후보를 확인해주세요.")
         temporary=path.with_suffix(".tmp")
         temporary.write_bytes(data)
         temporary.replace(path)

@@ -1,3 +1,9 @@
+# LEGACY — 현재 런타임(app.py 네비게이션·신규 화면)에서 import/실행하지 않는다. (2026-09-27 검색 확인, PRD §0 18차 개정)
+# 신규 UI: pages/2_analyze.py → ui/project_workspace.py
+# 신규 데이터 흐름: core/projects.py, core/project_jobs.py
+# 사용 금지 이유: 구 독립 타겟분석 탭. recommend_target()이 seeded_random() 기반 mock이며 Target은 신규 UI에서 사용하지 않는다.
+# 새 화면에 다시 연결하지 말 것. 기존 데이터 호환 검토 전까지 삭제하지 않고 보존한다.
+
 """[DEPRECATED — 더 이상 Workspace에서 사용하지 않음] 타겟분석 독립 탭 (구 PRD §6-1·§7-2·§9-2·§16-2).
 
 Target은 더 이상 독립 Primary Analysis Function이 아니다 — pages/2_analyze.py는 이 모듈을

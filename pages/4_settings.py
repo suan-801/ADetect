@@ -1,4 +1,4 @@
-"""설정 — API 키 연동 상태 확인 (PRD에는 상세 스펙 없음 → 최소 골격만 제공).
+"""설정 — API 키 연동 상태, 저장 공간 관리(정리 후보·정리 실행), DB 백업, 프로젝트 단위 정리.
 
 Utility page이므로 과도한 visual storytelling 없이 semantic status indicator 중심으로 구성합니다.
 """
@@ -10,6 +10,7 @@ import streamlit as st
 
 from config import settings
 from ui.components import section_header_block, status_badge
+from ui.storage_panel import backup_panel, cleanup_panel, project_cleanup_panel
 
 section_header_block("Settings", "설정")
 st.caption("키는 .env에서 설정합니다. 유료 기능은 기본 ON이며 수집·요약 버튼을 눌렀을 때 호출합니다. 키 값은 화면이나 산출물에 표시하지 않습니다.")
@@ -41,5 +42,14 @@ else:
         st.warning("토큰 부족. 개발자에게 문의해주세요")
 
 st.subheader("이 PC의 자료 보관")
-st.write("입력·수집 결과·다운로드 요청: storage/adetect.db · 산출물: storage/exports · 원본: storage/evidence (환경변수로 변경 가능)")
+from core.evidence_store import root as _evidence_root
+from core.exporters.artifact_store import root as _export_root
+st.write(f"입력·수집 결과·다운로드 요청: {settings.DB_PATH} · 산출물: {_export_root()} · 원본: {_evidence_root()} (환경변수로 변경 가능)")
 st.caption("산출물은 최근 20개 실행·총 5GB 기준으로 오래된 파일부터 만료합니다. 원본은 기본 5GB까지 저장하고 초과하면 새 저장을 중단합니다. DB 이력은 자동 삭제하지 않습니다. 백업할 때 DB와 두 폴더를 함께 복사하세요.")
+
+st.write("")
+cleanup_panel()
+st.write("")
+backup_panel()
+st.write("")
+project_cleanup_panel()

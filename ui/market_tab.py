@@ -1,3 +1,9 @@
+# LEGACY — 현재 런타임(app.py 네비게이션·신규 화면)에서 import/실행하지 않는다. (2026-09-27 검색 확인, PRD §0 18차 개정)
+# 신규 UI: pages/2_analyze.py → ui/project_workspace.py
+# 신규 데이터 흐름: core/projects.py, core/project_jobs.py
+# 사용 금지 이유: 16차 개정의 시장분석 탭. 분석·AI 해석 중심 화면으로 18차 팩트 수집 흐름에서 제외되었다. 검색 추이·검색량·뉴스는 자료 종류(trend/volume/news)로 수집한다.
+# 새 화면에 다시 연결하지 말 것. 기존 데이터 호환 검토 전까지 삭제하지 않고 보존한다.
+
 """시장분석: 12개월 원본, 기간별 추이, 계절성, 출처와 기능별 산출물."""
 from datetime import date, timedelta
 import pandas as pd

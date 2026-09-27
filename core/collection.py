@@ -43,6 +43,9 @@ def error_message(exc):
     message=str(exc).lower()
     if TOKEN_MESSAGE in str(exc):
         return TOKEN_MESSAGE
+    from core.retention import is_capacity_error, CAPACITY_MESSAGE
+    if is_capacity_error(exc):
+        return CAPACITY_MESSAGE
     cause=getattr(exc,"__cause__",None)
     if cause is not None:
         message += " " + str(cause).lower()

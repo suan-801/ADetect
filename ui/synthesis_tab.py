@@ -1,3 +1,9 @@
+# LEGACY — 현재 런타임(app.py 네비게이션·신규 화면)에서 import/실행하지 않는다. (2026-09-27 검색 확인, PRD §0 18차 개정)
+# 신규 UI: pages/2_analyze.py → ui/project_workspace.py
+# 신규 데이터 흐름: core/projects.py, core/project_jobs.py
+# 사용 금지 이유: 16차 개정의 종합분석 탭(SoS/SoA/SOV·포지셔닝·전략 추천·Target Insight). 18차 새 화면과 내보내기에서 제외된 해석 기능이다.
+# 새 화면에 다시 연결하지 말 것. 기존 데이터 호환 검토 전까지 삭제하지 않고 보존한다.
+
 """기존 결과만 사용하는 종합분석. Target Insight는 자동 파생한다."""
 import pandas as pd
 import streamlit as st

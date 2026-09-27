@@ -108,3 +108,94 @@ def test_selected_records_produce_downloadable_files():
         saved = at.session_state["last_artifact_" + label.split()[0].lower()]
         assert at.session_state["artifact_" + saved[1]].startswith(prefix)
     assert len(at.get("download_button")) == 3
+
+
+def test_project_screen_shows_storage_usage():
+    at = AppTest.from_file(str(ROOT / "pages/2_analyze.py"), default_timeout=15).run()
+    enter_project(at)
+    usage = [c.value for c in at.caption if c.value.startswith("저장 공간 · 파일")]
+    assert usage and "DB" in usage[0] and "전체 한도" in usage[0] and "사용률" in usage[0]
+
+
+def test_storage_warning_levels_link_to_cleanup(monkeypatch):
+    from core import retention
+    monkeypatch.setattr(retention, "usage", lambda: {"files": 95, "db": 1, "limits": {"files": 100, "db": 100}})
+    at = AppTest.from_file(str(ROOT / "pages/2_analyze.py"), default_timeout=15).run()
+    enter_project(at)
+    assert any("사용률 95%" in e.value for e in at.error)
+    assert any(b.label == "저장 공간 정리로 이동" for b in at.button)
+    monkeypatch.setattr(retention, "usage", lambda: {"files": 82, "db": 1, "limits": {"files": 100, "db": 100}})
+    at.run()
+    assert any("80%" in w.value for w in at.warning) and not any("사용률" in e.value for e in at.error)
+
+
+def test_result_tab_uses_latest_version_and_other_time_on_demand():
+    from core import projects
+    from database.db import get_conn
+    at = AppTest.from_file(str(ROOT / "pages/2_analyze.py"), default_timeout=60).run()
+    enter_project(at, "메리츠화재")
+    pid = at.session_state["project_id"]
+    collect(at, pid, ("trend", "news"))
+    old_trend = next(h for h in projects.histories(pid) if h["source"] == "trend")["run_id"]
+    with get_conn() as conn:
+        conn.execute("UPDATE function_run SET created_at='2026-01-02T00:00:00+00:00' WHERE id=?", (old_trend,))
+    at.session_state["force_collection"] = True
+    collect(at, pid, ("trend",))
+    latest_trend = next(h for h in projects.histories(pid) if h["source"] == "trend")["run_id"]
+    assert latest_trend != old_trend
+    assert any(e.label == "다른 시점 선택" for e in at.expander)
+    # 기본은 최근 성공 버전이며 다른 시점 표시·날짜 혼합 경고가 없다.
+    summary = next(c.value for c in at.caption if "검색 관심도 추이" in c.value and "건" in c.value)
+    assert "(다른 시점)" not in summary
+    assert at.selectbox(key="version_" + pid + "trend").value == latest_trend
+    at.selectbox(key="version_" + pid + "trend").set_value(old_trend).run()
+    assert not at.exception
+    assert any("(다른 시점)" in c.value for c in at.caption)
+    assert any("날짜 혼합" in w.value for w in at.warning)
+
+
+def test_history_tab_shows_three_availability_states():
+    import json
+    from core import projects
+    from database.db import get_conn
+    at = AppTest.from_file(str(ROOT / "pages/2_analyze.py"), default_timeout=60).run()
+    enter_project(at, "한샘")
+    pid = at.session_state["project_id"]
+    collect(at, pid, ("trend", "news"))
+    news = next(h for h in projects.histories(pid) if h["source"] == "news")
+    with get_conn() as conn:
+        conn.execute("UPDATE function_run SET result_json=? WHERE id=?", (json.dumps({"schema_version": 3, "source": "news", "status": "완료", "expired": True, "records": [], "parts": {}}), news["run_id"]))
+    at.run()
+    table = next(d for d in at.dataframe if "보유 상태" in d.value.columns)
+    states = set(table.value["보유 상태"])
+    assert states <= {"결과·원본 모두 있음", "결과만 있음 (일부 원본 없음)", "이력만 있음"}
+    assert "이력만 있음" in states and "결과·원본 모두 있음" in states
+    assert "결과 있음" not in states
+    at.selectbox(key="history_choice_" + pid).set_value(news["run_id"]).run()
+    assert any("백업에서 새 프로젝트 복원" in w.value and "새로 수집" in w.value for w in at.warning)
+
+
+def test_settings_cleanup_requires_preview_and_confirmation():
+    import os
+    from core.evidence_store import save_bytes, root
+    asset = save_bytes(b"orphan evidence", "png", "https://example.com/orphan")
+    path = root() / asset["filename"]
+    old = time.time() - 90 * 86400
+    os.utime(path, (old, old))
+    from database.db import get_conn
+    with get_conn() as conn:
+        conn.execute("UPDATE stored_blob SET created=?", (old,))
+    at = AppTest.from_file(str(ROOT / "pages/4_settings.py"), default_timeout=15).run()
+    assert not at.exception
+    assert any(c.value.startswith("저장 공간 · 파일") for c in at.caption)
+    assert not any(b.label == "정리 실행" for b in at.button), "후보 보기 전에는 실행 버튼이 없다"
+    at.button(key="cleanup_preview").click().run()
+    candidates = next(d for d in at.dataframe if "예상 용량" in d.value.columns)
+    assert asset["filename"] in set(candidates.value["파일명"])
+    assert at.button(key="cleanup_apply").disabled
+    assert path.exists()
+    at.checkbox(key="cleanup_agree").check().run()
+    at.button(key="cleanup_apply").click().run()
+    assert not at.exception
+    assert not path.exists()
+    assert any("정리 완료" in s.value for s in at.success)
