@@ -18,6 +18,7 @@ import time
 import requests
 
 from config import settings
+from core.jobs import source_cache
 
 _BASE_URL = "https://api.naver.com"
 _URI = "/keywordstool"
@@ -55,6 +56,7 @@ def _to_int(value) -> int:
         return 0
 
 
+@source_cache("keyword_stats")
 def fetch_keyword_stats(hint_keyword: str) -> list[dict]:
     """RelKwdStat 원본 호출 — 연관키워드 + PC/모바일 월간 검색수.
 
@@ -82,6 +84,8 @@ def fetch_keyword_stats(hint_keyword: str) -> list[dict]:
             "keyword": item.get("relKeyword", ""),
             "monthly_pc": _to_int(item.get("monthlyPcQcCnt")),
             "monthly_mobile": _to_int(item.get("monthlyMobileQcCnt")),
+            "monthly_pc_display": item.get("monthlyPcQcCnt"),
+            "monthly_mobile_display": item.get("monthlyMobileQcCnt"),
         }
         for item in items
     ]

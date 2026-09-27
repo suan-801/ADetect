@@ -38,18 +38,21 @@ def _command_bar(key_prefix: str, label: str = "START HERE"):
                 "브랜드명", placeholder="브랜드명을 입력하세요", label_visibility="collapsed", key=f"{key_prefix}_brand_input"
             )
         with btn_col:
-            start = st.button("분석 시작 →", type="primary", key=f"{key_prefix}_start_btn", width="stretch")
+            start = st.button("자료 수집 시작 →", type="primary", key=f"{key_prefix}_start_btn", width="stretch")
 
-        with st.expander("+ 카테고리 · 경쟁사 직접 설정"):
-            category = st.text_input("카테고리", placeholder="비워두면 AI가 추천", key=f"{key_prefix}_category_input")
+        with st.expander("+ 관심 주제 · 함께 조사할 브랜드 설정"):
+            category = st.text_input("카테고리", placeholder="예: TM 채용 (선택)", key=f"{key_prefix}_category_input")
             competitors = st.text_input(
-                "경쟁사", placeholder="쉼표로 구분, 비워두면 AI가 추천", key=f"{key_prefix}_competitors_input"
+                "경쟁사", placeholder="쉼표로 구분 (선택)", key=f"{key_prefix}_competitors_input"
             )
 
         if start:
             if not brand_name.strip():
                 st.error("브랜드명을 입력해주세요.")
             else:
+                for key in list(st.session_state):
+                    if not key.startswith(key_prefix+"_"):
+                        del st.session_state[key]
                 st.session_state.draft = {
                     "brand_name": brand_name.strip(),
                     "category": st.session_state.get(f"{key_prefix}_category_input", "").strip(),

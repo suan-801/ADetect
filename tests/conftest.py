@@ -15,5 +15,21 @@ for _key in (
     "NAVER_AD_CUSTOMER_ID",
     "APIFY_API_TOKEN",
     "GEMINI_API_KEY",
+    "YOUTUBE_API_KEY",
 ):
     os.environ[_key] = ""
+
+
+import pytest
+
+@pytest.fixture(autouse=True)
+def isolated_database(tmp_path, monkeypatch):
+    import database.db as db
+    from config import settings
+    monkeypatch.setattr(settings,"SAMPLE_MODE",False)
+    monkeypatch.setattr(db, "DB_PATH", str(tmp_path / "test.db"))
+    monkeypatch.setenv("ADETECT_EXPORT_DIR",str(tmp_path / "exports"))
+    yield
+    from core.jobs import _jobs
+    for job in list(_jobs.values()):
+        job["future"].result(timeout=20)

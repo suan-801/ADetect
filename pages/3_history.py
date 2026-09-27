@@ -1,30 +1,19 @@
-"""이력 관리 — PRD §16-6. 세션을 클릭하면 Workspace로 재진입합니다.
-
-카드 grid 대신 row 기반 compact list로 표현합니다 — 최근 분석이 가장 위에 오고,
-브랜드/카테고리/생성일을 한 줄에서 훑어볼 수 있게 합니다.
-
-지금 저장·복원되는 것은 analysis_session(브랜드/카테고리/경쟁사)뿐이다 — function_run(기능별
-실행 결과)은 `database.db.save_function_run()`이 어디서도 호출되지 않아 실제로 저장되지
-않는다(§7 최근 변경 이력). 그래서 target_status 같은 레거시 컬럼 값은 더 이상 이 화면에
-노출하지 않는다 — Target은 독립 개념이 아니고(§0 16차 개정), 이 컬럼은 과거 세션 호환용으로만
-DB에 남아있다. `save_function_run()`/`list_function_runs()` 인터페이스는 향후 기능별 결과
-복원을 구현할 담당자를 위해 그대로 유지한다.
-"""
+"""분석 세션·기능별 실행 이력과 파일 재다운로드. 만료 파일은 이력만 보존한다."""
 from __future__ import annotations
 
 import html
 import json
+from datetime import datetime
 
 import streamlit as st
 
-from database.db import list_sessions
+from database.db import list_sessions, list_function_runs
+from core.runtime import restore_results
+from core.exporters.artifact_store import list_artifacts, read_artifact, record_download, download_events
 from ui.components import section_header_block
 
 section_header_block("History", "이력 관리")
-st.caption(
-    "최근 분석 세션 목록입니다. '열기'를 누르면 같은 브랜드/카테고리/경쟁사 기준으로 Workspace를 다시 엽니다 — "
-    "기능별 실행 결과 자동 복원은 아직 준비 중이라(function_run 저장 미구현) 각 탭은 다시 실행해야 합니다."
-)
+st.caption("이 PC의 SQLite에 입력·수집 결과·다운로드 요청 이력을 저장합니다. 파일은 별도 폴더에 보관합니다. 브라우저 저장 완료 여부는 확인할 수 없습니다.")
 st.write("")
 
 sessions = list_sessions()
@@ -49,6 +38,38 @@ else:
                 "</div></div>",
                 unsafe_allow_html=True,
             )
+        runs = list_function_runs(s["id"])
+        with row_col:
+            latest = {}
+            for run in runs:
+                latest.setdefault(run["function_type"], run["status"])
+            st.caption(" · ".join(f"{k}: {v}" for k,v in latest.items() if k != "target") or "아직 실행한 분석이 없습니다.")
+        with row_col:
+            if runs:
+                with st.expander("실행 이력·파일 다운로드"):
+                    for run in runs:
+                        if run["function_type"] == "target":
+                            continue
+                        st.write(f"{run['created_at'][:19]} · {run['function_type']} · {run['status']}")
+                        artifacts = list_artifacts(run["id"])
+                        if not artifacts:
+                            st.caption("생성된 파일이 없습니다. Workspace에서 결과 파일을 생성하세요.")
+                        for artifact in artifacts:
+                            ext = artifact["extension"]
+                            events = download_events(artifact["id"])
+                            st.caption(f"파일 생성: {datetime.fromtimestamp(artifact['created']).astimezone().isoformat(timespec='seconds')} · 다운로드 요청 {len(events)}회")
+                            if events:
+                                st.write([datetime.fromtimestamp(e["requested"]).astimezone().isoformat(timespec="seconds") for e in events])
+                            if artifact["expired"]:
+                                st.button(f"{ext.upper()} · 파일 만료",disabled=True,key="expired_"+artifact["id"])
+                            else:
+                                key="history_data_"+artifact["id"]
+                                if st.button(f"{ext.upper()} 파일 불러오기",key="prepare_"+artifact["id"]):
+                                    st.session_state[key]=read_artifact(artifact["id"],touch=False)
+                                    if st.session_state[key] is None: st.warning("파일이 없습니다. 결과를 복원해 다시 생성하세요.")
+                                if st.session_state.get(key):
+                                    st.download_button(f"{ext.upper()} 재다운로드", data=st.session_state[key],
+                                        file_name=f"{run['function_type']}.{ext}",key="history_dl_"+artifact["id"], on_click=record_download, args=(artifact["id"],))
         with action_col:
             if st.button("열기 →", key=f"reenter_{s['id']}"):
                 st.session_state.session = {
@@ -60,5 +81,9 @@ else:
                     "brand_status": "미실행",
                     "creative_status": "미실행",
                 }
+                saved_inputs = json.loads(s["inputs_json"] or "{}")
+                st.session_state.session.update({k:v for k,v in saved_inputs.items() if v is not None})
+                st.session_state.session["creative_meta_overrides"] = {n:v["meta_page"] for n,v in saved_inputs.get("sources", {}).items() if v.get("meta_page")}
+                restore_results(st.session_state.session)
                 st.session_state.step = "workspace"
                 st.switch_page("pages/2_analyze.py")

@@ -14,6 +14,8 @@ import html
 import streamlit as st
 
 from config import settings
+from core.exporters.artifact_store import save_artifact
+from ui.job_control import start, pending
 from core.analyzers.creative_analyzer import compact_platforms, run_creative_analysis
 from core.exporters.excel_builder import build_creative_excel
 from core.exporters.html_builder import build_creative_html
@@ -70,7 +72,10 @@ def render(session: dict):
     status = session.get("creative_status", "미실행")
     tab_header("CREATIVE", "소재분석", status_icon(status))
 
-    if status in ("미실행", "전체 실패"):
+    if pending(session, "creative"):
+        return
+    if status in ("미실행", "전체 실패", "취소"):
+        session["creative_force"] = st.checkbox("24시간 캐시 무시하고 새로 수집", value=False, key="fresh_creative")
         feature_intro([
             "Meta Ads Library 활성 광고 소재 (FB+IG 노출 포함)",
             "헤드라인·CTA·포맷 등 실제 소재 정보",
@@ -85,7 +90,7 @@ def render(session: dict):
         if not settings.APIFY_MOCK:
             with st.expander("메타 라이브러리 페이지 직접 지정 (선택 — 자동 추천이 부정확할 때)"):
                 st.caption(
-                    "자동 매칭은 브랜드명으로 검색한 결과 중 가장 많이 등장한 페이지를 추정해 사용합니다 "
+                    "자사는 공식 페이지 확인이 필요합니다. 경쟁사는 인증·팔로워 신호를 우선하고, 없으면 정확히 일치하는 이름만 사용합니다 "
                     "— 동명이인·무관 광고주가 섞이면 엉뚱한 결과가 나올 수 있습니다. Meta Ads Library에서 "
                     "해당 브랜드의 정확한 광고 페이지를 찾아 URL을 붙여넣거나, 정확한 페이지명을 입력하세요."
                 )
@@ -98,25 +103,18 @@ def render(session: dict):
 
         if st.button("소재분석 시작하기", type="primary", key="btn_start_creative"):
             active_overrides = {k: v.strip() for k, v in overrides.items() if v.strip()}
-            try:
-                with st.status("자사 및 경쟁사 광고 소재를 수집·분석하는 중...", expanded=True) as status_box:
-                    def _on_progress(msg: str, _box=status_box):
-                        _box.update(label=msg)
-
-                    result = run_creative_analysis(
-                        session["brand_name"], session.get("competitors", []),
-                        meta_overrides=active_overrides, on_progress=_on_progress,
-                    )
-                    status_box.update(label="수집 완료", state="complete")
-                session["creative_result"] = result
-                session["creative_status"] = result["status"]
-            except (ApifyFetchError, NaverApiError) as exc:
-                session["creative_status"] = "전체 실패"
-                st.error(f"소재 수집 실패: {exc}")
-            st.rerun()
+            def execute(snapshot):
+                result = run_creative_analysis(snapshot["brand_name"], snapshot.get("competitors", []), meta_overrides=active_overrides)
+                result["sample_sources"] = ["meta_ads"] if settings.APIFY_MOCK else []
+                return result
+            start(session, "creative", execute, {"brand":session["brand_name"],"competitors":session.get("competitors", []),"overrides":active_overrides})
         return
 
     result = session["creative_result"]
+    for note in result.get("limitations", []):
+        st.caption(note)
+    for error in result.get("errors", []):
+        st.warning(error)
     own = result["own"]
     competitors = result["competitors"]
     all_brands = [own, *competitors]
@@ -124,11 +122,11 @@ def render(session: dict):
     tabs = st.tabs(["개요", "소재 목록", "Creative Analysis", "Long Running"])
 
     with tabs[0]:
-        if settings.APIFY_MOCK:
+        if result.get("sample_sources"):
             sample_data_notice()
         metric_row([
-            ("전체 활성 소재", str(sum(b["ad_count"] for b in all_brands)), None),
-            ("자사 소재", str(own["ad_count"]), None),
+            ("수집 활성 소재", str(sum(b["ad_count"] for b in all_brands)), None),
+            ("자사 소재", "미확인" if own.get("collection_failed") else str(own["ad_count"]), None),
             ("비교 경쟁사", str(len(competitors)), None),
         ])
         st.write(
@@ -220,6 +218,7 @@ def _render_downloads(session: dict, result: dict):
         if st.button("HTML 리포트 생성", key="gen_html_creative"):
             with st.spinner("HTML 리포트 생성 중... (이미지 포함)"):
                 session["creative_export_html"] = build_creative_html(session, result)
+                save_artifact(session.get("creative_run_id"), "creative", "html", session["creative_export_html"])
         if session.get("creative_export_html"):
             st.download_button(
                 "HTML 다운로드", data=session["creative_export_html"],
@@ -230,6 +229,7 @@ def _render_downloads(session: dict, result: dict):
         if st.button("Excel 생성", key="gen_excel_creative"):
             with st.spinner("Excel 파일 생성 중..."):
                 session["creative_export_excel"] = build_creative_excel(result)
+                save_artifact(session.get("creative_run_id"), "creative", "xlsx", session["creative_export_excel"])
         if session.get("creative_export_excel"):
             st.download_button(
                 "Excel 다운로드", data=session["creative_export_excel"],
@@ -242,6 +242,7 @@ def _render_downloads(session: dict, result: dict):
         if st.button("이미지/영상 ZIP 생성", key="gen_zip_creative"):
             with st.spinner("이미지/영상 원본을 내려받아 압축하는 중... (소재 수에 따라 시간이 걸릴 수 있습니다)"):
                 session["creative_export_zip"] = build_creative_zip(result)
+                save_artifact(session.get("creative_run_id"), "creative", "zip", session["creative_export_zip"])
         if session.get("creative_export_zip"):
             st.download_button(
                 "ZIP 다운로드", data=session["creative_export_zip"],

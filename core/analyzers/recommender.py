@@ -41,6 +41,9 @@ class _Competitor(BaseModel):
 class _Recommendation(BaseModel):
     category: str
     competitors: list[_Competitor]
+    search_variants: list[str] = []
+    representative_keyword: str = ""
+    generic_keywords: list[str] = []
 
 
 _PROMPT = """당신은 한국 시장을 잘 아는 마케팅 리서치 애널리스트입니다.
@@ -53,6 +56,9 @@ _PROMPT = """당신은 한국 시장을 잘 아는 마케팅 리서치 애널리
    - "직접 경쟁": 동일 카테고리에서 정면으로 경쟁하는 브랜드
    - "인접 경쟁": 인접 카테고리에 있어 고객군 일부가 겹치는 브랜드
    - "대체 채널": 다른 방식으로 같은 소비자 니즈를 해결하는 대안 채널/브랜드
+3. search_variants: 자사 브랜드의 검색 표기 변형(한글/영문/띄어쓰기), 최대 20개. 다른 브랜드를 섞지 마세요.
+4. representative_keyword: 카테고리 내 대표 검색 키워드 1개.
+5. generic_keywords: 브랜드명이 아닌 카테고리 일반 키워드 3~5개. 모르면 빈 배열.
 """
 
 
@@ -120,3 +126,11 @@ def recommend_competitors(brand_name: str, category: str) -> list[dict]:
         if rec is not None:
             return [{"name": c.name, "type": c.type} for c in rec.competitors]
     return _mock_competitors(brand_name, category)
+
+
+def recommend_search_inputs(brand_name):
+    rec = _gemini_recommend(brand_name) if not settings.GEMINI_MOCK else None
+    return {"variants": list(dict.fromkeys([brand_name, *(rec.search_variants if rec else [])]))[:20],
+            "representative_keyword": rec.representative_keyword if rec else "",
+            "generic_keywords": rec.generic_keywords[:5] if rec else [],
+            "sample": rec is None}

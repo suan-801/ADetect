@@ -38,11 +38,20 @@ NAVER_SEARCH_MOCK = not (NAVER_CLIENT_ID and NAVER_CLIENT_SECRET)
 NAVER_AD_MOCK = not (NAVER_AD_API_KEY and NAVER_AD_SECRET_KEY and NAVER_AD_CUSTOMER_ID)
 APIFY_MOCK = not APIFY_API_TOKEN
 GEMINI_MOCK = not GEMINI_API_KEY
-# Playwright 브랜드 홈페이지 크롤링은 키가 아니라 구현 여부의 문제라 항상 목업입니다.
-BRAND_SITE_MOCK = True
+# 홈페이지는 확인된 공개 URL의 실제 HTML 원문을 수집합니다.
+BRAND_SITE_MOCK = False
 
 # 하위 호환용 — "무엇 하나라도 목업이면 True". 신규 코드는 위의 서비스별 플래그를 사용하세요.
 USE_MOCK_DATA = NAVER_DATALAB_MOCK or NAVER_SEARCH_MOCK or NAVER_AD_MOCK or APIFY_MOCK or GEMINI_MOCK or BRAND_SITE_MOCK
 
 APP_NAME = "ADetect"
 DB_PATH = os.getenv("ADETECT_DB_PATH", "storage/adetect.db")
+
+YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY", "")
+
+# 명시적 SAMPLE 모드는 .env 유무와 관계없이 유료/외부 API 호출을 끈다.
+SAMPLE_MODE = os.getenv("ADETECT_SAMPLE_MODE", "").lower() in ("1", "true", "yes")
+if SAMPLE_MODE:
+    NAVER_DATALAB_MOCK = NAVER_SEARCH_MOCK = NAVER_AD_MOCK = APIFY_MOCK = GEMINI_MOCK = True
+    USE_MOCK_DATA = True
+    YOUTUBE_API_KEY = ""

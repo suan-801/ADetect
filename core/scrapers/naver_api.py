@@ -12,6 +12,7 @@ from datetime import date, timedelta
 from email.utils import parsedate_to_datetime
 
 import requests
+from core.jobs import source_cache
 
 from config import settings
 from core.scrapers import naver_ad_api
@@ -50,6 +51,7 @@ def _mock_search_volume_trend(keyword: str, months: int) -> list[dict]:
     return trend
 
 
+@source_cache("search_trend")
 def get_search_volume_trend(keyword: str, months: int = 12) -> list[dict]:
     """일별 상대 검색지수(0~100). §7-1 search_volume_trend / §7-1-a 계절성 후처리 원본."""
     if settings.NAVER_DATALAB_MOCK:
@@ -179,6 +181,7 @@ def _mock_news(keyword: str, scope: str, limit: int) -> list[dict]:
     return sorted(news, key=lambda x: x["published_at"], reverse=True)
 
 
+@source_cache("news")
 def get_news(keyword: str, scope: str = "market", limit: int = 5) -> list[dict]:
     """§7-1 top_news / §7-3 brand_news — 최근 뉴스.
 
@@ -217,3 +220,58 @@ def get_news(keyword: str, scope: str = "market", limit: int = 5) -> list[dict]:
             "published_at": published,
         })
     return news
+
+
+def get_comparable_brand_trends(brand_name, competitors, variants=None):
+    """최대 5그룹씩 자사를 공통 앵커로 조회한다(PRD §7-9)."""
+    names = list(dict.fromkeys([brand_name, *competitors]))
+    variants = variants or {}
+    if settings.NAVER_DATALAB_MOCK:
+        return {n: {"relative_trend": _mock_search_volume_trend(n, 3), "comparable": True, "sample": True,
+                    "variants_used": variants.get(n) or [n]} for n in names}
+    output, anchor = {}, None
+    batches = [[brand_name, *names[i:i+4]] for i in range(1, len(names), 4)] or [[brand_name]]
+    for batch in batches:
+        body = {"startDate": (date.today()-timedelta(days=90)).isoformat(), "endDate": date.today().isoformat(),
+                "timeUnit": "date", "keywordGroups": [{"groupName": n, "keywords": (variants.get(n) or [n])[:20]} for n in batch]}
+        try:
+            response = requests.post("https://naverapihub.apigw.ntruss.com/search-trend/v1/search",
+                headers={"X-NCP-APIGW-API-KEY-ID": settings.NAVER_CLIENT_ID, "X-NCP-APIGW-API-KEY": settings.NAVER_CLIENT_SECRET},
+                json=body, timeout=15)
+            response.raise_for_status()
+            data = {r["title"]: {v["period"]: float(v["ratio"]) for v in r["data"]} for r in response.json()["results"]}
+            current = data.get(brand_name, {})
+            factor, comparable = 1.0, True
+            if anchor is not None:
+                common = [d for d in current if current[d] > 0 and anchor.get(d, 0) > 0]
+                if not common:
+                    comparable = False
+                else:
+                    factor = sum(anchor[d] for d in common) / sum(current[d] for d in common)
+            else:
+                anchor = current
+            for n in batch:
+                if n == brand_name and n in output:
+                    continue
+                output[n] = {"relative_trend": [{"date": d, "search_index": v*factor} for d, v in sorted(data.get(n, {}).items())],
+                             "comparable": comparable and n in data, "sample": False, "variants_used": variants.get(n) or [n]}
+        except (requests.RequestException, ValueError, KeyError, TypeError):
+            for n in batch:
+                output.setdefault(n, {"relative_trend": [], "comparable": False, "status": "not_available", "variants_used": variants.get(n) or [n]})
+    return output
+
+
+def get_brand_keyword_metrics(brand_name, variants=None):
+    variants = list(dict.fromkeys(v.replace(" ", "").lower() for v in (variants or [brand_name]) if v.strip()))
+    if settings.NAVER_AD_MOCK:
+        return {"absolute_30d_pc": None, "absolute_30d_mobile": None, "related_keywords": [], "status": "not_available"}
+    rows = {}
+    for keyword in variants:
+        for row in naver_ad_api.fetch_keyword_stats(keyword):
+            rows[row["keyword"].replace(" ", "").lower()] = row
+    exact = [rows[v] for v in variants if v in rows]
+    return {"absolute_30d_pc": sum(r["monthly_pc"] for r in exact) if len(exact) == len(variants) else None,
+            "absolute_30d_mobile": sum(r["monthly_mobile"] for r in exact) if len(exact) == len(variants) else None,
+            "related_keywords": sorted(rows.values(), key=lambda r: r["monthly_pc"]+r["monthly_mobile"], reverse=True)[:20],
+            "status": "available" if len(exact) == len(variants) else "not_available",
+            "note": "최근 30일 근사치. API의 <10 값은 합산에서 하한 0으로 처리합니다."}

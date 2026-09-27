@@ -9,6 +9,12 @@ Target은 더 이상 독립 탭이 아니라 종합분석 탭 안의 Target Insi
 실행: `pytest tests/test_smoke.py -v`
 """
 from pathlib import Path
+import pytest
+
+@pytest.fixture(autouse=True)
+def explicit_sample(monkeypatch):
+    from config import settings
+    monkeypatch.setattr(settings,"SAMPLE_MODE",True)
 
 from streamlit.testing.v1 import AppTest
 
@@ -37,11 +43,11 @@ def test_home_page_loads():
 
 
 def test_workspace_has_4_primary_tabs_no_standalone_target():
-    at = AppTest.from_file(str(PAGES / "2_analyze.py")).run()
+    at = AppTest.from_file(str(PAGES / "2_analyze.py"), default_timeout=15).run()
     _enter_workspace(at, "나이키")
 
     tab_labels = [t.label for t in at.tabs]
-    assert tab_labels == ["01 시장분석", "02 브랜드분석", "03 소재분석", "04 종합분석"]
+    assert tab_labels == ["01 검색·뉴스", "02 공식 페이지·SNS", "03 광고 소재", "04 확인·정리"]
     assert not any("타겟" in label for label in tab_labels)
 
     # Analysis Status Index — 항상 4개 항목(§17), 5번째(구 타겟) 행이 남아있지 않은지 확인.
@@ -50,31 +56,24 @@ def test_workspace_has_4_primary_tabs_no_standalone_target():
 
 
 def test_full_flow_market_brand_creative_synthesis():
-    at = AppTest.from_file(str(PAGES / "2_analyze.py")).run()
+    at = AppTest.from_file(str(PAGES / "2_analyze.py"), default_timeout=15).run()
     _enter_workspace(at, "메리츠화재")
 
-    at.button(key="btn_start_market").click().run()
+    _run_analysis(at, "market")
     assert not at.exception
     assert at.session_state["session"]["market_status"] == "완료"
 
-    at.button(key="btn_start_brand").click().run()
+    _run_analysis(at, "brand")
     assert not at.exception
     assert at.session_state["session"]["brand_status"] == "완료"
 
-    at.button(key="btn_start_creative").click().run()
+    _run_analysis(at, "creative")
     assert not at.exception
     creative_result = at.session_state["session"]["creative_result"]
     assert at.session_state["session"]["creative_status"] == "완료"
-    assert creative_result["own"]["ad_count"] >= 0
-
-    # 소재분석 결과에 랜덤 Appeal Point가 어디에도 노출되지 않는다 (PRD §8~§10).
-    for ad in creative_result["own"]["ads"]:
-        assert "appeal_tags" not in ad
-    assert "appeal_distribution" not in creative_result["own"]
-    for lr in creative_result["own"]["long_running_analysis"]:
-        assert "dominant_appeal_tags" not in lr
-
-    # 종합분석은 시장/브랜드/소재 중 하나만 있어도 열린다 — Target은 이 게이트에 관여하지 않는다.
+    assert creative_result["schema_version"] == 2
+    assert creative_result["records"]
+    assert all("appeal_tags" not in ad for ad in creative_result["records"])
     assert not at.exception
 
 
@@ -115,3 +114,35 @@ def test_history_and_settings_pages_load():
 
     at = AppTest.from_file(str(PAGES / "4_settings.py")).run()
     assert not at.exception
+
+
+def _run_analysis(at, function):
+    from core.jobs import get_job
+    at.button(key="btn_start_"+function).click().run()
+    jid = at.session_state["session"].get(function+"_job")
+    if jid:
+        get_job(jid)["future"].result(timeout=20)
+        at.run()
+    assert not at.exception
+
+
+def test_synthesis_and_downloads_restore():
+    from core.runtime import restore_results
+    at = AppTest.from_file(str(PAGES / "2_analyze.py"), default_timeout=15).run()
+    _enter_workspace(at, "검증브랜드")
+    _run_analysis(at, "market")
+    _run_analysis(at, "brand")
+    choices = at.session_state["session"]["market_result"]["records"]
+    at.multiselect(key="summary_selection").set_value([choices[0]["id"]]).run()
+    _run_analysis(at, "synthesis")
+    for function in ("market", "brand", "synthesis"):
+        at.button(key=f"gen_html_{function}").click().run()
+        at.button(key=f"gen_xlsx_{function}").click().run()
+        assert not at.exception
+        result = at.session_state["session"]
+        assert result[f"{function}_export_html"].startswith("<!doctype")
+        assert result[f"{function}_export_xlsx"][:2] == b"PK"
+    saved = dict(at.session_state["session"])
+    restored = restore_results({"id":saved["id"],"reviews":saved.get("reviews",{}),"selected_records":saved.get("selected_records",[])})
+    assert restored["market_result"] == saved["market_result"]
+    assert restored["synthesis_status"] == "완료"

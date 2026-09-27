@@ -12,19 +12,20 @@ from config import settings
 from ui.components import section_header_block, status_badge
 
 section_header_block("Settings", "설정")
-st.caption(".env 파일에 키를 채워 넣으면 자동으로 실제 연동 모드로 전환됩니다 (config/settings.py).")
+st.caption("키는 .env에서 설정합니다. 유료 기능은 기본 ON이며 수집·요약 버튼을 눌렀을 때 호출합니다. 키 값은 화면이나 산출물에 표시하지 않습니다.")
 st.write("")
 
 st.markdown("<span class='adetect-eyebrow' style='margin-bottom:0.2rem;'>API 연동 상태</span>", unsafe_allow_html=True)
 
 keys = [
-    ("네이버 오픈API (DataLab/뉴스)", bool(settings.NAVER_CLIENT_ID and settings.NAVER_CLIENT_SECRET)),
-    ("네이버 검색광고 (키워드도구)", bool(settings.NAVER_AD_API_KEY)),
+    ("NAVER API HUB (검색 추이/뉴스)", bool(settings.NAVER_CLIENT_ID and settings.NAVER_CLIENT_SECRET)),
+    ("네이버 검색광고 (키워드도구)", bool(settings.NAVER_AD_API_KEY and settings.NAVER_AD_SECRET_KEY and settings.NAVER_AD_CUSTOMER_ID)),
     ("Apify (Meta Ads/Instagram)", bool(settings.APIFY_API_TOKEN)),
     ("Google Gemini", bool(settings.GEMINI_API_KEY)),
+    ("YouTube Data API", bool(settings.YOUTUBE_API_KEY)),
 ]
 for label, ok in keys:
-    dot = status_badge("완료" if ok else "미실행", label="연동됨" if ok else "미연동")
+    dot = status_badge("완료" if ok else "미실행", label="키 설정됨" if ok else "키 미설정")
     st.markdown(
         f'<div class="adetect-kv-row"><span class="label">{html.escape(label)}</span>{dot}</div>',
         unsafe_allow_html=True,
@@ -32,7 +33,13 @@ for label, ok in keys:
 
 st.write("")
 st.markdown("<span class='adetect-eyebrow' style='margin-bottom:0.2rem;'>현재 모드</span>", unsafe_allow_html=True)
-if settings.USE_MOCK_DATA:
-    st.caption("일부 서비스가 목업(mock) 데이터 모드입니다 — 위 키를 모두 채우면 전체 실제 연동 모드로 전환됩니다.")
+if settings.SAMPLE_MODE:
+    st.caption("명시적 SAMPLE 모드입니다. 실제 수집과 유료 API 호출을 하지 않습니다.")
 else:
-    st.caption("전체 실제 연동 모드입니다.")
+    st.caption("실제 수집 모드입니다. 누락된 키를 SAMPLE로 대체하지 않습니다. 키 존재 여부만 확인했으며 잔액·권한·수집 성공은 실행 결과에서 확인하세요.")
+    if not settings.APIFY_API_TOKEN or not settings.GEMINI_API_KEY:
+        st.warning("토큰 부족. 개발자에게 문의해주세요")
+
+st.subheader("이 PC의 자료 보관")
+st.write("입력·수집 결과·다운로드 요청: storage/adetect.db · 산출물: storage/exports · 원본: storage/evidence (환경변수로 변경 가능)")
+st.caption("산출물은 최근 20개 실행·총 5GB 기준으로 오래된 파일부터 만료합니다. 원본은 기본 5GB까지 저장하고 초과하면 새 저장을 중단합니다. DB 이력은 자동 삭제하지 않습니다. 백업할 때 DB와 두 폴더를 함께 복사하세요.")

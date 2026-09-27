@@ -51,11 +51,13 @@ def build_creative_zip(result: dict) -> bytes:
     manifest_rows = [["브랜드", "ad_id", "포맷", "파일명", "상태"]]
 
     with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+        if result.get("sample_sources"):
+            zf.writestr("SAMPLE.txt", "실제 분석 데이터가 아닌 SAMPLE 소재입니다.")
         for b in all_brands:
             folder = _slugify(_brand_label(b))
             for ad in b["ads"]:
                 url = ad.get("image_url") or ad.get("thumbnail_url")
-                filename = f"{folder}/{ad['ad_id']}{_ext_for(ad)}"
+                filename = f"{folder}/{_slugify(str(ad['ad_id']))}{_ext_for(ad)}"
                 if not url:
                     manifest_rows.append([b["brand"], ad["ad_id"], ad["format"], filename, "원본 URL 없음"])
                     continue

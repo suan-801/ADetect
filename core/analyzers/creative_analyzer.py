@@ -14,6 +14,7 @@ PRD §11(taxonomy 정의, multi-label, evidence, confidence, low-confidence 숨�
 from __future__ import annotations
 
 from typing import Callable
+from config import settings
 
 from core.analyzers.insight_synthesizer import build_insight
 from core.scrapers.ad_library import fetch_meta_ads_detail
@@ -95,14 +96,24 @@ def run_creative_analysis(
     부정확할 때 사용자가 직접 지정한 값(ad_library.fetch_meta_ads_detail의 page_override로 전달).
     on_progress: 브랜드별 수집 진행 상황을 알리는 콜백(UI의 st.status 등에 연결).
     """
+    from core.jobs import checkpoint
     meta_overrides = meta_overrides or {}
     targets = [(brand_name, True), *[(c, False) for c in competitors]]
     total = len(targets)
     all_brands = []
+    errors = []
     for i, (name, is_own) in enumerate(targets, start=1):
+        checkpoint(f"{name} 광고 수집 중", {"own":all_brands[0] if all_brands else {},"competitors":all_brands[1:]})
         if on_progress:
             on_progress(f"{i}/{total} 브랜드 — {name} 광고 소재를 Meta Ads Library에서 수집하는 중...")
-        all_brands.append(_analyze_single_brand_creatives(name, is_own, meta_overrides.get(name) or None))
+        try:
+            if is_own and not settings.APIFY_MOCK and not meta_overrides.get(name):
+                raise ValueError("자사 Meta 페이지 확인 필요")
+            all_brands.append(_analyze_single_brand_creatives(name, is_own, meta_overrides.get(name) or None))
+        except Exception:
+            errors.append(f"{name}: 광고 수집 실패")
+            all_brands.append({"brand": name, "is_own": is_own, "ads": [], "ad_count": 0,
+                               "format_mix": {}, "long_running_analysis": [], "collection_failed": True})
     if on_progress:
         on_progress("수집한 데이터를 종합하는 중...")
     own, *competitor_results = all_brands
@@ -116,9 +127,11 @@ def run_creative_analysis(
     )
     own_long_running_count = own_long_running["ad_count"] if own_long_running else 0
 
-    if own["ad_count"] > 0:
+    if own.get("collection_failed"):
+        one_line = f"{brand_name} 광고 수집에 실패했습니다. 활성 광고 수는 확인할 수 없습니다."
+    elif own["ad_count"] > 0:
         one_line = (
-            f"{brand_name}는 현재 활성 광고 {own['ad_count']}건을 운영 중이며, "
+            f"{brand_name}는 수집된 활성 광고 {own['ad_count']}건을 운영 중이며, "
             f"이 중 영상 소재가 {own_video}건, 90일 이상 장기 운영 소재가 {own_long_running_count}건입니다."
         )
     else:
@@ -129,13 +142,15 @@ def run_creative_analysis(
         source=[f"Meta Ads Library {total_ads}건 (자사+경쟁사)"],
         evidence=[
             f"{b['brand']}: 활성 {b['ad_count']}건 (영상 {b['format_mix'].get('video', 0)}건)"
-            for b in all_brands
+            for b in all_brands if not b.get("collection_failed")
         ],
         confidence="high",
     )
 
     return {
-        "status": "완료",
+        "status": "전체 실패" if len(errors) == len(all_brands) else "부분 실패" if errors else "완료",
+        "errors": errors,
+        "limitations": ["Meta 수집 요청당 최대 20건 표본입니다. 수집 건수는 전체 활성 광고 총량이 아닐 수 있습니다."],
         "own": own,
         "competitors": competitor_results,
         "creative_key_visual": creative_key_visual,

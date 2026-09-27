@@ -4,11 +4,9 @@
 - fetch_meta_ads() / fetch_meta_ads_detail(): 활성 광고 소재 (FB+IG 노출 통합, "Instagram 전용 광고"는 별도로 없음)
 - fetch_instagram_profile(): 광고가 아닌 SNS 계정 자체의 운영현황
 
-Meta Ads는 Apify `curious_coder/facebook-ads-library-scraper` 액터로 실연동되어 있습니다
-(§10·§21-11, 2026-09-13 실계정 검증). Instagram 프로필은 여전히 목업입니다 — 실제 Apify
-Instagram 액터(apify/instagram-profile-scraper)는 브랜드명이 아니라 정확한 계정 handle을
-입력받는데, 이 프로젝트에는 아직 브랜드명→handle 해석 단계가 없습니다(§7-10과 동일한 문제,
-Meta는 §7-3-b의 "최빈 페이지" 근사로 우회했지만 Instagram은 대응하는 우회 신호가 없음).
+Meta는 사용자 확인 페이지를 우선 사용한다. 경쟁사는 인증·팔로워 신호를 우선하고,
+그 정보가 없으면 정확히 일치하는 페이지명 한 개만 사용한다. 모호하면 미확인으로 처리한다.
+Instagram은 확인된 handle 또는 공식 홈페이지의 프로필 링크로 조회한다.
 """
 from __future__ import annotations
 
@@ -17,7 +15,7 @@ import html
 import urllib.parse
 from collections import Counter
 from datetime import date, datetime, timedelta
-from functools import lru_cache
+from core.jobs import source_cache
 
 import requests
 
@@ -34,32 +32,52 @@ def _run_actor_sync(actor: str, run_input: dict) -> list[dict]:
     try:
         resp = requests.post(
             f"https://api.apify.com/v2/acts/{actor_path}/run-sync-get-dataset-items",
-            params={"token": settings.APIFY_API_TOKEN},
+            headers={"Authorization": f"Bearer {settings.APIFY_API_TOKEN}"},
             json=run_input,
             timeout=180,
         )
         resp.raise_for_status()
     except requests.RequestException as exc:
-        raise ApifyFetchError(f"Apify 액터({actor}) 호출 실패: {exc}") from exc
+        raise ApifyFetchError(f"Apify 액터({actor}) 호출 실패") from exc
 
     items = resp.json()
     if items and isinstance(items[0], dict) and "error" in items[0] and len(items) == 1:
-        raise ApifyFetchError(f"Apify 액터({actor}) 오류 응답: {items[0]['error']}")
+        raise ApifyFetchError(f"Apify 액터({actor}) 오류 응답")
     return items
 
 
-def _resolve_brand_page(items: list[dict]) -> str | None:
-    """브랜드명 키워드 검색 결과에는 리셀러·무관 광고주가 섞여 들어온다(§7-10 한계).
+def _candidate_pages(items):
+    pages = {}
+    for item in items:
+        snap = item.get("snapshot") or {}
+        name = item.get("page_name") or snap.get("page_name")
+        pid = str(item.get("page_id") or snap.get("page_id") or "")
+        if not name:
+            continue
+        followers = item.get("page_like_count", snap.get("page_like_count"))
+        verified = item.get("is_verified", snap.get("is_verified"))
+        pages[pid or name] = {"page_id":pid,"name":name,
+            "followers":followers if isinstance(followers,(int,float)) else None,
+            "verified":verified if isinstance(verified,bool) else None}
+    return sorted(pages.values(), key=lambda p:(p["verified"] is True,p["followers"] if p["followers"] is not None else -1), reverse=True)
 
-    정식 Page ID 확인 절차가 아직 없으므로, 검색 결과에서 가장 자주 등장한 page_name을
-    실제 브랜드 페이지로 간주하는 근사 해석을 사용한다 — 정확한 Page 선택 UI(§7-10)가
-    생기기 전까지의 임시 방편이며, 실제 사용 시 결과 화면에 어떤 페이지로 필터링됐는지
-    항상 노출해야 한다(§13 투명성 원칙과 동일한 정신).
-    """
-    names = [it.get("page_name") for it in items if it.get("page_name")]
-    if not names:
-        return None
-    return Counter(names).most_common(1)[0][0]
+
+@source_cache("meta_page_candidates")
+def find_meta_pages(brand_name):
+    if settings.APIFY_MOCK:
+        return []
+    url = "https://www.facebook.com/ads/library/?"+urllib.parse.urlencode({"active_status":"active","ad_type":"all","country":"KR","q":brand_name,"search_type":"keyword_unordered"})
+    raw = _run_actor_sync(settings.APIFY_META_ADS_ACTOR,{"urls":[{"url":url}],"count":20,"scrapeAdDetails":False})
+    return _candidate_pages(raw)
+
+
+def _resolve_brand_page(items, brand_name=None):
+    pages = _candidate_pages(items)
+    with_evidence = [p for p in pages if p["verified"] is True or p["followers"] is not None]
+    if with_evidence:
+        return with_evidence[0]["name"]
+    exact = [p for p in pages if brand_name and p["name"].replace(" ","").casefold() == brand_name.replace(" ","").casefold()]
+    return exact[0]["name"] if len(exact) == 1 else None
 
 
 def _extract_media(snapshot: dict) -> tuple[str, str | None, str | None]:
@@ -85,7 +103,7 @@ def _extract_media(snapshot: dict) -> tuple[str, str | None, str | None]:
     return "unknown", None, None
 
 
-@lru_cache(maxsize=64)
+@source_cache("meta_ads")
 def _fetch_meta_ads_raw(
     brand_name: str, count: int = 20, page_override: str | None = None,
 ) -> tuple[str | None, tuple[dict, ...]]:
@@ -98,7 +116,14 @@ def _fetch_meta_ads_raw(
     - 그 외 문자열이면 그 값으로 검색하고, 최빈값 대신 정확히 그 페이지명과 일치하는 광고만 사용한다.
     """
     if page_override and page_override.startswith("http"):
-        search_url = page_override
+        parsed = urllib.parse.urlsplit(page_override)
+        if parsed.scheme != "https" or parsed.hostname not in ("facebook.com","www.facebook.com") or not parsed.path.startswith("/ads/library"):
+            raise ApifyFetchError("Meta Ads Library의 https URL을 입력하세요.")
+        query = urllib.parse.parse_qs(parsed.query)
+        if not query.get("view_all_page_id", [""])[0].isdigit():
+            raise ApifyFetchError("view_all_page_id가 있는 페이지별 Ads Library URL을 입력하세요.")
+        query.update(active_status=["active"], country=["KR"], ad_type=["all"])
+        search_url = urllib.parse.urlunsplit((parsed.scheme,parsed.netloc,parsed.path,urllib.parse.urlencode(query,doseq=True),""))
     else:
         query = urllib.parse.quote(page_override or brand_name)
         search_url = (
@@ -116,12 +141,16 @@ def _fetch_meta_ads_raw(
         resolved_page = page_override
         page_items = [it for it in raw_items if it.get("page_name") == page_override]
     else:
-        resolved_page = _resolve_brand_page(raw_items)
-        page_items = [it for it in raw_items if it.get("page_name") == resolved_page] if resolved_page else raw_items
+        resolved_page = _resolve_brand_page(raw_items, brand_name)
+        if raw_items and not resolved_page:
+            raise ApifyFetchError("공식 광고 페이지를 특정하지 못했습니다. Meta 페이지를 확인해 지정하세요.")
+        page_items = [it for it in raw_items if it.get("page_name") == resolved_page] if resolved_page else []
 
     today = date.today()
     ads = []
     for it in page_items:
+        if it.get("is_active") is False:
+            continue
         snap = it.get("snapshot") or {}
         fmt, image_url, thumbnail_url = _extract_media(snap)
         body = snap.get("body")
@@ -132,7 +161,9 @@ def _fetch_meta_ads_raw(
             "ad_id": str(it.get("ad_archive_id") or it.get("ad_id") or ""),
             "brand": brand_name,
             "resolved_page_name": resolved_page,
+            "resolved_page_id": str(it.get("page_id") or snap.get("page_id") or ""),
             "platform": "meta",
+            "is_active": True,
             "publisher_platforms": ",".join(it.get("publisher_platform") or []),
             "format": fmt,
             "headline": snap.get("title") or snap.get("page_name") or "",
@@ -250,20 +281,37 @@ def fetch_meta_ads(brand_name: str) -> dict:
     }
 
 
-def fetch_instagram_profile(brand_name: str) -> dict:
-    """§7-3 instagram — 팔로워/포스팅 수 등 SNS 운영현황 (광고 아님).
-
-    실제 Apify Instagram 프로필 액터는 handle 입력이 필수라 브랜드명→handle 해석이 먼저
-    필요합니다(§7-10과 같은 미해결 문제). 그 전까지는 목업으로 유지합니다.
-    """
-    rng = _seeded_random(f"ig_profile:{brand_name}")
-    has_profile = rng.random() > 0.1
-    if not has_profile:
-        return {"brand": brand_name, "profile_found": False}
-    return {
-        "brand": brand_name,
-        "profile_found": True,
-        "followers": rng.randint(500, 300_000),
-        "posts": rng.randint(20, 3000),
-        "recent_caption_sample": f"{brand_name}의 최근 소식을 확인해보세요 (샘플 캡션)",
-    }
+@source_cache("instagram_profile")
+def fetch_instagram_profile(brand_name: str, handle: str | None = None) -> dict:
+    """확인된 handle만 조회한다. 이름으로 계정을 추측하지 않는다."""
+    import re
+    from datetime import datetime, timezone
+    from urllib.parse import urlsplit
+    base = {"brand": brand_name, "profile_found": False, "collected_at": datetime.now(timezone.utc).isoformat()}
+    if not handle:
+        return {**base, "status": "not_available", "message": "공식 Instagram 계정 미확인"}
+    if "://" in handle:
+        parsed = urlsplit(handle)
+        if parsed.hostname not in ("instagram.com", "www.instagram.com"):
+            return {**base, "status": "not_available"}
+        handle = parsed.path.strip("/").split("/")[0]
+    handle = handle.lstrip("@")
+    if not re.fullmatch(r"[A-Za-z0-9_.]{1,30}", handle) or handle in ("p", "reel", "reels", "stories"):
+        return {**base, "status": "not_available"}
+    if settings.APIFY_MOCK:
+        return {**base, "status": "not_available", "message": "Apify 키 미설정"}
+    try:
+        response = requests.post("https://api.apify.com/v2/acts/apify~instagram-profile-scraper/run-sync-get-dataset-items",
+            headers={"Authorization": f"Bearer {settings.APIFY_API_TOKEN}"}, json={"usernames": [handle]}, timeout=120)
+        response.raise_for_status()
+        items = response.json()
+        item = next((r for r in items if str(r.get("username", "")).lower() == handle.lower()), None)
+        if not item:
+            return {**base, "status": "channel_not_found"}
+        return {**base, "status": "available", "profile_found": True, "handle": handle,
+                "source_url": f"https://www.instagram.com/{handle}/", "followers": item.get("followersCount"),
+                "posts": item.get("postsCount"), "recent_caption_sample": "\n".join(p.get("caption", "") for p in item.get("latestPosts", [])[:5]),
+                "recent_posts": [{k:p.get(k) for k in ("id","url","caption","timestamp")} for p in item.get("latestPosts", [])[:5]]}
+    except (requests.RequestException, ValueError, TypeError) as exc:
+        from core.collection import error_message
+        return {**base, "status": "not_available", "message": error_message(exc)}

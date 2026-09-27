@@ -16,3 +16,6 @@ openpyxl>=3.1
 
 # 개발용 (배포 시 불필요)
 pytest>=8.0
+
+# 공개 검색결과 캡처 (설치 후 python -m playwright install chromium)
+playwright>=1.50,<2

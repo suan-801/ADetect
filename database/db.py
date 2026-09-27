@@ -6,6 +6,7 @@ Phase 0~1 스켈레톤 단계에서는 데모/이력 화면이 동작하는 정�
 import json
 import sqlite3
 import uuid
+from pathlib import Path
 from contextlib import contextmanager
 from datetime import datetime, timezone
 
@@ -39,9 +40,13 @@ CREATE TABLE IF NOT EXISTS function_run (
 
 @contextmanager
 def get_conn():
-    conn = sqlite3.connect(DB_PATH)
+    Path(DB_PATH).parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(DB_PATH, timeout=30)
     conn.row_factory = sqlite3.Row
     conn.executescript(_SCHEMA)  # 매 연결마다 idempotent하게 스키마 보장 (page 단위 실행 대비)
+    columns = {r[1] for r in conn.execute("PRAGMA table_info(analysis_session)")}
+    if "inputs_json" not in columns:
+        conn.execute("ALTER TABLE analysis_session ADD COLUMN inputs_json TEXT")
     try:
         yield conn
         conn.commit()
@@ -106,3 +111,8 @@ def list_function_runs(session_id: str) -> list[sqlite3.Row]:
             "SELECT * FROM function_run WHERE session_id=? ORDER BY created_at DESC", (session_id,)
         )
         return cur.fetchall()
+
+
+def save_session_inputs(session_id, inputs):
+    with get_conn() as conn:
+        conn.execute("UPDATE analysis_session SET inputs_json=? WHERE id=?", (json.dumps(inputs, ensure_ascii=False), session_id))

@@ -1,3 +1,13 @@
+# 2026-09-26 설정 변경 안내 (아래 과거 설명보다 우선)
+
+새 자료 수집 화면은 유료 기능 기본 ON입니다. .env에 Apify/Gemini 키가 없으면 '토큰 부족. 개발자에게 문의해주세요'를 표시하고 해당 소스를 미수집으로 남깁니다. 입력 확인 화면에서는 API를 호출하지 않습니다. SAMPLE은 ADETECT_SAMPLE_MODE=true로 명시해야 하며, 실사용 중 키 누락을 목업으로 대체하지 않습니다.
+
+개인 PC 서버 주소는 127.0.0.1입니다. SQLite와 storage/exports, storage/evidence를 같은 PC에 저장합니다. 기본 보관 한도와 백업 방법은 README를 참고하세요. 다운로드 요청 기록은 파일 생성과 별도이며 실제 디스크 저장 완료를 의미하지 않습니다.
+
+네이버 검색 추이는 NAVER API HUB에서 완료된 최근 36개월을 월간 단위로 요청합니다. 검색어에 따라 일부 월만 제공될 수 있으며 그 달들을 0으로 바꾸지 않습니다. 실제 값이 없는 경우 피크·저점 확정을 하지 않습니다.
+
+---
+
 # SETUP_GUIDE
 
 API 키 발급 및 환경 준비 가이드입니다. 이 문서가 단일 기준(single source of truth)이며,
@@ -90,3 +100,20 @@ Residential Proxy를 구매하지 않습니다 (PRD §21-1).
 - API 키는 `.env` 또는 Secret Manager에서만 관리 — 코드/커밋/로그에 절대 노출 금지
 - 로그에 키가 출력되지 않도록 마스킹
 - 산출물(HTML/Excel/ZIP)에 키가 포함되지 않도록 내보내기 직전 검사
+
+
+## 2026-09-26 추가 설정
+
+- YouTube 선택 수집: Google Cloud에서 YouTube Data API v3를 활성화하고 `YOUTUBE_API_KEY`를 설정합니다.
+  STEP 1에서 공식 채널 ID(`UC...`) 또는 `@handle`을 입력합니다. 계정을 브랜드명으로 추측하지 않습니다.
+- Instagram: STEP 1에 공식 handle/URL을 입력하거나 공식 홈페이지의 Instagram 링크를 사용합니다.
+  `apify/instagram-profile-scraper`를 호출하므로 Apify 권한과 과금 설정을 확인합니다.
+- 네이버 캡처: `python -m playwright install chromium` 설치가 필요합니다. 차단·DOM 미감지는 미확인으로 기록합니다.
+- 명시적 오프라인 분석: `ADETECT_SAMPLE_MODE=true`를 설정한 뒤 앱을 재시작합니다.
+- 파일 보관: `ADETECT_EXPORT_MAX_RUNS=20`, `ADETECT_EXPORT_MAX_BYTES=5368709120`이 기본입니다.
+
+구현 근거 문서: [Naver DataLab](https://developers.naver.com/docs/serviceapi/datalab/search/search.md),
+[Instagram 입력](https://apify.com/apify/instagram-profile-scraper/input-schema),
+[YouTube 채널 조회](https://developers.google.com/youtube/v3/docs/channels/list),
+[Playwright Page](https://playwright.dev/python/docs/api/class-page).
+키 설정 여부가 연동 성공을 보장하지 않으며 실제 권한과 사이트별 응답은 별도 수용 검증이 필요합니다.

@@ -1,3 +1,22 @@
+# 최신 구현 방향 — 팩트 중심 MVP (2026-09-26)
+
+이 절과 PRD §0 17차 개정이 아래 과거 계획보다 우선한다. 사용자 승인에 따라 분석 중심에서 1차 자료 수집·확인 중심으로 변경했다.
+
+- 4개 탭: 검색·뉴스 / 공식 페이지·SNS / 광고 소재 / 확인·정리. Home Hero 디자인 유지.
+- 브랜드/조사 대상 분리, 검색어 용도 설명, 직접 확인한 공식 계정, 유료 기본 ON·토큰 누락 안내.
+- 검색어별 완료된 36개월 수집, 누락 월 구분, 월별 평균·연도별 피크/저점.
+- 뉴스·SNS·근거 요약을 포함한 선택 수집, 일괄 수집·실패 재시도, 원본 캡처/이미지 보관.
+- 검색/필터/중복 제거/포함·제외, 원문과 출처 기반 선택 요약, 변경 관측.
+- schema_version=2 및 11개 Excel 시트, 동일 자료의 HTML/ZIP 통합 내보내기.
+- SQLite 입력·결과·다운로드 요청 이벤트 + 로컬 exports/evidence. 요청 기록과 브라우저 저장 완료를 구분.
+- Target Insight·포지셔닝·White Space·전략 권고·SoS/SoA/SOV는 새 흐름에서 제거. 레거시는 호환용.
+
+검증 기록 (2026-09-27): 자동 테스트 30개 통과. 실제 Chromium에서 Home → 입력 → SAMPLE 일괄 수집 → 통합 ZIP 다운로드 → 다운로드 요청 1회 표시 → 서버 재시작 후 이력 복원을 확인했다. 무료 NAVER API로 2023-09~2026-08의 메리츠화재 36개 월을 수신했고, TM 채용은 제공 월이 1개인 부족 사례를 확인했다. 지정된 채용 랜딩은 전체 캡처 1개와 이미지 원본 4개 저장에 성공했다. 유료 API는 호출하지 않았다.
+
+남은 외부 수용 검증: 유료 실계정 Meta/Instagram/Gemini, 사이트별 누락·유료 잔액 오류 검증. 이미지 OCR은 범위 밖이며 원본을 보존한다. 외부 공개/다중 사용자 인증은 개인 PC 범위 밖이다.
+
+---
+
 # ADetect 개발 계획서 (뼈대/프로토타입 단계)
 
 > 기준 문서: [`PRD.md`](../PRD.md) (16차 개정 — 4개 Primary Analysis Function + Target Insight 구조).
@@ -5,31 +24,25 @@
 
 ---
 
-## 1. 지금까지 만든 것 (현재 상태, 2026-09-19 갱신)
+## 1. 현재 구현·검증 상태 (2026-09-26)
 
-| 영역 | 상태 | 위치 |
+사용자의 MVP 전체 구현 요청에 따라 분석·산출물·이력 경로를 연결했다.
+**전체 수용 완료와 코드 구현은 구분한다.** 최신 상태의 원본은 PRD §0-1이며 아래 이전 변경 이력은 역사적 기록이다.
+
+| 영역 | 현재 구현 | 주요 파일 |
 |---|---|---|
-| 저장소 뼈대 (폴더 구조, .env, requirements) | ✅ 완료 | 루트 |
-| 디자인 시스템 — Cinematic Editorial Intelligence(4차 리뉴얼, §8 Active Design Direction) | ✅ 완료 | `config/theme.py`, `.streamlit/config.toml` |
-| 홈 화면 — Cinematic Brand Experience(2026-09-20부로 Hero 단일 화면 축소, Manifesto/Story/Sample Output/Final CTA 제거) | ✅ 완료 | `pages/1_home.py`, `ui/hero.py` |
-| STEP 1 브랜드 설정 + AI 추천 확인 화면 | ✅ 완료 — **카테고리/경쟁사 추천 Gemini 실연동**(GEMINI_API_KEY 있으면), 실패해도 목업으로 조용히 폴백. 타겟 입력 필드 없음 | `pages/2_analyze.py`, `core/analyzers/recommender.py` |
-| STEP 2 Workspace **4개 탭** 골격 + 상태 스트립 | ✅ 완료 (16차 개정 — 독립 타겟분석 탭 제거) | `pages/2_analyze.py` |
-| 시장분석 탭 | 🟡 **부분 실연동** — 검색량 추이(DataLab)·뉴스는 NAVER 키 있으면 실동작. `search_seasonality`/`reference_sources`/`market_issues`/`upcoming_changes`(§7-1) 및 다운로드는 아직 미구현 | `ui/market_tab.py`, `core/scrapers/naver_api.py` |
-| **브랜드분석 탭 (자사+경쟁사 통합)** | 🟡 **부분 실연동** — 브랜드 검색량(절대치 포함)·Meta 광고 요약은 Naver/Apify 키 있으면 실동작. 홈페이지 크롤링(Playwright)·Instagram 프로필·`brand_context`/해석 문구는 아직 목업(Gemini 미연동) | `ui/brand_tab.py`, `core/analyzers/brand_analyzer.py`, `core/scrapers/{naver_api,naver_ad_api,brand_site,ad_library}.py` |
-| **소재분석 탭** | 🟢 **End-to-End 동작** — Meta Ads Library 실연동(APIFY_API_TOKEN), 자동 페이지 매칭이 부정확할 때 URL/페이지명 직접 지정 폴백, 브랜드별 수집 진행상황(st.status) 표시, HTML/Excel/ZIP 다운로드 완료. **소구포인트(appeal_tags) 태깅은 근거 없는 mock이라 16차 개정에서 제거**(§0) — `creative_key_visual`은 FACT 지표(활성 광고 수/포맷 구성/장기 운영 소재 수)만 사용 | `ui/creative_tab.py`, `core/analyzers/creative_analyzer.py`, `core/scrapers/ad_library.py`, `core/exporters/*.py` |
-| 종합분석 탭 | 🟡 **Target Insight 구현 완료** — 시장분석+브랜드분석 결과가 있으면 근거 기반 insight 생성, 근거 부족 시 `insufficient_data`/정직한 안내로 처리(임의 인구통계 생성 없음). SOV/포지셔닝맵/White Space 등 나머지 필드는 화면 골격만(담당자 미배정) | `ui/synthesis_tab.py`, `core/analyzers/insight_synthesizer.py` |
-| 이력 관리 / 설정 화면 | 🟡 골격만 (실제 재진입 기능 없음, API 키 상태 표시만 동작) | `pages/3_history.py`, `pages/4_settings.py` |
-| SQLite 이력 저장 (`analysis_session`/`function_run`) | ✅ 완료 (레거시 `target_status`/`recommended_target`/`confirmed_target` 컬럼은 destructive migration 없이 유지, 신규 UI는 사용 안 함) | `database/db.py` |
-| [DEPRECATED] `ui/target_tab.py`, `core/analyzers/target_recommender.py` | ⚫ 코드는 유지하되 Workspace에서 import/render하지 않음 — `recommend_target()`은 seeded_random mock이라 재사용 금지(§0·§14) | `ui/target_tab.py`, `core/analyzers/target_recommender.py` |
+| Market | 계절성·뉴스 구간·참고출처·AI 근거 검증·산출물 | `core/analyzers/market_analyzer.py`, `ui/market_tab.py` |
+| Brand | 앵커 검색비교·지정 홈페이지 원문·공식 handle SNS·AI·UTM·산출물 | `core/analyzers/brand_analyzer.py`, `core/scrapers/{brand_site,naver_serp,youtube}.py` |
+| Creative | 기존 수집·산출물 + 부분 실패·캐시·저장 | `core/analyzers/creative_analyzer.py`, `ui/creative_tab.py` |
+| Synthesis | 표본 기반 점유율·AI/REC·Target·확인 축 좌표 | `core/analyzers/{insight_synthesizer,positioning,evidence}.py` |
+| 공통 실행 | FIFO 1건·취소·24시간 전체/소스 캐시 | `core/jobs.py`, `ui/job_control.py` |
+| 이력·파일 | 실행 결과/입력 복원·재다운로드·파일 LRU | `core/runtime.py`, `database/db.py`, `core/exporters/artifact_store.py` |
 
-지금 `streamlit run app.py`로 실행하면 **브랜드명 입력 → STEP1 확인(키 있으면 Gemini 실추천) → Workspace 진입 →
-시장분석/브랜드분석/소재분석 시작(키 있으면 부분 실연동) → 종합분석 탭 진입 시 Target Insight 자동 표시**까지
-전부 클릭으로 눌러볼 수 있습니다. API 키 발급 방법은 [`SETUP_GUIDE.md`](../SETUP_GUIDE.md) 참고 —
-키를 하나도 안 채워도 전체 화면이 목업 데이터로 그대로 동작합니다.
-
-> ⚠️ **다른 문서와의 정합성**: 위 표는 각 화면을 직접 열어보고 확인한 실제 상태입니다. 앞으로
-> 이 표가 또 실제와 어긋나지 않도록, 목업→실연동 전환처럼 눈에 보이는 변화가 생기면 이 표부터
-> 갱신해주세요 — README.md의 표는 이 표를 사용자 관점으로 요약한 것이라 함께 갱신이 필요합니다.
+검증: 23개 pytest 통과, Streamlit 정상 기동, 실제 Chromium Home→Workspace→4개 분석 실행 및 SAMPLE 안내 확인.
+재개 후 최종 검증에서는 HTML 생성과 History 복원 후 `4 / 4` 표시도 확인했다.
+기준 검색지수가 0인 Target Insight의 증감률 처리와 표시 변수 누락을 수정했고, 23개 테스트를 다시 통과했다.
+외부 유료 API를 실제로 호출하는 수용 시험과 실제 사이트별 DOM 검증은 이번 자동 검증에 포함되지 않는다.
+파일 보관 기본값은 최근 20개 실행/5GB이며 환경변수로 변경 가능하다. 이력 메타데이터 자동 삭제는 하지 않는다.
 
 ---
 
@@ -97,24 +110,16 @@ main                        — 항상 동작하는 상태만 유지 (지금 이
 
 ---
 
-## 4. 브랜드분석 파트 — 다음 단계 (신규 합류자 인계 예정, 지금까지는 본인이 진행)
+## 4. 남은 MVP 수용 작업
 
-각 서비스는 `config/settings.py`의 서비스별 `_MOCK` 플래그(`NAVER_DATALAB_MOCK`/`NAVER_AD_MOCK`/
-`APIFY_MOCK`/`GEMINI_MOCK`/`BRAND_SITE_MOCK`)에 따라 개별적으로 실연동 여부가 갈립니다.
-진행 상황:
+- 실제 계정으로 Naver/Apify/YouTube/Gemini의 응답·권한·비용·품질을 검증한다.
+- Meta 후보 조회/선택·인증/팔로워 우선 식별을 실제 액터 응답으로 검증한다. 자사 페이지는 사용자 확인이 필수이며, 모호한 자동 식별은 실패로 처리한다.
+- 네이버 광고 마크업과 최대 3회 순차 관측을 실제 사이트에서 검증한다. 미확인을 미운영으로 바꾸지 않는다.
+- JS 렌더링 폴백·자동 검색어 제안·사용자 확인 흐름을 실제 브랜드로 수용 검증한다. 구현 코드와 테스트는 추가되었다.
+- 전사 배포 전 접근 인증/네트워크 범위·메타데이터 보관 기간을 결정한다(PRD §19).
+- Google Ads·세그먼트 인구통계·Appeal 분류는 PRD의 보류/금지 원칙을 유지한다.
 
-1. ✅ `SETUP_GUIDE.md` 따라 네이버 오픈API/검색광고 키 발급 → `.env`에 입력하는 절차는 정리됨
-2. ✅ `core/scrapers/naver_api.py`의 `get_brand_search_volume()` — DataLab `keywordGroups`(상대추이) +
-   `core/scrapers/naver_ad_api.py`(RelKwdStat, 절대 검색량·연관검색어) 실연동 완료 (PRD §7-9·§21-10)
-3. ⬜ `brand_site.py`의 `crawl_brand_website()` — 아직 목업(`BRAND_SITE_MOCK = True` 고정). 실제
-   Playwright 크롤링으로 교체 필요 (PRD §7-3 — 대표 상세페이지 없으면 홈페이지/브랜드스토리 폴백)
-4. 🟡 `ad_library.py`의 `fetch_meta_ads()` — Apify 실연동 완료(§21-11). `fetch_instagram_profile()`은
-   브랜드명→handle 해석 문제로 아직 목업(§7-10과 동일한 미해결 문제)
-5. ⬜ `infer_brand_context()`(`brand_analyzer.py`)와 `core/analyzers/insight_synthesizer.py`의 목업
-   문구 생성 — 아직 전부 규칙 기반 템플릿. 실제 Gemini 프롬프트 호출로 교체 필요 (반환 shape
-   `insight/source/evidence/confidence`는 그대로 유지). STEP1의 `core/analyzers/recommender.py`가
-   Gemini 실연동의 참고 예시가 될 수 있습니다 (구조화된 JSON 응답 스키마 + 실패 시 목업 폴백 패턴).
-6. `run_brand_analysis()`의 반환 shape은 바꾸지 마세요 — `ui/brand_tab.py`가 그 shape을 그대로 렌더링하고 있습니다.
+이 항목이 남아 있으므로 이번 작업을 전체 MVP 수용 완료로 표기하지 않는다.
 
 ---
 

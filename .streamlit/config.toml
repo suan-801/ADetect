@@ -28,8 +28,9 @@ backgroundColor = "#060708"
 borderColor = "#202328"
 
 [server]
+address = "127.0.0.1"
 headless = true
-enableCORS = false
+enableCORS = true
 
 [browser]
 gatherUsageStats = false

@@ -51,7 +51,7 @@ def render_hero_copy():
     st.markdown(
         "<span class='adetect-hero-wordmark'><b>ADetect</b> · Brand Intelligence Engine</span>"
         "<p class='adetect-hero-title'>브랜드를 입력하면,<br>시장이 연결됩니다.</p>"
-        "<p class='adetect-hero-sub'>시장, 브랜드, 광고 소재의 신호를 하나의 전략으로 연결합니다.</p>",
+        "<p class='adetect-hero-sub'>검색, 브랜드, 광고 자료를 출처와 원본으로 확인합니다.</p>",
         unsafe_allow_html=True,
     )
 

@@ -177,7 +177,7 @@ def analysis_status_index(status_items: list[tuple[str, str]]):
         )
     st.markdown(
         '<div class="adetect-status-header">'
-        '<span class="adetect-status-label">Analysis Status</span>'
+        '<span class="adetect-status-label">자료 수집 상태</span>'
         f'<span class="adetect-status-count">{done_count} / {len(status_items)}</span>'
         '</div>' + "".join(rows),
         unsafe_allow_html=True,

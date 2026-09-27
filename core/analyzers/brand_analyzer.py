@@ -1,160 +1,117 @@
-"""브랜드분석 오케스트레이터 — PRD §7-3(브랜드 프로필, 자사+경쟁사 동일 스키마) 구현.
-
-'브랜드분석 시작하기' 버튼이 호출하는 최상위 함수가 run_brand_analysis()입니다.
-지금은 core/scrapers/*가 전부 목업(mock) 데이터를 반환하지만, 이 함수의 반환 shape과
-ui/brand_tab.py의 렌더링 방식은 실제 API 연동 후에도 그대로 유지됩니다 — scraper 내부만
-config.settings.USE_MOCK_DATA 분기에 따라 실제 호출로 교체하면 됩니다.
-"""
-from __future__ import annotations
-
-from core.analyzers.insight_synthesizer import build_insight, mock_promotion_interpretation
-from core.scrapers.ad_library import fetch_instagram_profile, fetch_meta_ads
+"""자사·경쟁사 동일 스키마, 소스별 실패 격리, 근거 없는 판단 금지."""
+from datetime import datetime, timezone
+from urllib.parse import parse_qs, urlsplit
+from config import settings
+from core.analyzers.recommender import recommend_search_inputs
+from core.analyzers.evidence import interpret, unavailable
+from core.analyzers.market_analyzer import news_windows
+from core.scrapers.naver_api import get_comparable_brand_trends, get_brand_keyword_metrics, get_news
+from core.scrapers.ad_library import fetch_meta_ads_detail, fetch_instagram_profile
 from core.scrapers.brand_site import crawl_brand_website
-from core.scrapers.naver_api import get_brand_search_volume, get_news, seeded_random
+from core.scrapers.youtube import fetch_youtube
+from core.scrapers.naver_serp import capture_search
 
 
-def infer_brand_context(brand_name: str) -> dict:
-    """§7-3-a brand_context — 내부 판단 필드(비노출). 브랜드명만으로 성격을 추정하는 목업.
-
-    DO NOT PORT THIS LOGIC TO PRODUCTION ANALYZER. UI skeleton verification only —
-    브랜드명 해시로 3개 preset 중 하나를 고르는 seeded_random 목업이며, 실제 브랜드 판단
-    근거가 전혀 없다. 실제 연동 시에는 브랜드 홈페이지·뉴스·검색결과를 근거로 Gemini가
-    판단하되, 이 함수의 반환 shape(브랜드 유형/전환 목표 등)은 그대로 유지합니다.
-    """
-    rng = seeded_random(f"brand_context:{brand_name}")
-    presets = [
-        {
-            "brand_type": "멀티카테고리 제품 브랜드",
-            "business_model": "단일 브랜드 직접판매",
-            "offering_type": "물리적 상품",
-            "conversion_objective": "구매",
-        },
-        {
-            "brand_type": "손해보험/금융 서비스 브랜드",
-            "business_model": "상담·가입·계약형 서비스",
-            "offering_type": "금융상품",
-            "conversion_objective": "상담/견적/가입/계약",
-        },
-        {
-            "brand_type": "멀티브랜드 리테일 플랫폼",
-            "business_model": "여러 브랜드가 입점하는 플랫폼형",
-            "offering_type": "복합(다품목 물리적 상품)",
-            "conversion_objective": "상품 탐색/구매/재방문",
-        },
-    ]
-    preset = presets[rng.randint(0, len(presets) - 1)]
-    return {**preset, "analysis_scope": "brand", "confidence": "medium"}
-
-
-def _analyze_single_brand(
-    brand_name: str,
-    is_own: bool,
-    brand_context: dict,
-    collect_instagram: bool = True,
-    collect_youtube: bool = False,
-    collect_naver_sa: bool = True,
-    collect_news: bool = True,
-) -> dict:
-    """§7-3 필드셋 — 자사/경쟁사 동일 스키마로 브랜드 1건을 채웁니다.
-
-    collect_* 는 §16-2 "선택 수집 옵션" 체크박스 상태 그대로입니다. 체크 해제된 소스는
-    수집을 시도하지 않고 §7-0 "선택 미체크 = not_collected(실패 아님)" 규칙대로 빈 값으로 채웁니다.
-    """
-    search_volume = get_brand_search_volume(brand_name)
-    website = crawl_brand_website(brand_name)
-    news = get_news(brand_name, scope="brand", limit=5) if collect_news else []
-    meta_ads = fetch_meta_ads(brand_name)
-    instagram = (
-        fetch_instagram_profile(brand_name)
-        if collect_instagram
-        else {"profile_found": False, "not_collected": True}
-    )
-
-    website_target_message = build_insight(
-        insight=f"{brand_name}은(는) 홈페이지 카피 상 '{website['usp_summary']}'를 중심으로 "
-                f"{brand_context['conversion_objective']} 전환을 유도하는 메시지를 사용 중 (샘플 해석)",
-        source=["Mock Brand Website"],
-        evidence=website["raw_copy_snippets"],
-        confidence="medium",
-    )
-    promotion_interpretation = mock_promotion_interpretation(
-        website["promotion_fact"], brand_context["conversion_objective"]
-    )
-
-    return {
-        "brand": brand_name,
-        "is_own": is_own,
-        "brand_search_volume": search_volume,
-        "brand_website_facts": website,
-        "brand_website_target_message": website_target_message,
-        "brand_news": news,
-        "meta_ads": meta_ads,
-        "instagram": instagram,
-        "promotion_fact": website["promotion_fact"],
-        "promotion_interpretation": promotion_interpretation,
-        "key_message": meta_ads["key_message"],
-        "ad_count": meta_ads["ad_count"],
-        "format_mix": meta_ads["format_mix"],
-        "media_operation_matrix_row": {
-            "naver_sa": collect_naver_sa and rng_bool(brand_name, "sa"),
-            "naver_brand_search": collect_naver_sa and rng_bool(brand_name, "brand_search"),
-            "meta_ads": meta_ads["ad_count"] > 0,
-            "instagram_profile": instagram.get("profile_found", False),
-            "youtube_channel": collect_youtube and rng_bool(brand_name, "youtube"),
-        },
-    }
-
-
-def rng_bool(brand_name: str, salt: str) -> bool:
-    """DO NOT PORT THIS LOGIC TO PRODUCTION ANALYZER. UI skeleton verification only —
-    media_operation_matrix_row의 네이버 SA/브랜드검색/YouTube 운영 여부는 API 키 유무와
-    무관하게 항상 이 함수로 채워진다(실제 조회 로직 없음). 화면 구조를 미리 보여주기 위한
-    placeholder이며, 실제 운영 여부 판단 근거로 재사용하지 않는다."""
-    return seeded_random(f"{brand_name}:{salt}").random() > 0.4
-
-
-def run_brand_analysis(
-    brand_name: str,
-    competitors: list[str],
-    *,
-    collect_instagram: bool = True,
-    collect_youtube: bool = False,
-    collect_naver_sa: bool = True,
-    collect_news: bool = True,
-) -> dict:
-    """§6-1 function_run(브랜드분석) 실행 결과 — 자사 1건 + 경쟁사 N건.
-
-    completed_instagram/youtube/naver_sa/news는 §16-2 "선택 수집 옵션" 체크박스 상태이며,
-    자사·경쟁사 전원에게 동일하게 적용됩니다(§7-0 핵심 vs 선택 구분).
-
-    완료/부분실패 판정은 §6 "기능별 상태 판정" 표를 따르되, 이 스켈레톤에서는
-    목업 데이터가 항상 성공하므로 status는 항상 '완료'로 반환합니다.
-    """
-    brand_context = infer_brand_context(brand_name)
-    options = dict(
-        collect_instagram=collect_instagram,
-        collect_youtube=collect_youtube,
-        collect_naver_sa=collect_naver_sa,
-        collect_news=collect_news,
-    )
-
-    own_profile = _analyze_single_brand(brand_name, is_own=True, brand_context=brand_context, **options)
-    competitor_profiles = [
-        _analyze_single_brand(c, is_own=False, brand_context=brand_context, **options) for c in competitors
-    ]
-
-    comparison_insight = build_insight(
-        insight=f"경쟁사 {len(competitor_profiles)}개사와 비교했을 때, {brand_name}의 광고 소재는 "
-                f"'{', '.join(own_profile['key_message'])}' 메시지에 집중되어 있음 (샘플 총평)",
-        source=[f"Meta Ads Library {own_profile['ad_count']}건 (자사)"],
-        evidence=own_profile["key_message"],
-        confidence="medium",
-    )
-
-    return {
-        "status": "완료",
-        "brand_context": brand_context,
-        "own": own_profile,
-        "competitors": competitor_profiles,
-        "comparison_insight": comparison_insight,
-    }
+def run_brand_analysis(brand_name, competitors, *, collect_instagram=True, collect_youtube=False,
+                       collect_naver_sa=True, collect_news=True, sources=None, variants=None, on_progress=None, representative_keyword=None, generic_keywords=None):
+    from core.jobs import checkpoint
+    checkpoint("공통 검색지수 조회 중")
+    sources, variants = sources or {}, variants or {}
+    demo = settings.NAVER_DATALAB_MOCK and settings.APIFY_MOCK and settings.GEMINI_MOCK
+    names = list(dict.fromkeys([brand_name, *competitors]))
+    for competitor in names[1:]:
+        variants.setdefault(competitor, recommend_search_inputs(competitor)["variants"])
+    trends = get_comparable_brand_trends(brand_name, names[1:], variants)
+    profiles, errors = [], []
+    for name in names:
+        checkpoint(f"{name} 브랜드 수집 중", {"own": profiles[0] if profiles else {}, "competitors":profiles[1:]})
+        if on_progress:
+            on_progress(f"{name} — 검색·홈페이지·광고 수집")
+        configured = sources.get(name, {})
+        problems = []
+        sv = {**trends[name], "gender_ratio": None, "demographics": "unavailable"}
+        if sv.get("status") == "not_available":
+            problems.append("검색지수 수집 실패")
+        try:
+            metrics = get_brand_keyword_metrics(name, variants.get(name))
+        except Exception:
+            metrics = {"absolute_30d_pc": None, "absolute_30d_mobile": None, "related_keywords": [], "status": "not_available"}
+        sv.update(metrics)
+        checkpoint(f"{name} 홈페이지 수집 중")
+        website = crawl_brand_website(name, configured.get("detail_url"), configured.get("homepage"))
+        try:
+            if name == brand_name and not settings.APIFY_MOCK and not configured.get("meta_page"):
+                raise ValueError("자사 Meta 페이지 확인 필요")
+            ads = fetch_meta_ads_detail(name, page_override=configured.get("meta_page") or None)
+            ads_status = "available"
+        except Exception:
+            ads, ads_status = [], "not_available"
+            problems.append("Meta 광고 수집 실패")
+        try:
+            news = get_news(name, scope="brand", limit=100) if collect_news else []
+            news_status = "available" if collect_news else "not_collected"
+        except Exception:
+            news, news_status = [], "not_available"
+            problems.append("뉴스 수집 실패")
+        checkpoint(f"{name} SNS 수집 중")
+        handle = configured.get("instagram") or next((u for u in website["social_links"] if "instagram.com" in u), None)
+        instagram = fetch_instagram_profile(name, handle) if collect_instagram else {"status": "not_collected", "not_collected": True}
+        youtube = fetch_youtube(configured.get("youtube")) if collect_youtube else {"status": "not_collected"}
+        keywords = list(dict.fromkeys([representative_keyword or brand_name, *(generic_keywords or [])]))
+        rankings = [capture_search(k, name, "brand_rep" if i == 0 else "generic", configured.get("homepage"), observe_rotations=3 if k == name else 1) for i,k in enumerate(keywords)] if collect_naver_sa else []
+        brand_capture = next((r for r in rankings if r["keyword"] == name), None)
+        if collect_naver_sa and brand_capture is None:
+            brand_capture = capture_search(name,name,"brand_rep",configured.get("homepage"),observe_rotations=3)
+        brand_search = (brand_capture or {}).get("brand_search") or unavailable("브랜드검색 광고를 확인하지 못했습니다.", "not_available" if collect_naver_sa else "not_collected")
+        website_facts = [{"source": website["source_url"], "text": t} for t in website["raw_copy_snippets"]]
+        ad_facts = [] if settings.APIFY_MOCK else [{"source": "Meta:"+str(a["ad_id"]), "text": (a.get("headline") or "")+"\n"+(a.get("body") or "")} for a in ads]
+        checkpoint(f"{name} 근거 분석 중")
+        context_fields = ["brand_type", "business_model", "offering_type", "conversion_objective"]
+        site_ai = interpret(["brand_website_target_message", "promotion_interpretation", *context_fields], website_facts,
+                            "브랜드 유형은 정해진 선택지로 강제하지 마세요. 프로모션을 의미하는 원문이 없다면 해석하지 마세요.")
+        context = {k: site_ai[k].get("insight", "unknown") for k in context_fields}
+        context.update(analysis_scope="brand", confidence="low", evidence={k:site_ai[k] for k in context_fields})
+        ai = {k:site_ai[k] for k in ("brand_website_target_message", "promotion_interpretation")}
+        ai.update(interpret(["key_message", "usp", "creative_type"], ad_facts,
+                            "여러 메시지 패턴이 있으면 하나로 합치지 말고 모두 서술하세요."))
+        if not demo:
+            required = {"홈페이지":website.get("status"), "절대 검색량":metrics.get("status")}
+            if collect_instagram:
+                required["Instagram"] = instagram.get("status")
+            if collect_youtube:
+                required["YouTube"] = youtube.get("status")
+            if collect_naver_sa and any(r.get("status") != "available" for r in rankings):
+                problems.append("네이버 광고 일부 미확인")
+            for source, state in required.items():
+                if state not in ("available", "channel_not_found"):
+                    problems.append(source+" 미수집 또는 실패")
+            if any(value.get("status") for value in ai.values()):
+                problems.append("일부 AI 해석 근거 부족 또는 호출 실패")
+        format_mix = {}
+        utm = []
+        for ad in ads:
+            fmt = ad.get("format") or "unknown"
+            format_mix[fmt] = format_mix.get(fmt, 0)+1
+            params = parse_qs(urlsplit(ad.get("landing_url") or "").query)
+            utm.append({"brand": name, "ad_id": ad.get("ad_id"), **{k: v[0] for k,v in params.items() if k.startswith("utm_")}})
+        p = {"brand": name, "is_own": name == brand_name, "brand_search_volume": sv,
+             "brand_related_keywords": metrics["related_keywords"], "brand_website_facts": website,
+             "brand_news": news, "brand_news_windows": news_windows(news), "news_status": news_status,
+             "meta_ads": {"ads": ads, "status": ads_status}, "ads": ads, "ad_count": len(ads) if ads_status == "available" else None,
+             "format_mix": format_mix, "collection_scope": "Meta 최대 20건 수집 표본", "instagram": instagram, "brand_context": context,
+             "youtube": youtube,
+             "naver_brand_search": brand_search,
+             "naver_sa_ranking": rankings, "meta_utm": utm,
+             "media_operation_matrix_row": {"naver_sa": True if any(r.get("has_ad") is True for r in rankings) else False if rankings and all(r.get("has_ad") is False for r in rankings) else None, "naver_brand_search": brand_search.get("has_ad"),
+                 "meta_ads": bool(ads) if ads_status == "available" else None,
+                 "instagram_profile": True if instagram.get("profile_found") else None, "youtube_channel": True if youtube.get("status") == "available" else False if youtube.get("status") == "channel_not_found" else None},
+             "sample_sources": [k for k,v in (("search",settings.NAVER_DATALAB_MOCK), ("meta_ads",settings.APIFY_MOCK), ("news",collect_news and settings.NAVER_SEARCH_MOCK)) if v],
+             "errors": problems, "collected_at": datetime.now(timezone.utc).isoformat(), **ai}
+        profiles.append(p)
+        errors.extend(f"{name}: {e}" for e in problems)
+    own = profiles[0]
+    any_core = any(p["brand_search_volume"].get("relative_trend") or p["meta_ads"]["status"] == "available" for p in profiles)
+    return {"status": "전체 실패" if not any_core else "부분 실패" if errors else "완료", "own": own,
+            "competitors": profiles[1:], "errors": errors, "brand_context": own["brand_context"],
+            "comparison_insight": unavailable("종합분석에서 수집 근거를 비교합니다."),
+            "sample_sources": sorted(set(s for p in profiles for s in p["sample_sources"]))}

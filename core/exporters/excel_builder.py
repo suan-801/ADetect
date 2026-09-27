@@ -24,6 +24,9 @@ def _write_sheet(ws, headers: list[str], rows: list[list]):
         cell.font = Font(bold=True)
     for row in rows:
         ws.append(row)
+        for cell in ws[ws.max_row]:
+            if isinstance(cell.value, str):
+                cell.data_type = "s"
     for i, header in enumerate(headers, start=1):
         width = max(len(str(header)) + 2, 12)
         ws.column_dimensions[get_column_letter(i)].width = min(width, 60)
@@ -42,17 +45,19 @@ def build_creative_excel(result: dict) -> bytes:
     wb = Workbook()
     wb.remove(wb.active)
 
+    overview = wb.create_sheet("01_Overview")
+    _write_sheet(overview, ["status", "sample_sources", "collected_at"], [[result.get("status"), ", ".join(result.get("sample_sources", [])), result.get("collected_at")]])
     ws_ads = wb.create_sheet("09_Ads")
     _write_sheet(
         ws_ads,
         ["브랜드", "platform", "publisher_platforms", "ad_id", "format", "headline", "body",
          "cta", "landing_url", "image_url", "thumbnail_url", "ad_delivery_start_time",
-         "ad_running_days", "collected_at"],
+         "ad_running_days", "collected_at", "is_active"],
         [
             [_brand_label(b), ad["platform"], ad["publisher_platforms"], ad["ad_id"], ad["format"],
              ad["headline"], ad["body"], ad["cta"], ad["landing_url"], ad.get("image_url"),
              ad.get("thumbnail_url"), ad.get("ad_delivery_start_time"), ad.get("ad_running_days"),
-             ad["collected_at"]]
+             ad["collected_at"], ad.get("is_active", True)]
             for b in all_brands for ad in b["ads"]
         ],
     )

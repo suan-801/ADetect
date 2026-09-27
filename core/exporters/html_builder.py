@@ -109,6 +109,7 @@ def build_creative_html(session: dict, result: dict) -> str:
 <title>{html.escape(session["brand_name"])} 소재분석</title>
 <style>{_CSS}</style></head>
 <body>
+{'<p>SAMPLE — 실제 분석 데이터가 아닌 샘플이 포함되어 있습니다.</p>' if result.get("sample_sources") else ""}
   <h1>{html.escape(session["brand_name"])} — 소재분석 리포트</h1>
   <p class="meta">경쟁사 {len(competitors)}개 브랜드 비교 · 생성일시 {generated_at} · ADetect</p>
   <div class="insight">
