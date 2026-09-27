@@ -158,7 +158,7 @@
 ```text
 ADetect/
 ├── README.md                          — 설치→실행 퀵스타트
-├── SETUP_GUIDE.md                     — API 키 발급·환경변수 가이드 (single source of truth)
+├── docs/SETUP_GUIDE.md                — API 키 발급·환경변수 가이드 (single source of truth)
 ├── docs/
 │   └── REFERENCE.md                   — 레거시 워크스페이스 레퍼런스 매핑표 (§4, 코드 변경 시 갱신)
 ├── Dockerfile / docker-compose.yml    — 사내 서버 배포용 컨테이너 설정 (Phase 5)
@@ -1430,7 +1430,7 @@ AI 추천 (카테고리·경쟁사·대표키워드·일반키워드·광고페�
 참고 워크스페이스의 문서화 관례를 그대로 따른다 — **폴더를 처음 보는 사람도 무엇을 하는 폴더인지 즉시 알 수 있어야 한다.**
 
 * **루트 `README.md`**: 5분 안에 설치→실행까지 되는 퀵스타트. 명령어는 그대로 복붙 가능해야 함.
-* **루트 `SETUP_GUIDE.md`**: API 키 발급처(Apify, Gemini, 네이버 개발자센터 등)별 단계별 안내 + "왜 이 방식을 택했는지" 배경 설명(예: 왜 프록시를 안 쓰는지, 왜 User Access Token 방식인지). 이 문서를 **single source of truth**로 두고, 다른 문서·스크립트가 이 내용을 복붙하지 않고 그때그때 참조한다.
+* **`docs/SETUP_GUIDE.md`** (2026-09-27 루트에서 이동): API 키 발급처(Apify, Gemini, 네이버 개발자센터 등)별 단계별 안내 + "왜 이 방식을 택했는지" 배경 설명(예: 왜 프록시를 안 쓰는지, 왜 User Access Token 방식인지). 이 문서를 **single source of truth**로 두고, 다른 문서·스크립트가 이 내용을 복붙하지 않고 그때그때 참조한다.
 * **`docs/REFERENCE.md`**: 본 PRD §4 표를 그대로 옮겨 유지 — 어떤 로직이 어느 레거시 파일에서 이식됐는지 추적 가능하게. 레거시 파일이 바뀌면 이 문서도 갱신한다.
 * **모듈별 짧은 `README.md`** (`core/scrapers/`, `core/analyzers/`, `core/exporters/`, `database/`, `config/` 등): 해당 폴더의 입력·출력·핵심 함수를 1페이지로 요약. 풀스펙 API 문서는 지양 — 상세 스펙은 함수 docstring, README는 "이 폴더가 하는 일" 요약만.
 * **주석 원칙**: "무엇"이 아니라 "왜"만 남긴다 (예: quota 예외 처리·재시도 로직처럼 코드만 봐서는 이유를 알 수 없는 부분에만 주석 — 나머지는 코드 자체로 설명).

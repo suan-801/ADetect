@@ -16,3 +16,4 @@ storage/evidence/*
 /*.png
 storage/backups/
 storage/smoke/
+docs/design_reference/

@@ -2,6 +2,18 @@
 
 브랜드 전체 또는 특정 상품·캠페인의 1차 자료를 프로젝트별로 수집하고 출처·원본과 함께 정리하는 앱입니다. 제품 동작은 [PRD §0 18차 개정](PRD.md)이 기준입니다.
 
+## 폴더 구성
+
+| 위치 | 내용 |
+|---|---|
+| 루트 | `app.py`(진입점), `README.md`, `PRD.md`(제품 기준), `CLAUDE.md`/`AGENTS.md`(작업 지침), `requirements.txt`, `.env.example` |
+| `pages/`, `ui/` | 화면 (`ui/project_workspace.py`가 프로젝트 화면, 레거시 UI는 파일 상단 `LEGACY` 표시) |
+| `core/`, `database/`, `config/` | 수집·저장·내보내기 로직, SQLite, 설정 |
+| `tests/` | 자동 테스트 (임시 DB 사용) |
+| `docs/` | `PROJECT_PLAN.md`, `SETUP_GUIDE.md`(API 키 발급), 개발일지(pptx), 과거 계획서. `docs/design_reference/`는 외부 사이트 참고 이미지로 git에 올리지 않음 |
+| `adetect_reference/` | 기존 워크스페이스에서 가져온 참고 코드 (PRD §4) |
+| `storage/` (git 제외) | `adetect.db`, `exports/`, `evidence/`, `backups/`, `smoke/`(수동 테스트 DB), `temp/`(스크린샷·로그·테스트 DB·임시 산출물) |
+
 ## 실행
 
 ```powershell
@@ -19,7 +31,7 @@ $env:ADETECT_SAMPLE_MODE="true"
 .venv\Scripts\python.exe -m streamlit run app.py
 ```
 
-실수집은 `ADETECT_SAMPLE_MODE=false`로 재시작합니다. 상세 설정은 [SETUP_GUIDE.md](SETUP_GUIDE.md)를 참고하세요.
+실수집은 `ADETECT_SAMPLE_MODE=false`로 재시작합니다. 상세 설정은 [docs/SETUP_GUIDE.md](docs/SETUP_GUIDE.md)를 참고하세요.
 
 ## 사용 흐름
 
@@ -89,18 +101,73 @@ $env:ADETECT_EVIDENCE_DIR="storage/smoke/evidence"
 - `.env`: API 키가 들어 있습니다. 본인 PC로만 옮길 때만 포함하고, 다른 사람에게 줄 때는 빼고 `.env.example`로 새로 만듭니다.
 - `storage/`(adetect.db, evidence, exports, backups): 기존 프로젝트와 원본까지 가져가려면 **앱을 종료한 뒤** 폴더째 포함합니다. 빼면 새 PC에서 빈 상태로 시작합니다. 프로젝트 하나만 옮길 때는 이력 탭의 '프로젝트 백업' ZIP → 새 PC의 '백업에서 새 프로젝트 복원'을 써도 됩니다.
 
-**새 PC에서 실행 (Windows PowerShell)**
+### zip을 받은 뒤 할 일 (Windows PowerShell, 압축 푼 ADetect 폴더에서)
+
+**1. Python 확인** — 3.12 이상 (개발 PC는 3.14). 없으면 python.org에서 설치하고 "Add python.exe to PATH"를 체크합니다.
 
 ```powershell
-# Python 3.12 이상 (개발 PC: 3.14)
+python --version
+```
+
+**2. 가상환경 만들기와 패키지 설치** — `.venv`는 zip에 넣지 않으므로 PC마다 새로 만듭니다. `Activate.ps1`을 쓰지 않고 `.venv\Scripts\python.exe`를 직접 부르면 실행 정책(ExecutionPolicy) 오류를 피할 수 있습니다.
+
+```powershell
 python -m venv .venv
+.venv\Scripts\python.exe -m pip install --upgrade pip
 .venv\Scripts\python.exe -m pip install -r requirements.txt
 .venv\Scripts\python.exe -m playwright install chromium
-Copy-Item .env.example .env   # .env를 가져오지 않았을 때만
+```
+
+`playwright install`은 공식 페이지 캡처·네이버 검색 화면에만 필요합니다. 회사망에서 다운로드가 막혀도 나머지 자료 수집은 동작합니다.
+
+**3. `.env` 준비** — `.env`를 zip에 넣어 왔다면 이 단계를 건너뜁니다.
+
+```powershell
+Copy-Item .env.example .env
+notepad .env
+```
+
+| 변수 | 필요할 때 | 발급 안내 |
+|---|---|---|
+| `NAVER_CLIENT_ID`, `NAVER_CLIENT_SECRET` | 검색 관심도 추이·관련 뉴스 | docs/SETUP_GUIDE.md 2절 |
+| `NAVER_AD_API_KEY`, `NAVER_AD_SECRET_KEY`, `NAVER_AD_CUSTOMER_ID` | 월간 검색량·연관 검색어 | 3절 |
+| `APIFY_API_TOKEN` | Meta 광고·Instagram (유료) | 4절 |
+| `GEMINI_API_KEY` | 근거 요약 (유료) | 5절 |
+| `YOUTUBE_API_KEY` | YouTube 공식 채널 | 하단 추가 설정 |
+| `ADETECT_SAMPLE_MODE` | `true`면 외부 호출 없이 SAMPLE 자료, `false`면 실수집 | — |
+
+- 키가 없는 자료는 수집되지 않고 상태로 안내됩니다(Apify/Gemini는 `토큰 부족. 개발자에게 문의해주세요`).
+- 저장 위치를 바꾸려면 `ADETECT_DB_PATH`, `ADETECT_EXPORT_DIR`, `ADETECT_EVIDENCE_DIR`를 설정합니다. 비워두면 `storage/` 아래를 씁니다.
+- `.env`를 고친 뒤에는 앱을 재시작해야 반영됩니다.
+
+**4. 먼저 SAMPLE 모드로 화면 확인** — 실제 데이터와 섞이지 않게 별도 DB를 씁니다. 이 설정은 이 PowerShell 창에서만 유효합니다.
+
+```powershell
+$env:ADETECT_SAMPLE_MODE="true"
+$env:ADETECT_DB_PATH="storage/smoke/adetect_smoke.db"
+$env:ADETECT_EXPORT_DIR="storage/smoke/exports"
+$env:ADETECT_EVIDENCE_DIR="storage/smoke/evidence"
 .venv\Scripts\python.exe -m streamlit run app.py
 ```
 
-앱은 127.0.0.1에서만 열립니다(그 PC의 브라우저에서만 접속). 회사·외부 네트워크에 따라 네이버/Apify/Gemini 호출이 방화벽·프록시에 막힐 수 있으며, 이 경우 해당 자료가 `실패`로 기록되고 토큰 부족으로 표시하지 않습니다. 이동 직후에는 `ADETECT_SAMPLE_MODE=true`로 화면을 먼저 확인한 뒤 실수집으로 전환하는 것을 권장합니다.
+브라우저에서 http://127.0.0.1:8501 을 열어 홈 → 프로젝트 생성 → 기본 자료 수집 → 자료 확인·다운로드 → HTML 생성까지 확인한 뒤, 터미널에서 `Ctrl+C`로 종료합니다.
+
+**5. 실사용 실행** — 새 PowerShell 창을 열고 (4번의 임시 설정이 남지 않도록), `.env`의 `ADETECT_SAMPLE_MODE=false`를 확인한 뒤:
+
+```powershell
+.venv\Scripts\python.exe -m streamlit run app.py
+```
+
+**6. (선택) 자동 테스트** — 실제 API나 운영 DB를 쓰지 않습니다.
+
+```powershell
+.venv\Scripts\python.exe -m pytest tests -q
+```
+
+**문제가 생겼을 때**
+- `python`을 찾을 수 없음: Python 설치 시 PATH 추가를 확인하거나 `py -3 -m venv .venv`로 만듭니다.
+- 8501 포트가 사용 중: `.venv\Scripts\python.exe -m streamlit run app.py --server.port 8502`
+- 앱은 127.0.0.1에서만 열립니다(그 PC의 브라우저에서만 접속). 회사·외부 네트워크의 방화벽·프록시가 네이버/Apify/Gemini 호출을 막으면 해당 자료가 `실패`로 기록되며, 토큰 부족으로 표시하지 않습니다.
 
 ## 검증
 
