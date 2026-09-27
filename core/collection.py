@@ -90,6 +90,12 @@ def apply_reviews(rows, session):
     return rows
 
 
+def official_urls(sources):
+    """공식 URL 목록. 예전 입력(homepage 한 개)도 그대로 읽는다. 캠페인 상세 URL을 맨 앞에 둔다."""
+    urls=[sources.get("detail_url")]+list(sources.get("official_urls") or [])+[sources.get("homepage")]
+    return [u for u in dict.fromkeys(u.strip() for u in urls if u and u.strip())]
+
+
 def run_stage(stage, session, retry=False):
     options={**DEFAULT_OPTIONS,**session.get("collection_options",{})}
     old=session.get(stage+"_result",{}) if retry else {}
@@ -154,7 +160,7 @@ def run_stage(stage, session, retry=False):
             sources=session.get("sources",{}).get(brand,{})
             url=sources.get("detail_url") or sources.get("homepage")
             if options["website"]:
-                def website(b=brand,u=url):
+                def website(b=brand,u=None):
                     if settings.SAMPLE_MODE:
                         return {"records":[record("홈페이지",b,u or "https://example.com","SAMPLE 페이지 원문",coverage="SAMPLE — 실제 사이트 미수집",assets=[])]}
                     data=crawl_brand_website(b,u)
@@ -163,7 +169,12 @@ def run_stage(stage, session, retry=False):
                         raw_copy_snippets=data["raw_copy_snippets"],assets=captured["assets"],links=captured["links"],coverage=captured["coverage"],
                         image_count=captured["image_count"],warnings=captured["warnings"],note="페이지에 기재된 내용입니다. 혜택의 실제 이행 여부는 검증하지 않았습니다.")],
                         "state":"부분 완료" if captured["warnings"] else "완료"}
-                collect("site:"+brand,brand+" · 홈페이지",website,None if url or settings.SAMPLE_MODE else "조사 페이지 URL 미입력")
+                # 공식 URL(자사몰·스마트스토어·브랜드스토어 등)과 캠페인 상세 URL을 각각 수집한다.
+                targets=official_urls(sources)
+                if not targets:
+                    collect("site:"+brand,brand+" · 홈페이지",website,None if settings.SAMPLE_MODE else "조사 페이지 URL 미입력")
+                for i,target in enumerate(targets):
+                    collect(f"site:{brand}:{i}",brand+" · "+(urlsplit(target).netloc or target),lambda b=brand,u=target: website(b,u))
             if options["instagram"]:
                 handle=sources.get("instagram")
                 def instagram(b=brand,h=handle):

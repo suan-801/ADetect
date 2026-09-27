@@ -199,3 +199,77 @@ def test_settings_cleanup_requires_preview_and_confirmation():
     assert not at.exception
     assert not path.exists()
     assert any("정리 완료" in s.value for s in at.success)
+
+
+def test_config_shows_examples_and_saves_multiple_official_urls():
+    from core import projects
+    at = AppTest.from_file(str(ROOT / "pages/2_analyze.py"), default_timeout=15).run()
+    at.text_input(key="new_brand").set_value("한샘").run()
+    at.button(key="new_project").click().run()
+    assert at.text_input(key="project_own").placeholder.startswith("예)")
+    assert at.text_area(key="project_src_official").placeholder.startswith("예)")
+    assert any("view_all_page_id" in c.value for c in at.caption)
+    assert any("utm" in c.value for c in at.caption)
+    assert not any("을 기준으로" in i.value for i in at.info)
+    at.text_area(key="project_src_official").set_value("https://a.example\nhttps://smartstore.naver.com/a").run()
+    at.button(key="save_project").click().run()
+    src = projects.load(at.session_state["project_id"])["sources"]["한샘"]
+    assert src["official_urls"] == ["https://a.example", "https://smartstore.naver.com/a"]
+    assert src["homepage"] == "https://a.example"
+
+
+def test_website_collects_each_official_url():
+    from core.collection import run_stage
+    session = {"brand_name": "A", "sources": {"A": {"official_urls": ["https://a.example", "https://b.example"], "detail_url": "https://a.example/event"}},
+               "collection_options": {"website": True, "instagram": False, "youtube": False, "search_capture": False}, "source_selection": ["website"]}
+    result = run_stage("brand", session)
+    assert len([k for k in result["parts"] if k.startswith("site:")]) == 3
+
+
+def test_paid_toggle_off_locks_paid_sources():
+    at = AppTest.from_file(str(ROOT / "pages/2_analyze.py"), default_timeout=15).run()
+    enter_project(at)
+    pid = at.session_state["project_id"]
+    assert not at.checkbox(key="select_" + pid + "meta").disabled
+    at.toggle(key="collection_paid").set_value(False).run()
+    assert at.checkbox(key="select_" + pid + "meta").disabled
+    assert at.checkbox(key="select_" + pid + "instagram").disabled
+    assert not at.checkbox(key="select_" + pid + "trend").disabled
+
+
+def test_project_list_checkbox_delete_with_confirmation():
+    from core import projects
+    at = AppTest.from_file(str(ROOT / "pages/2_analyze.py"), default_timeout=15).run()
+    enter_project(at, "삭제대상")
+    pid = at.session_state["project_id"]
+    at.button(key="to_project_list").click().run()
+    assert not any(b.key == "delete_picked" for b in at.button), "선택 전에는 삭제 버튼이 없다"
+    at.checkbox(key="pick_" + pid).check().run()
+    at.button(key="delete_picked").click().run()
+    assert at.button(key="delete_confirm").disabled, "백업 확인 전에는 삭제 불가"
+    at.checkbox(key="delete_backup_ok").check().run()
+    at.button(key="delete_confirm").click().run()
+    assert not at.exception
+    assert all(r["id"] != pid for r in projects.overview())
+
+
+def test_result_tab_shows_metrics_and_charts():
+    at = AppTest.from_file(str(ROOT / "pages/2_analyze.py"), default_timeout=60).run()
+    enter_project(at, "메리츠화재")
+    pid = at.session_state["project_id"]
+    collect(at, pid, ("trend", "news"))
+    assert [m.label for m in at.metric][:4] == ["자료", "포함", "확인 필요", "제외"]
+    labels = [t.label for t in at.tabs]
+    assert "검색 추이" in labels and "검색량·뉴스" in labels
+
+
+def test_settings_is_concise_and_backup_opens_done_dialog(tmp_path, monkeypatch):
+    monkeypatch.setenv("ADETECT_BACKUP_DIR", str(tmp_path / "backups"))
+    from core import projects
+    projects.create("백업", {"brand_name": "A"})
+    at = AppTest.from_file(str(ROOT / "pages/4_settings.py"), default_timeout=15).run()
+    assert not any("이 PC의 자료 보관" in (h.value or "") for h in at.subheader)
+    at.button(key="make_db_backup").click().run()
+    assert not at.exception
+    assert any(b.label == "바로 확인하기" for b in at.button)
+    assert list((tmp_path / "backups").glob("adetect_*.db"))

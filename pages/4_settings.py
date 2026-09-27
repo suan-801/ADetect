@@ -10,10 +10,10 @@ import streamlit as st
 
 from config import settings
 from ui.components import section_header_block, status_badge
-from ui.storage_panel import backup_panel, cleanup_panel, project_cleanup_panel
+from ui.storage_panel import backup_panel, cleanup_panel
 
 section_header_block("Settings", "설정")
-st.caption("키는 .env에서 설정합니다. 유료 기능은 기본 ON이며 수집·요약 버튼을 눌렀을 때 호출합니다. 키 값은 화면이나 산출물에 표시하지 않습니다.")
+st.caption("API 키는 .env에서 설정합니다.")
 st.write("")
 
 st.markdown("<span class='adetect-eyebrow' style='margin-bottom:0.2rem;'>API 연동 상태</span>", unsafe_allow_html=True)
@@ -35,21 +35,13 @@ for label, ok in keys:
 st.write("")
 st.markdown("<span class='adetect-eyebrow' style='margin-bottom:0.2rem;'>현재 모드</span>", unsafe_allow_html=True)
 if settings.SAMPLE_MODE:
-    st.caption("명시적 SAMPLE 모드입니다. 실제 수집과 유료 API 호출을 하지 않습니다.")
+    st.warning("SAMPLE 모드 — 외부 API를 호출하지 않고 가상 자료를 씁니다. 실행 창에 ADETECT_SAMPLE_MODE=true가 남아 있으면 새 PowerShell 창에서 다시 실행하세요.")
 else:
-    st.caption("실제 수집 모드입니다. 누락된 키를 SAMPLE로 대체하지 않습니다. 키 존재 여부만 확인했으며 잔액·권한·수집 성공은 실행 결과에서 확인하세요.")
+    st.caption("실제 수집 모드")
     if not settings.APIFY_API_TOKEN or not settings.GEMINI_API_KEY:
         st.warning("토큰 부족. 개발자에게 문의해주세요")
-
-st.subheader("이 PC의 자료 보관")
-from core.evidence_store import root as _evidence_root
-from core.exporters.artifact_store import root as _export_root
-st.write(f"입력·수집 결과·다운로드 요청: {settings.DB_PATH} · 산출물: {_export_root()} · 원본: {_evidence_root()} (환경변수로 변경 가능)")
-st.caption("산출물은 최근 20개 실행·총 5GB 기준으로 오래된 파일부터 만료합니다. 원본은 기본 5GB까지 저장하고 초과하면 새 저장을 중단합니다. DB 이력은 자동 삭제하지 않습니다. 백업할 때 DB와 두 폴더를 함께 복사하세요.")
 
 st.write("")
 cleanup_panel()
 st.write("")
 backup_panel()
-st.write("")
-project_cleanup_panel()

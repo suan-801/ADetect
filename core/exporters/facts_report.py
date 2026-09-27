@@ -35,6 +35,13 @@ def _join(values):
     return ", ".join(values) if values else MISSING
 
 
+def official_rows(official):
+    urls=[u for u in dict.fromkeys(list(official.get("official_urls") or [])+[official.get("homepage")]) if u]
+    if len(urls)<=1:
+        return [("공식 페이지",_safe_url(urls[0] if urls else None))]
+    return [(f"공식 페이지 {i}",_safe_url(u)) for i,u in enumerate(urls,1)]
+
+
 def collection_info_rows(result):
     """01_수집정보. HTML과 Excel이 같은 행을 쓴다. 입력값 화이트리스트만 사용하며 JSON을 덤프하지 않는다."""
     from core import projects
@@ -57,7 +64,7 @@ def collection_info_rows(result):
           ("조사 대상",_join([s.get("campaign") for s in snapshots]+[inputs.get("campaign")])),
           ("브랜드/캠페인 검색어",_join([k for s in snapshots for k in s.get("brand_keywords") or []]+list(inputs.get("brand_keywords") or []))),
           ("일반 검색어",_join([k for s in snapshots for k in s.get("general_keywords") or []]+list(inputs.get("general_keywords") or []))),
-          ("공식 페이지",_safe_url(official.get("homepage"))),
+          *official_rows(official),
           ("캠페인 상세 페이지",_safe_url(official.get("detail_url"))),
           ("공식 Instagram",_safe_url(official.get("instagram"))),
           ("공식 YouTube",_safe_url(official.get("youtube"))),

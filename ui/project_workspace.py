@@ -1,5 +1,6 @@
 """프로젝트별 자료 수집·확인·다운로드 화면."""
 import hashlib
+import html
 import json
 import streamlit as st
 import pandas as pd
@@ -20,56 +21,112 @@ def _reset():
     st.rerun()
 
 
+EXAMPLE = {  # 입력칸의 연한 예시는 한 프로젝트로 통일한다.
+    "name": "예) 한샘 리하우스 캠페인 조사", "campaign": "예) 리하우스 캠페인", "category": "예) 인테리어 리모델링",
+    "own": "예) 한샘, 한샘리하우스", "general": "예) 인테리어, 리모델링",
+    "include": "예) 리하우스, 패키지 할인", "exclude": "예) 채용, 주가",
+    "official": "예)\nhttps://www.hanssem.com\nhttps://smartstore.naver.com/hanssem\nhttps://brand.naver.com/hanssem",
+    "detail_url": "예) https://remodeling.hanssem.com/event?utm_source=meta&utm_campaign=rehaus",
+    "instagram": "예) @hanssem 또는 https://www.instagram.com/hanssem",
+    "youtube": "예) @hanssem 또는 UC로 시작하는 채널 ID",
+    "meta_page": "예) https://www.facebook.com/ads/library/?view_all_page_id=123456789",
+}
+
+
 def _config(project=None):
     source = (project or {}).get("sources", {}).get((project or {}).get("brand_name", ""), {})
     # Home Hero에서 입력한 브랜드명·관심 주제를 초기값으로 이어받는다 (같은 값 재입력 방지).
     draft = {} if project else st.session_state.get("draft", {})
     brand = (project or {}).get("brand_name", draft.get("brand_name", ""))
     st.title("프로젝트 설정")
-    name = st.text_input("프로젝트 이름", value=(project or {}).get("name", brand), key="project_name")
-    campaign = st.text_input("조사 대상 (선택)", value=(project or {}).get("campaign", ""), key="project_campaign")
-    category = st.text_input("관심 주제 (선택)", value=(project or {}).get("category", draft.get("category", "")), key="project_category")
-    own = words(st.text_input("브랜드/캠페인 검색어", value=", ".join((project or {}).get("brand_keywords", [brand])), key="project_own"))
-    general = words(st.text_input("일반 검색어", value=", ".join((project or {}).get("general_keywords", [])), key="project_general"))
-    st.info(f"브랜드/캠페인 검색어: {', '.join(own) or '미입력'}을 기준으로 선택한 검색 추이·검색량·뉴스를 수집합니다.\n\n일반 검색어: {', '.join(general) or '미입력'}을 기준으로 같은 자료를 수집합니다.")
-    include = words(st.text_input("포함 문구 (선택)", value=", ".join((project or {}).get("include_terms", [])), key="project_include"))
-    exclude = words(st.text_input("제외 문구 (선택)", value=", ".join((project or {}).get("exclude_terms", [])), key="project_exclude"))
+    st.caption("브랜드: " + brand)
+    name = st.text_input("프로젝트 이름", value=(project or {}).get("name", ""), placeholder=EXAMPLE["name"], key="project_name")
+    campaign = st.text_input("조사 대상 (선택)", value=(project or {}).get("campaign", ""), placeholder=EXAMPLE["campaign"], key="project_campaign")
+    category = st.text_input("관심 주제 (선택)", value=(project or {}).get("category", draft.get("category", "")), placeholder=EXAMPLE["category"], key="project_category")
+    own = words(st.text_input("브랜드/캠페인 검색어", value=", ".join((project or {}).get("brand_keywords", [])), placeholder=EXAMPLE["own"], key="project_own"))
+    general = words(st.text_input("일반 검색어", value=", ".join((project or {}).get("general_keywords", [])), placeholder=EXAMPLE["general"], key="project_general",
+                                  help="검색어마다 검색 추이·검색량·뉴스를 따로 수집합니다. 두 칸 합쳐 최대 10개."))
+    include = words(st.text_input("포함 문구 (선택)", value=", ".join((project or {}).get("include_terms", [])), placeholder=EXAMPLE["include"], key="project_include"))
+    exclude = words(st.text_input("제외 문구 (선택)", value=", ".join((project or {}).get("exclude_terms", [])), placeholder=EXAMPLE["exclude"], key="project_exclude"))
     with st.expander("공식 페이지·계정", expanded=True):
-        src = {}
-        for field, label in (("homepage", "공식 홈페이지 또는 조사 랜딩 URL"), ("detail_url", "캠페인 상세 URL"), ("instagram", "공식 Instagram 계정"), ("youtube", "공식 YouTube 채널"), ("meta_page", "Meta 광고 라이브러리 페이지")):
-            src[field] = st.text_input(label, value=source.get(field, ""), key="project_src_" + field)
-    paid = st.toggle("유료 기능 ON", value=(project or {}).get("paid_enabled", True), key="project_paid")
-    if paid:
-        for service in ("Apify", "Gemini"):
-            if paid_problem({"paid_enabled": True}, service) == TOKEN_MESSAGE:
-                st.warning(service + " · " + TOKEN_MESSAGE)
+        official = [u.strip() for u in st.text_area("공식 URL (한 줄에 하나)", value="\n".join(source.get("official_urls") or ([source["homepage"]] if source.get("homepage") else [])),
+                                                    placeholder=EXAMPLE["official"], key="project_src_official", height=110).splitlines() if u.strip()]
+        st.caption("자사몰·스마트스토어·브랜드스토어 등 여러 개를 넣을 수 있습니다. '공식 페이지 자료'를 수집하면 각각 저장합니다.")
+        detail = st.text_input("캠페인 상세 URL (선택)", value=source.get("detail_url", ""), placeholder=EXAMPLE["detail_url"], key="project_src_detail_url")
+        st.caption("Meta 광고 라이브러리 등에서 광고의 랜딩 URL을 열어 utm 구조를 확인해 보세요. 이 URL과 일치하는 자료는 '포함'으로 분류됩니다.")
+        instagram = st.text_input("공식 Instagram 계정", value=source.get("instagram", ""), placeholder=EXAMPLE["instagram"], key="project_src_instagram")
+        youtube = st.text_input("공식 YouTube 채널", value=source.get("youtube", ""), placeholder=EXAMPLE["youtube"], key="project_src_youtube")
+        meta = st.text_input("Meta 광고 라이브러리 페이지", value=source.get("meta_page", ""), placeholder=EXAMPLE["meta_page"], key="project_src_meta_page")
+        st.caption("facebook.com/ads/library에서 브랜드 페이지를 찾아 '페이지의 모든 광고 보기'를 연 뒤 주소를 붙여넣으세요. 주소에 view_all_page_id=숫자가 있어야 합니다.")
+    src = {"official_urls": official, "homepage": official[0] if official else "", "detail_url": detail,
+           "instagram": instagram, "youtube": youtube, "meta_page": meta}
     inputs = {"brand_name": brand, "campaign": campaign, "category": category, "competitors": [],
-              "brand_keywords": own, "general_keywords": general, "include_terms": include,
-              "exclude_terms": exclude, "sources": {brand: src}, "paid_enabled": paid,
+              "brand_keywords": own or [brand], "general_keywords": general, "include_terms": include,
+              "exclude_terms": exclude, "sources": {brand: src}, "paid_enabled": (project or {}).get("paid_enabled", True),
               "save_images": True, "save_ad_assets": True}
-    disabled = not name.strip() or not brand.strip() or len(set(own + general)) > 10
-    if st.button("설정 저장", type="primary", disabled=disabled, key="save_project"):
+    too_many = len(set(inputs["brand_keywords"] + general)) > 10
+    if too_many:
+        st.warning("검색어는 두 칸 합쳐 최대 10개입니다.")
+    left, right = st.columns([1, 5])
+    if left.button("설정 저장", type="primary", disabled=not brand.strip() or too_many, key="save_project"):
+        # 이름을 비워두면 브랜드명·조사 대상으로 만든다.
+        title = name.strip() or " ".join(x for x in (brand, campaign.strip()) if x)
         if project:
-            projects.update(project["id"], name.strip(), inputs)
+            projects.update(project["id"], title, inputs)
             pid = project["id"]
         else:
-            pid = projects.create(name.strip(), inputs)
+            pid = projects.create(title, inputs)
         st.session_state.project_id = pid
         st.session_state.step = "workspace"
         st.session_state.pop("edit_project", None)
         st.rerun()
-    if st.button("프로젝트 목록", key="back_projects"):
+    if right.button("프로젝트 목록", key="back_projects"):
         _reset()
+
+
+def _close_delete():
+    st.session_state.pop("delete_ids", None)
+
+
+@st.dialog("프로젝트 삭제", on_dismiss=_close_delete)
+def _delete_dialog(ids):
+    rows = [r for r in projects.overview() if r["id"] in ids]
+    st.write(f"{len(rows)}개 프로젝트를 삭제합니다. 되돌릴 수 없습니다.")
+    for r in rows:
+        impact = projects.delete_impact(r["id"])
+        st.caption(f"{r['name']} · 수집 실행 {impact['수집 실행']}건 · 확인 상태 {impact['확인 상태']}건 · 다운로드 기록 {impact['다운로드 선택 기록']}건")
+    backed = st.checkbox("DB 백업을 먼저 만들었습니다 (설정 > DB 백업)", key="delete_backup_ok")
+    left, right = st.columns(2)
+    if left.button("취소", key="delete_cancel"):
+        _close_delete()
+        st.rerun()
+    if right.button("삭제", type="primary", disabled=not backed, key="delete_confirm"):
+        failed = []
+        for r in rows:
+            try:
+                projects.delete(r["id"], r["name"])
+            except ValueError as exc:
+                failed.append(r["name"] + " — " + str(exc))
+        for r in rows:
+            st.session_state.pop("pick_" + r["id"], None)
+        _close_delete()
+        st.session_state.deleted_message = (f"{len(rows) - len(failed)}개 삭제 완료" + (" · 실패: " + "; ".join(failed) if failed else ""))
+        st.rerun()
 
 
 def _project_list():
     st.title("프로젝트")
-    st.caption("브랜드와 조사 목적별로 자료와 이력을 관리합니다.")
-    archived = bool(st.checkbox("보관한 프로젝트 보기"))
+    if st.session_state.get("deleted_message"):
+        st.success(st.session_state.pop("deleted_message"))
+    archived = bool(st.checkbox("보관한 프로젝트 보기", key="show_archived"))
     rows = projects.listing(archived)
+    kinds = {r["id"]: r["kind"] for r in projects.overview()} if rows else {}
     for row in rows:
-        left, middle, right = st.columns([5, 1, 1])
-        left.write(f"{row['name']} · {row['brand_name']} · {row['updated'][:10]}")
+        pick, left, middle, right = st.columns([0.4, 5, 1, 1], vertical_alignment="center")
+        pick.checkbox("선택", key="pick_" + row["id"], label_visibility="collapsed")
+        tag = kinds.get(row["id"], "")
+        left.markdown(f"**{row['name']}** · {row['brand_name']} · {row['updated'][:10]}"
+                      + (f" <span style='color:#797C84;font-size:0.8rem'>· {tag}</span>" if tag and tag != "실수집 자료 포함" else ""), unsafe_allow_html=True)
         if middle.button("열기", key="open_" + row["id"]):
             st.session_state.project_id = row["id"]
             st.session_state.step = "workspace"
@@ -78,8 +135,14 @@ def _project_list():
         if right.button("보관 해제" if archived else "보관", key="archive_" + row["id"]):
             projects.archive(row["id"], not archived)
             st.rerun()
+    picked = [r["id"] for r in rows if st.session_state.get("pick_" + r["id"])]
+    if picked and st.button(f"선택 {len(picked)}개 삭제", key="delete_picked"):
+        st.session_state.delete_ids = picked
+    # 팝업 안의 체크박스를 눌러도 팝업이 유지되도록 선택 목록을 상태로 들고 있는다.
+    if st.session_state.get("delete_ids"):
+        _delete_dialog(st.session_state.delete_ids)
     with st.expander("새 프로젝트 만들기", expanded=not bool(rows)):
-        brand = st.text_input("브랜드명 *", key="new_brand")
+        brand = st.text_input("브랜드명 *", placeholder="예) 한샘", key="new_brand")
         if st.button("다음", type="primary", disabled=not brand.strip(), key="new_project"):
             st.session_state.draft = {"brand_name": brand.strip()}
             st.session_state.step = "config"
@@ -107,35 +170,37 @@ def _watch(pid):
         st.info("현재 요청이 끝난 뒤 후속 수집을 중단합니다.")
 
 
+PAID_SOURCES = ("meta", "instagram")
+
+
 def _collect(project, history):
-    st.subheader("조사에 필요한 자료를 선택하세요")
     pid = project["id"]
     tasks = project_jobs.tasks(pid)
     busy = any(t["state"] in ("대기", "수집 중") for t in tasks)
     _watch(pid)
+    project = dict(project)
+    project["paid_enabled"] = st.toggle("유료 기능 ON", value=project.get("paid_enabled", True), key="collection_paid", disabled=busy,
+                                        help="ON일 때만 Meta 광고·Instagram(Apify 유료)을 선택할 수 있습니다.")
+    if project["paid_enabled"] and paid_problem(project, "Apify") == TOKEN_MESSAGE:
+        st.warning("Apify · " + TOKEN_MESSAGE)
     if st.button("기본 자료 선택", disabled=busy, key="default_sources"):
         for source in projects.SOURCES:
             st.session_state["select_" + pid + source] = source in ("trend", "volume", "news", "website")
         st.rerun()
     selected = []
-    for source, (label, description, _) in projects.SOURCES.items():
-        latest = next((h for h in history if h["source"] == source and projects.available(h)), None)
-        if st.checkbox(label, key="select_" + pid + source, disabled=busy):
-            selected.append(source)
-        suffix = f" · 최근 {latest['created'][:16]} · {len(latest['result'].get('records', []))}건" if latest else " · 저장 자료 없음"
-        st.caption(description + suffix)
+    with st.container(key="adetect_sources"):
+        for source, (label, description, _) in projects.SOURCES.items():
+            locked = source in PAID_SOURCES and not project["paid_enabled"]
+            if locked:
+                st.session_state["select_" + pid + source] = False
+            latest = next((h for h in history if h["source"] == source and projects.available(h)), None)
+            if st.checkbox(label, key="select_" + pid + source, disabled=busy or locked):
+                selected.append(source)
+            meta = (f"최근 {latest['created'][:16].replace('T', ' ')} · {_size(latest)}" if latest else "저장 자료 없음") + (" · 유료 기능 ON 시 선택 가능" if locked else "")
+            st.markdown(f"<div class='adetect-src-desc'>{html.escape(description)}</div><div class='adetect-src-meta{' done' if latest else ''}'>{html.escape(meta)}</div>", unsafe_allow_html=True)
     queries = list(dict.fromkeys(project.get("brand_keywords", []) + project.get("general_keywords", [])))
-    st.caption("브랜드/캠페인 검색어: " + (", ".join(project.get("brand_keywords", [])) or "미입력") + "을 기준으로 선택한 검색 자료를 조회합니다.")
-    st.caption("일반 검색어: " + (", ".join(project.get("general_keywords", [])) or "미입력") + "을 기준으로 선택한 검색 자료를 조회합니다.")
-    project = dict(project)
-    project["brand_keywords"] = [q for q in project.get("brand_keywords", []) if q in queries]
-    project["general_keywords"] = [q for q in project.get("general_keywords", []) if q in queries]
-    project["paid_enabled"] = st.toggle("유료 기능 ON", value=project.get("paid_enabled", True), key="collection_paid", disabled=busy)
-    if project["paid_enabled"] and any(source in selected for source in ("meta", "instagram")):
-        if paid_problem(project, "Apify") == TOKEN_MESSAGE:
-            st.warning("Apify · " + TOKEN_MESSAGE)
     force = st.checkbox("캐시를 사용하지 않고 새로 수집", disabled=busy, key="force_collection")
-    st.caption(f"검색어 {len(queries)}개 · 선택 자료 {len(selected)}종 · 선택 자료만 실행합니다. 이미 수집한 자료는 다시 호출하지 않습니다.")
+    st.caption(f"검색어 {len(queries)}개 ({', '.join(queries) or '미입력'}) · 선택 자료 {len(selected)}종")
     if selected and st.button("선택 자료 수집", type="primary", disabled=busy, key="start_project_collection"):
         try:
             project_jobs.submit(project, selected, force=force)
@@ -160,6 +225,14 @@ def _versions(available):
     return {s: by_source[s] for s in projects.SOURCES if s in by_source}
 
 
+def _size(item):
+    """검색 추이는 자료 행이 아니라 월별 시리즈이므로 개월 수로 센다."""
+    if item["source"] == "trend":
+        months = max((len(p["series"]["rows"]) for p in item["result"].get("parts", {}).values() if p.get("series")), default=0)
+        return f"{months}개월"
+    return f"{len(item['result'].get('records', []))}건"
+
+
 def _open_version(pid, item):
     """이력 탭의 '이 시점 결과 열기' — 위젯 생성 전에 상태를 바꿀 수 있도록 on_click 콜백으로만 호출한다."""
     st.session_state["version_" + pid + item["source"]] = item["run_id"]
@@ -167,6 +240,100 @@ def _open_version(pid, item):
     if chosen is not None and item["source"] not in chosen:
         st.session_state["result_sources_" + pid] = chosen + [item["source"]]
     st.session_state.opened_version = projects.SOURCES[item["source"]][0] + " · " + item["created"][:16].replace("T", " ")
+
+
+IMAGE_EXT = (".png", ".jpg", ".jpeg", ".webp", ".gif")
+
+
+def _num(value):
+    try:
+        return float(str(value).replace(",", ""))
+    except (TypeError, ValueError):
+        return None  # '<10' 같은 표시값은 숫자로 바꾸지 않는다.
+
+
+@st.cache_data(max_entries=64, show_spinner=False)
+def _image(filename, sha256):
+    from core.evidence_store import read_bytes
+    return read_bytes({"filename": filename, "sha256": sha256})
+
+
+def _visuals(snapshots, rows):
+    """선택한 수집 버전의 요약 지표·차트·이미지. 값은 저장된 자료 그대로이며 새 해석을 만들지 않는다."""
+    by = {i["source"]: i for i in snapshots}
+    counts = {state: sum(1 for r in rows if r.get("review", "확인 필요") == state) for state in ("포함", "확인 필요", "제외")}
+    cols = st.columns(4)
+    cols[0].metric("자료", f"{len(rows)}건")
+    for col, state in zip(cols[1:], counts):
+        col.metric(state, f"{counts[state]}건")
+    series = [p["series"] for p in by.get("trend", {}).get("result", {}).get("parts", {}).values() if p.get("series", {}).get("rows")]
+    seasonality = [(p["series"]["keyword"], p["seasonality"]) for p in by.get("trend", {}).get("result", {}).get("parts", {}).values() if p.get("seasonality") and p.get("series")]
+    volume = [r for r in rows if r["kind"] in ("검색량", "연관 검색어")]
+    news = [r for r in rows if r["kind"] == "뉴스"]
+    images = [(r, a) for r in rows for a in r.get("assets", []) if a.get("filename", "").lower().endswith(IMAGE_EXT)]
+    names = [n for n, ok in (("검색 추이", series), ("검색량·뉴스", volume or news), ("이미지", images)) if ok]
+    if not names:
+        return
+    tabs = dict(zip(names, st.tabs(names)))
+    if "검색 추이" in tabs:
+        with tabs["검색 추이"]:
+            frame = pd.DataFrame([{"월": r["date"][:7], "검색어": s["keyword"], "상대지수": r["search_index"]} for s in series for r in s["rows"]])
+            st.line_chart(frame.pivot_table(index="월", columns="검색어", values="상대지수"), height=260)
+            st.caption("검색어별 조회 기간 최고치=100인 상대지수입니다. 서로 다른 검색어의 100은 같은 규모가 아니며, 빠진 달은 0이 아닙니다.")
+            if seasonality:
+                left, right = st.columns([3, 2])
+                with left:
+                    monthly = pd.DataFrame([{"월": f"{m['월']:02d}월", "검색어": k, "평균": m["평균 검색지수"]} for k, v in seasonality for m in v["monthly"]])
+                    if not monthly.empty:
+                        st.caption("월별 평균 (36개월)")
+                        st.bar_chart(monthly.pivot_table(index="월", columns="검색어", values="평균"), height=220, stack=False)
+                with right:
+                    st.caption("연도별 피크·저점 월")
+                    st.dataframe([{"검색어": k, **y} for k, v in seasonality for y in v["yearly"]], hide_index=True)
+    if "검색량·뉴스" in tabs:
+        with tabs["검색량·뉴스"]:
+            exact = [r for r in volume if r["kind"] == "검색량"]
+            if exact:
+                frame = pd.DataFrame([{"검색어": r["text"], "PC": _num(r.get("pc")), "모바일": _num(r.get("mobile"))} for r in exact]).set_index("검색어")
+                if frame.notna().any().any():
+                    st.caption("월간 검색량 (조회 시점)")
+                    st.bar_chart(frame, height=220, stack=False)
+            related = [r for r in volume if r["kind"] == "연관 검색어"]
+            if related or exact:
+                st.dataframe([{"구분": r["kind"], "검색어": r["text"], "조회어": r.get("keyword"), "PC": r.get("pc"), "모바일": r.get("mobile")} for r in exact + related[:20]],
+                             hide_index=True, height=min(38 * (len(exact) + min(len(related), 20)) + 40, 320))
+            if news:
+                dates = pd.to_datetime(pd.Series([r.get("published_at") for r in news]), errors="coerce", utc=True).dropna()
+                left, right = st.columns([3, 2])
+                with left:
+                    if not dates.empty:
+                        st.caption(f"뉴스 발행일별 건수 (수집 {len(news)}건)")
+                        st.bar_chart(dates.dt.strftime("%Y-%m-%d").value_counts().sort_index().rename("건수"), height=220)
+                with right:
+                    st.caption("검색어별 뉴스 수")
+                    per = {}
+                    for r in news:
+                        for q in r.get("matched_queries") or [r.get("keyword")]:
+                            per[q] = per.get(q, 0) + 1
+                    st.dataframe([{"검색어": k, "건수": v} for k, v in sorted(per.items(), key=lambda x: -x[1])], hide_index=True)
+    if "이미지" in tabs:
+        with tabs["이미지"]:
+            shown = 0
+            grid = st.columns(4)
+            for r, asset in images:
+                data = _image(asset["filename"], asset.get("sha256", ""))
+                if data is None:
+                    continue
+                with grid[shown % 4]:
+                    st.image(data, caption=f"{r['brand']} · {r['kind']}", width="stretch")
+                    st.markdown(f"[원문]({r['source_url']})")
+                shown += 1
+                if shown >= 12:
+                    break
+            if not shown:
+                st.caption("보유한 이미지 원본이 없습니다.")
+            elif len(images) > shown:
+                st.caption(f"{shown}개 표시 · 전체 {len(images)}개는 ZIP 다운로드에 포함됩니다.")
 
 
 def _result(project, history):
@@ -189,18 +356,19 @@ def _result(project, history):
         snapshots.append(next((h for h in versions if h["run_id"] == st.session_state.get(key)), versions[0]))
     if st.session_state.get("opened_version"):
         st.success("이력에서 연 결과: " + st.session_state.pop("opened_version"))
-    st.caption("  ·  ".join(f"{projects.SOURCES[i['source']][0]} {i['created'][:10]} {len(i['result'].get('records', []))}건"
+    st.caption("  ·  ".join(f"{projects.SOURCES[i['source']][0]} {i['created'][:10]} {_size(i)}"
                             + ("" if i is by_source[i["source"]][0] else " (다른 시점)") for i in snapshots) or "선택한 자료 종류가 없습니다.")
     with st.expander("다른 시점 선택", expanded=False):
         st.multiselect("확인할 자료 종류", order, format_func=lambda s: projects.SOURCES[s][0], key=source_key)
         for source in [s for s in order if s in st.session_state[source_key]]:
             versions = by_source[source]
             st.selectbox(projects.SOURCES[source][0] + " 수집 버전", [h["run_id"] for h in versions], key="version_" + pid + source,
-                         format_func=lambda rid, rows=versions: next(h["created"][:19].replace("T", " ") + " · " + h["result"]["status"] + " · " + str(len(h["result"].get("records", []))) + "건" + (" · 최근" if h is rows[0] else "") for h in rows if h["run_id"] == rid))
+                         format_func=lambda rid, rows=versions: next(h["created"][:19].replace("T", " ") + " · " + h["result"]["status"] + " · " + _size(h) + (" · 최근" if h is rows[0] else "") for h in rows if h["run_id"] == rid))
     dates = projects.collection_dates(snapshots)
     if len(dates) > 1:
         st.warning("날짜 혼합 — 선택한 자료의 수집일이 서로 다릅니다 (" + ", ".join(dates) + "). 다운로드 파일에도 이 안내가 기록됩니다.")
     rows = [row for item in snapshots for row in projects.review_rows(item)]
+    _visuals(snapshots, rows)
     search = st.text_input("자료 검색", key="project_record_search", placeholder=f"자료 {len(rows)}건 · 확인 상태와 다운로드 대상은 따로 관리합니다")
     visible = [r for r in rows if not search or search.casefold() in str(r).casefold()]
     frame = pd.DataFrame([{"선택": r["selection_id"] in st.session_state.get("download_selection", []), "자료ID": r["selection_id"], "종류": r["kind"], "내용": r["text"][:180], "확인 상태": r.get("review", "확인 필요"), "출처": r["source_url"]} for r in visible])
@@ -342,16 +510,14 @@ def render():
         return
     st.title(project["name"])
     st.caption(project["brand_name"] + " · " + (project.get("campaign") or "브랜드 전체"))
-    left, right = st.columns(2)
+    left, right, _ = st.columns([1, 1, 4])
     if left.button("프로젝트 목록", key="to_project_list"):
         _reset()
     if right.button("프로젝트 설정", key="edit_project_button"):
         st.session_state.edit_project = True
         st.rerun()
-    with st.expander("1분 사용법"):
-        st.write("필요한 자료 선택 → 수집 → 자료 확인·다운로드 순서로 사용합니다. 체크 해제는 저장된 자료를 삭제하지 않습니다.")
     if settings.SAMPLE_MODE:
-        st.warning("SAMPLE — 실제 수집 자료가 아닙니다.")
+        st.warning("SAMPLE 모드 — 실제 수집 자료가 아닙니다. 실행한 PowerShell 창에 ADETECT_SAMPLE_MODE=true가 남아 있으면 새 창에서 다시 실행하세요.")
     usage_bar("project_usage")
     history = projects.histories(pid)
     tabs = st.tabs(["자료 수집", "자료 확인·다운로드", "이력"])

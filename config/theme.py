@@ -35,6 +35,10 @@ COLORS = {
     # Secondary(본문) / Faint(eyebrow·meta) 2단계 — 과거 값은 faint가 대비 3.5:1로 AA 미달이었다.
     "text_dim": "#A0A3AA",
     "text_faint": "#797C84",
+    # 입력칸 — 배경(bg)과 구분되도록 한 단계 밝게. placeholder는 입력칸 위 대비 4.8:1.
+    "input_bg": "#191C21",
+    "input_border": "#33373E",
+    "placeholder": "#878A92",
     # Primary brand accent — clean vermilion/red-orange. 좁은 면적에만: active nav, key action,
     # section index, important highlight, key data point, selected state.
     "accent": "#F0462C",
@@ -422,8 +426,8 @@ div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .
 [data-testid="stTextInput"] input,
 [data-testid="stTextArea"] textarea,
 [data-testid="stNumberInput"] input {{
-    background: {COLORS['bg_elevated']} !important;
-    border: 1px solid {COLORS['border']} !important;
+    background: {COLORS['input_bg']} !important;
+    border: 1px solid {COLORS['input_border']} !important;
     border-radius: {RADIUS['sm']} !important;
     color: {COLORS['text']} !important;
     padding: 0.6rem 0.85rem !important;
@@ -431,7 +435,7 @@ div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .
     transition: border-color 0.15s ease;
 }}
 [data-testid="stTextInput"] input::placeholder,
-[data-testid="stTextArea"] textarea::placeholder {{ color: {COLORS['text_faint']} !important; opacity: 1 !important; }}
+[data-testid="stTextArea"] textarea::placeholder {{ color: {COLORS['placeholder']} !important; opacity: 1 !important; }}
 [data-testid="stTextInput"] input:hover,
 [data-testid="stTextArea"] textarea:hover,
 [data-testid="stNumberInput"] input:hover {{ border-color: {COLORS['text_faint']} !important; }}
@@ -439,9 +443,20 @@ div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .
 [data-testid="stTextArea"] textarea:focus,
 [data-testid="stNumberInput"] input:focus {{
     border-color: {COLORS['accent']} !important;
-    background: {COLORS['bg_elevated']} !important;
+    background: {COLORS['input_bg']} !important;
     box-shadow: none !important;
 }}
+[data-testid="stSelectbox"] div[data-baseweb="select"] > div,
+[data-testid="stMultiSelect"] div[data-baseweb="select"] > div {{
+    background: {COLORS['input_bg']} !important;
+    border-color: {COLORS['input_border']} !important;
+}}
+
+/* ── 자료 종류 목록: 제목 > 설명 > 최근 수집 ─────────────────────────────── */
+.st-key-adetect_sources [data-testid="stCheckbox"] label p {{ color: {COLORS['text']} !important; font-size: 0.95rem !important; font-weight: 600 !important; }}
+.adetect-src-desc {{ color: {COLORS['text_dim']}; font-size: 0.84rem; margin: -0.35rem 0 0 1.75rem; line-height: 1.45; }}
+.adetect-src-meta {{ color: {COLORS['text_faint']}; font-size: 0.74rem; margin: 0.1rem 0 0.7rem 1.75rem; }}
+.adetect-src-meta.done {{ color: {COLORS['success']}; }}
 [data-testid="stWidgetLabel"] p {{ color: {COLORS['text_dim']} !important; font-size: 0.8rem !important; font-weight: 460 !important; }}
 [data-testid="stWidgetLabel"] span[style*="rgba(250, 250, 250, 0.6)"] {{ color: {COLORS['text_faint']} !important; }}
 
