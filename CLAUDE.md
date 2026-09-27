@@ -40,7 +40,7 @@
 
 11. **유료 기능은 기본 ON이다.** Apify/Gemini는 수집·요약 버튼을 눌렀을 때만 호출하고, 키 누락 또는 확인된 인증/잔액 부족에만 정확히 `토큰 부족. 개발자에게 문의해주세요`를 표시한다. 네트워크 실패·일반 속도 제한을 토큰 부족으로 단정하지 않는다.
 
-12. **저장은 로컬 SQLite(`storage/adetect.db`)와 로컬 파일(`storage/exports`, `storage/evidence`)이 기본이다.** 원격 DB/Storage 어댑터(`database/remote.py`, `core/storage.py`)와 클라우드 배포는 아직 검증 전이므로 완료로 표시하지 않는다. 저장 공간 표시·정리·보유 상태·원본 보호는 `core/retention.py`의 `usage`/`summary`/`cleanup`/`availability`/`pin`을 그대로 쓴다.
+12. **저장은 로컬 SQLite(`storage/adetect.db`)와 로컬 파일(`storage/exports`, `storage/evidence`)이 기본이다.** 원격 DB/Storage 어댑터(`database/remote.py`, `core/storage.py`)와 클라우드 배포는 아직 검증 전이므로 완료로 표시하지 않는다. 현재 운영 방식은 로컬 실행 후 프로젝트 폴더를 zip으로 다른 PC·네트워크에 옮기는 것이며(README '다른 PC로 옮기기'), 사용자가 요청하기 전까지 배포 설정(Streamlit Cloud·Supabase 등)을 추가하지 않는다. 저장 공간 표시·정리·보유 상태·원본 보호는 `core/retention.py`의 `usage`/`summary`/`cleanup`/`availability`/`pin`을 그대로 쓴다.
 
 13. **요청받지 않은 분석 알고리즘·새 외부 API 연동을 Claude가 임의로 구현하지 않는다.** 18차 범위는 팩트 수집·확인·내보내기이며 타깃 추정·포지셔닝·전략 추천·점유율 해석은 제외다. **Mock data(예: `seeded_random()`, `rng_bool()`, `infer_brand_context()`)는 layout verification/테스트 fixture용이지 production business logic reference가 아니다** — 실제 구현 시 그대로 옮기지 않는다.
 

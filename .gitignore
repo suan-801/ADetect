@@ -14,3 +14,5 @@ storage/evidence/*
 .DS_Store
 *.log
 /*.png
+storage/backups/
+storage/smoke/

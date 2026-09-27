@@ -79,6 +79,29 @@ $env:ADETECT_EVIDENCE_DIR="storage/smoke/evidence"
 
 개별 원본 최대 25MB, 랜딩 이미지 최대 6MB/12개, ZIP 원본 합계 최대 250MB입니다. 누락 사유는 패키지에 표시합니다. 비밀 키는 결과·내보내기에 포함하지 않습니다.
 
+## 다른 PC로 옮기기 (zip)
+
+현재는 로컬 실행이 기준입니다. 다른 PC·네트워크에서 쓰려면 프로젝트 폴더를 zip으로 옮깁니다. 클라우드 배포 설정은 이번 범위에 포함하지 않습니다.
+
+**zip에서 뺄 것**: `.venv/`(PC마다 새로 만들어야 함), `__pycache__/`, `.pytest_cache/`, `storage/temp/`, `storage/smoke/`
+
+**상황에 따라 판단할 것**
+- `.env`: API 키가 들어 있습니다. 본인 PC로만 옮길 때만 포함하고, 다른 사람에게 줄 때는 빼고 `.env.example`로 새로 만듭니다.
+- `storage/`(adetect.db, evidence, exports, backups): 기존 프로젝트와 원본까지 가져가려면 **앱을 종료한 뒤** 폴더째 포함합니다. 빼면 새 PC에서 빈 상태로 시작합니다. 프로젝트 하나만 옮길 때는 이력 탭의 '프로젝트 백업' ZIP → 새 PC의 '백업에서 새 프로젝트 복원'을 써도 됩니다.
+
+**새 PC에서 실행 (Windows PowerShell)**
+
+```powershell
+# Python 3.12 이상 (개발 PC: 3.14)
+python -m venv .venv
+.venv\Scripts\python.exe -m pip install -r requirements.txt
+.venv\Scripts\python.exe -m playwright install chromium
+Copy-Item .env.example .env   # .env를 가져오지 않았을 때만
+.venv\Scripts\python.exe -m streamlit run app.py
+```
+
+앱은 127.0.0.1에서만 열립니다(그 PC의 브라우저에서만 접속). 회사·외부 네트워크에 따라 네이버/Apify/Gemini 호출이 방화벽·프록시에 막힐 수 있으며, 이 경우 해당 자료가 `실패`로 기록되고 토큰 부족으로 표시하지 않습니다. 이동 직후에는 `ADETECT_SAMPLE_MODE=true`로 화면을 먼저 확인한 뒤 실수집으로 전환하는 것을 권장합니다.
+
 ## 검증
 
 ```powershell
@@ -95,4 +118,4 @@ $env:ADETECT_EVIDENCE_DIR="storage/smoke/evidence"
 
 ## 현재 미구현·별도 검증 필요
 
-무료 Vercel/Streamlit/Supabase 배포는 아직 완료하지 않았습니다. 클라우드에서 브라우저 캡처·지속 저장·비공개 접근을 확인한 뒤 배포 대상으로 판단합니다. 클라우드 인증·다중 사용자·signed URL·자동 백업·분산 작업 큐, 유료 Meta/Instagram/Gemini 실계정 호출, 이미지 OCR과 전략·타깃·포지셔닝 해석은 이번 구현에 포함하지 않았습니다.
+클라우드 배포(Streamlit Community Cloud·Supabase 등)는 현재 범위에서 제외했습니다 — 로컬 실행 후 zip으로 다른 PC에 옮겨 씁니다. 원격 DB·Storage 코드(`database/remote.py`, `core/storage.py`)는 미검증 준비 상태입니다. 클라우드 인증·다중 사용자·signed URL·자동 백업·분산 작업 큐, 유료 Meta/Instagram/Gemini 실계정 호출, 이미지 OCR과 전략·타깃·포지셔닝 해석은 이번 구현에 포함하지 않았습니다.

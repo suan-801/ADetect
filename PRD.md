@@ -34,6 +34,8 @@
 7. **DB 백업·프로젝트 정리(설정)**: `DB 백업 만들기`는 SQLite 온라인 백업으로 `storage/backups/adetect_<시각>.db`를 만든다(덮어쓰지 않음, 원본·다운로드 폴더는 미포함). 프로젝트 목록은 저장된 사실로만 구분한다 — `수집 이력 없음`/`SAMPLE 자료만 있음`/`실수집 자료 포함`/`구분 불가 (만료 기록만 있음)`. 정리 후 만료 기록도 SAMPLE 여부를 보존한다. 테스트 여부를 추정하지 않는다. 삭제는 프로젝트 단위만, 영향 범위(수집 실행·확인 상태·다운로드 선택·작업 기록 수) 표시, 백업 확인 체크, 프로젝트 이름 재입력 후에만 가능하다. 원본 파일은 공유될 수 있어 즉시 지우지 않고 정리 후보로만 남는다. 기존 DB 세션을 자동 삭제하지 않는다.
 8. **레거시 UI**: `pages/3_history.py`, `ui/facts_workspace.py`, `ui/{market,brand,creative,synthesis,target}_tab.py`, `ui/analysis_shared.py`, `ui/job_control.py`는 런타임에서 import되지 않으며 상단에 `LEGACY` 주석을 둔다. 삭제는 보류한다.
 9. **테스트 DB 분리**: 자동 테스트는 임시 DB/폴더를 쓴다(`tests/conftest.py`). 수동 브라우저 스모크는 `ADETECT_DB_PATH`·`ADETECT_EXPORT_DIR`·`ADETECT_EVIDENCE_DIR`로 운영 데이터와 분리한다(README).
+10. **실행·이동 방식**: 로컬 PC 실행(127.0.0.1)이 기준이다. 다른 PC·네트워크에서는 프로젝트 폴더를 zip으로 옮긴 뒤 가상환경을 새로 만들어 실행한다(`.venv`는 옮기지 않음). 자료까지 옮기려면 앱 종료 후 `storage/`를 함께 포함한다. Streamlit Community Cloud·Supabase 배포 설정은 이번 단계 범위에서 제외하며, `database/remote.py`·`core/storage.py`는 미검증 준비 코드로 남긴다.
+11. **Git 운영**: `main` 단일 브랜치.
 
 이번 단계에서 제외: 실제 Supabase 계정 연결과 배포, 클라우드 인증·다중 사용자 권한, Linux Playwright 운영 수용, 원격 Storage signed URL, 완전한 분산 작업 복구, 자동 클라우드 백업, 유료 실계정 검증, OCR, 미래 계절성 예측.
 
@@ -150,6 +152,8 @@
 ---
 
 ## 3. 개발 환경 폴더 계층 구조 (Directory Structure)
+
+> **2026-09-27 주의**: 아래 트리는 초기 계획 구조이며 `templates/`, `database/history_manager.py`, `core/analyzers/gemini_vision.py`, `docs/REFERENCE.md`, Dockerfile 등은 실제로 존재하지 않는다. 현재 구조와 모듈 역할은 docs/PROJECT_PLAN.md §2(아키텍처 한 장 요약)를 따른다.
 
 ```text
 ADetect/

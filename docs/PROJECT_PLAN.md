@@ -25,6 +25,7 @@
 - 레거시 UI(`pages/3_history.py`, `ui/facts_workspace.py`, `ui/*_tab.py`, `ui/analysis_shared.py`, `ui/job_control.py`)는 런타임 import 없음을 확인하고 `LEGACY` 주석을 추가했다. 삭제는 보류(후보로만 보고).
 - 테스트 DB 분리: pytest는 임시 경로, 수동 스모크는 `ADETECT_DB_PATH`/`ADETECT_EXPORT_DIR`/`ADETECT_EVIDENCE_DIR` 별도 지정(README).
 - Git: `main` 단일 브랜치 운영. feature 브랜치는 병합 후 정리.
+- 실행 방식: 로컬 PC 실행이 기준이며 다른 PC·네트워크로는 프로젝트 폴더를 zip으로 옮겨 실행한다(README '다른 PC로 옮기기'). 클라우드 배포 설정은 이번 범위에서 제외한다.
 
 2026-09-27 18차 보완 검증: 자동 테스트 41개 통과(smoke 11개 포함), compileall 통과. 분리된 SAMPLE DB로 실제 브라우저에서 프로젝트 생성 → 기본 자료 수집 → 확인·다운로드 최근 버전 자동 선택·`다른 시점 선택` → 이력 3단계 표시(결과·원본 모두 있음/결과만 있음/이력만 있음) → 설정 저장 공간 표시·정리 후보 보기·동의 전 실행 버튼 비활성·정리 실행 결과 표시 → HTML 01_수집정보 행 표시를 확인했다. 운영 DB(`storage/adetect.db`, 세션 86개)는 변경하지 않았다.
 
@@ -63,31 +64,34 @@
 
 ---
 
-## 2. 아키텍처 한 장 요약
+## 2. 아키텍처 한 장 요약 (2026-09-27 현행)
 
 ```
-app.py (라우팅 + 전역 CSS)
- └─ pages/1_home.py       — 홈(랜딩)
- └─ pages/2_analyze.py    — STEP1 입력 → STEP2 Workspace(4탭)
- │     └─ ui/market_tab.py     ─┐
- │     └─ ui/brand_tab.py       │  각 탭은 session(dict)을 받아 그리고,
- │     └─ ui/creative_tab.py    │  core/analyzers/*.py 를 호출해 결과를 채움
- │     └─ ui/synthesis_tab.py  ─┘  (Target Insight는 synthesis_tab 안의 subsection)
- └─ pages/3_history.py    — [LEGACY] 구 세션 이력 (네비게이션 미등록)
- └─ pages/4_settings.py   — API 키 상태 확인
+app.py (st.navigation 상단 메뉴: 홈 · 프로젝트 · 설정 + 전역 CSS)
+ └─ pages/1_home.py       — Hero 단일 화면. 브랜드 입력 → 프로젝트 설정(step="config")
+ └─ pages/2_analyze.py    — ui/project_workspace.py 호출
+ │     ├─ 프로젝트 목록·생성·설정·보관, 백업에서 새 프로젝트 복원
+ │     └─ 프로젝트 내부 탭: 자료 수집 · 자료 확인·다운로드 · 이력 (상단에 저장 공간 사용량)
+ └─ pages/4_settings.py   — API 키 상태, 저장 공간 관리(정리), DB 백업, 프로젝트 단위 삭제 (ui/storage_panel.py)
 
-core/scrapers/*   — 실제 수집 (서비스별 config.settings.*_MOCK 플래그에 따라 개별적으로 mock↔실연동 전환)
-core/analyzers/*  — AI 판단/추천 (§8 FACT/AI/REC 스키마 공통 사용, insight_synthesizer.build_insight/build_target_insight)
-core/exporters/*  — 결과 내보내기 (지금은 소재분석 전용 HTML/Excel/ZIP만 존재)
-database/db.py    — analysis_session / function_run (PRD §6-1·§13)
+core/projects.py         — 프로젝트·입력 스냅샷·8개 자료 종류(SOURCES)·확인 상태·선택 결과·삭제
+core/project_jobs.py     — 단일 워커 수집 실행(자료 종류별 function_run 저장, 중단)
+core/collection.py       — 자료 종류별 실제 수집(run_stage) · 캠페인 관련성 · 토큰 부족 판정
+core/scrapers/*          — 네이버 API·검색 화면·공식 페이지·Apify·YouTube 수집기
+core/evidence_store.py   — 원본(캡처·이미지) 해시 저장 (storage/evidence)
+core/retention.py        — 저장 사용량·정리·보유 상태(availability)·원본 보호(pin)
+core/db_backup.py        — SQLite 온라인 백업 (storage/backups)
+core/project_backup.py   — 프로젝트 백업 ZIP 생성·검증·복원
+core/exporters/facts_report.py   — HTML/Excel/ZIP (01_수집정보~11_이전수집대비)
+core/exporters/artifact_store.py — 산출물 저장·LRU·다운로드 요청 이력
+database/db.py           — SQLite analysis_session / function_run (+ project 계열 테이블은 core에서 생성)
 
-[DEPRECATED, Workspace에서 import/render하지 않음] ui/target_tab.py, core/analyzers/target_recommender.py
-— 과거 세션/DB 호환용으로만 코드베이스에 남아있음(§0 16차 개정).
+[LEGACY — 런타임 import 없음] pages/3_history.py, ui/facts_workspace.py, ui/*_tab.py,
+ui/analysis_shared.py, ui/job_control.py, core/analyzers/* (과거 결과 호환·테스트용)
+[배포 준비 코드 — 미검증·이번 범위 제외] database/remote.py, core/storage.py
 ```
 
-**중요한 설계 원칙**: `ui/*_tab.py`는 화면만 그리고, 실제 로직은 항상 `core/analyzers/*.py`
-함수 호출로 위임합니다. 그래서 **담당자는 core 쪽 함수 내부만 mock → 실제 구현으로 바꾸면 되고,
-화면 코드는 거의 건드릴 필요가 없습니다.**
+**설계 원칙**: 화면(`ui/`)은 `core/projects.py`·`core/project_jobs.py`만 통해 데이터를 다룬다. 레거시 분석 탭을 새 화면에 다시 연결하지 않는다.
 
 ---
 

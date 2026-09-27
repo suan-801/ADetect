@@ -1,3 +1,12 @@
+# 2026-09-27 설정 기준 (아래 모든 과거 설명보다 우선)
+
+- 화면은 `홈 · 프로젝트 · 설정` 3개 메뉴다. 프로젝트 안에서 `자료 수집 → 자료 확인·다운로드 → 이력` 순서로 쓴다.
+- 키가 없는 자료 종류는 목업으로 바뀌지 않는다. 해당 자료가 `설정 필요`/미수집으로 남고, 유료(Apify/Gemini) 키 누락은 `토큰 부족. 개발자에게 문의해주세요`로 표시된다. 가상 자료는 `ADETECT_SAMPLE_MODE=true`일 때만 사용된다.
+- 저장 경로·한도 환경변수: `ADETECT_DB_PATH`, `ADETECT_EXPORT_DIR`, `ADETECT_EVIDENCE_DIR`, `ADETECT_BACKUP_DIR`, `ADETECT_STORAGE_MAX_BYTES`, `ADETECT_DB_MAX_BYTES` 등 (`.env.example` 참고).
+- 다른 PC·네트워크로 옮기는 방법은 README '다른 PC로 옮기기'를 따른다. 클라우드 배포 설정은 현재 범위가 아니다.
+
+---
+
 # 2026-09-26 설정 변경 안내 (아래 과거 설명보다 우선)
 
 새 자료 수집 화면은 유료 기능 기본 ON입니다. .env에 Apify/Gemini 키가 없으면 '토큰 부족. 개발자에게 문의해주세요'를 표시하고 해당 소스를 미수집으로 남깁니다. 입력 확인 화면에서는 API를 호출하지 않습니다. SAMPLE은 ADETECT_SAMPLE_MODE=true로 명시해야 하며, 실사용 중 키 누락을 목업으로 대체하지 않습니다.
@@ -31,19 +40,16 @@ API 키 발급 및 환경 준비 가이드입니다. 이 문서가 단일 기준
 cp .env.example .env   # 아직 .env가 없다면
 ```
 
-`.env` 파일을 열어 해당 줄에 값을 붙여넣고 저장하면 끝입니다. 키를 채운 서비스만 자동으로
-실연동으로 전환되고(`config/settings.py`의 서비스별 `_MOCK` 플래그), 나머지는 계속 목업으로
-동작합니다 — 4개를 한 번에 다 채울 필요 없습니다. `GEMINI_MODEL`/`APIFY_META_ADS_ACTOR`/
+`.env` 파일을 열어 해당 줄에 값을 붙여넣고 저장하면 끝입니다. 키를 채운 서비스만 실제로 수집되고, 비어 있는 서비스의 자료는
+미수집 상태로 안내됩니다(SAMPLE 모드가 아니면 목업으로 대체하지 않음) — 모든 키를 한 번에 채울 필요는 없습니다. `GEMINI_MODEL`/`APIFY_META_ADS_ACTOR`/
 `ADETECT_DB_PATH`는 선택 항목이며 비워두면 기본값을 씁니다(`.env.example` 하단 주석 참고).
 
 `.env`는 `.gitignore`에 등록돼 있어 커밋되지 않습니다 — 절대 직접 커밋하거나 코드/로그에
 값을 그대로 출력하지 마세요(맨 아래 "시크릿 관리 원칙" 참고).
 
-## 지금 당장은 필요 없습니다
+## 키 없이 화면만 확인하려면
 
-이 저장소는 **API 키가 하나도 없어도** `streamlit run app.py`로 전체 화면(홈/분석하기/이력관리/설정)이
-목업(mock) 데이터로 동작하도록 만들어져 있습니다. `config/settings.py`의 `USE_MOCK_DATA` 플래그가
-키 유무에 따라 자동으로 켜지고 꺼집니다. 실제 데이터 연동이 필요해지는 시점에 아래 절차를 따르세요.
+`.env`에 `ADETECT_SAMPLE_MODE=true`를 넣고 앱을 재시작하면 외부 API 호출 없이 SAMPLE 자료로 전체 화면을 확인할 수 있습니다. SAMPLE이 아닐 때 키가 비어 있으면 해당 자료는 수집되지 않고 상태로 안내됩니다(목업으로 대체하지 않음).
 
 ## 1. .env 파일 준비
 
@@ -105,8 +111,8 @@ Residential Proxy를 구매하지 않습니다 (PRD §21-1).
 ## 2026-09-26 추가 설정
 
 - YouTube 선택 수집: Google Cloud에서 YouTube Data API v3를 활성화하고 `YOUTUBE_API_KEY`를 설정합니다.
-  STEP 1에서 공식 채널 ID(`UC...`) 또는 `@handle`을 입력합니다. 계정을 브랜드명으로 추측하지 않습니다.
-- Instagram: STEP 1에 공식 handle/URL을 입력하거나 공식 홈페이지의 Instagram 링크를 사용합니다.
+  프로젝트 설정의 '공식 YouTube 채널'에 채널 ID(`UC...`) 또는 `@handle`을 입력합니다. 계정을 브랜드명으로 추측하지 않습니다.
+- Instagram: 프로젝트 설정의 '공식 Instagram 계정'에 handle/URL을 입력하거나 공식 홈페이지의 Instagram 링크를 사용합니다.
   `apify/instagram-profile-scraper`를 호출하므로 Apify 권한과 과금 설정을 확인합니다.
 - 네이버 캡처: `python -m playwright install chromium` 설치가 필요합니다. 차단·DOM 미감지는 미확인으로 기록합니다.
 - 명시적 오프라인 분석: `ADETECT_SAMPLE_MODE=true`를 설정한 뒤 앱을 재시작합니다.
