@@ -21,7 +21,7 @@ SOURCES = {
 # 프로젝트 입력 v4: 브랜드별 검색어 묶음·계정(brands), 시장 관심 검색어, 뉴스 전용 필터.
 # 이전 필드는 과거 프로젝트·수집 당시 입력 사본을 읽기 위해 계속 허용한다.
 INPUT_VERSION = 4
-RESULT_VERSION = 5
+RESULT_VERSION = 6
 MAX_COMPETITORS = 4      # 데이터랩 한 요청의 최대 5개 주제 = 자사 1 + 경쟁사 4
 MAX_TERMS = 20           # 데이터랩 주제 하나의 최대 검색어 수
 MAX_MARKET = 10

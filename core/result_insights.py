@@ -71,6 +71,25 @@ def all_trend_facts(parts):
     return rows
 
 
+def annual_extremes(series):
+    """연도별 제공 월에서만 최고·최저 계산. 공동값과 미제공 연도를 보존한다."""
+    values = monthly_values(series)
+    start = (series.get("start") or next(iter(values), ""))[:4]
+    end = (series.get("end") or next(reversed(values), ""))[:4]
+    if not start.isdigit() or not end.isdigit():
+        return []
+    rows = []
+    for year in range(int(start), int(end) + 1):
+        observed = {m: v for m, v in values.items() if m.startswith(str(year))}
+        def label(extreme):
+            if not observed: return "미제공"
+            value = extreme(observed.values())
+            months = [f"{int(m[5:7])}월" for m, v in observed.items() if v == value]
+            return ", ".join(months) + f" · 지수 {value:g}"
+        rows.append({"연도": str(year), "최저": label(min), "최고": label(max)})
+    return rows
+
+
 # 긍정/부정 영향은 추정하지 않는다. 제목의 명시적인 주제만 표시한다.
 TOPICS = (
     ("리콜·분쟁·제재 보도", ("리콜", "소송", "과징금", "제재", "불매", "결함")),
@@ -90,7 +109,7 @@ def news_sections(rows):
         title = row.get("title") or row.get("text", "").split("\n")[0]
         topic = next((name for name, words in TOPICS if any(w in title for w in words)), "기타 관련 보도")
         brands = ", ".join(sorted(row.get("found_brands") or [])) or "시장·기타"
-        key = brands + " · " + topic
+        key = (topic, brands)
         normalized = re.sub(r"\W+", "", title.casefold())
         numbers = re.findall(r"\d+(?:[.,]\d+)*", title)
         group = next((g for g in buckets[key] if numbers == g["numbers"] and normalized and
@@ -100,4 +119,12 @@ def news_sections(rows):
                      "normalized": normalized, "numbers": numbers, "articles": []}
             buckets[key].append(group)
         group["articles"].append(row)
-    return [{"title": title, "groups": groups, "count": sum(len(g["articles"]) for g in groups)} for title, groups in buckets.items()]
+    sections = []
+    for topic in [name for name, _ in TOPICS] + ["기타 관련 보도"]:
+        subjects = [{"title": subject, "groups": groups, "count": sum(len(g["articles"]) for g in groups)}
+                    for (category, subject), groups in buckets.items() if category == topic]
+        if subjects:
+            groups = [g for subject in subjects for g in subject["groups"]]
+            sections.append({"title": topic, "subjects": subjects, "groups": groups,
+                             "count": sum(s["count"] for s in subjects)})
+    return sections

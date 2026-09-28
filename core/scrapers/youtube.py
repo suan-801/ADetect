@@ -29,7 +29,11 @@ def fetch_youtube(channel):
                 "part": "snippet", "playlistId": playlist, "maxResults": 5}, timeout=15)
             videos.raise_for_status()
             recent = [{"title": v["snippet"]["title"], "published_at": v["snippet"].get("publishedAt"),
-                       "video_id": v["snippet"].get("resourceId", {}).get("videoId")} for v in videos.json().get("items", [])]
+                       "video_id": v["snippet"].get("resourceId", {}).get("videoId"),
+                       "thumbnail_url": next((v["snippet"].get("thumbnails", {}).get(size, {}).get("url")
+                                              for size in ("maxres", "standard", "high", "medium", "default")
+                                              if v["snippet"].get("thumbnails", {}).get(size, {}).get("url")), None)}
+                      for v in videos.json().get("items", [])]
         return {**result, "status": "available", "channel_id": item["id"], "source_url": "https://www.youtube.com/channel/"+item["id"],
                 "subscribers": None if stats.get("hiddenSubscriberCount") else stats.get("subscriberCount"),
                 "videos": stats.get("videoCount"), "recent_content": recent}

@@ -132,3 +132,12 @@ def public(rows):
     """표·내보내기용 (내부 정규화 필드 제외)."""
     return [{**{k: v for k, v in r.items() if not k.startswith("_")},
              **{k: " | ".join(dict.fromkeys(v)) for k, v in r.get("_utm_values", {}).items()}} for r in rows]
+
+
+def display_structures(rows):
+    """한 브랜드의 첫 행만 이름을 표시하며 상세 근거는 Excel에 둔다."""
+    output = []
+    for brand in dict.fromkeys(r.get("브랜드", "") for r in rows):
+        for index, row in enumerate(r for r in rows if r.get("브랜드", "") == brand):
+            output.append({"브랜드": brand if index == 0 else "", "UTM 항목": row.get("UTM 항목"), "관측값": row.get("관측값")})
+    return output

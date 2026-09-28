@@ -18,7 +18,7 @@ core/projects.py            프로젝트 저장소, v4 입력 정규화(project_
 core/project_jobs.py        단일 백그라운드 워커. 자료 종류별 작업 기록(project_task), 실행 결과(function_run) 저장, 중단
 core/project_sources.py     자료 종류별 수집(collect), 실행 가능 여부(readiness), 기본 브랜드 범위, 광고 노출 상태(ad_status), UTM 대상
 core/project_view.py        브랜드 비교 요약, 검색량 합계, 검색 추이 표시 정보, 뉴스·광고 관측 표시
-core/result_insights.py     검색 추이 사실 계산, 뉴스 주제·유사 제목 묶음 (화면·파일 공유)
+core/result_insights.py     검색 추이 사실·연도별 최저/최고 계산, 뉴스 주제→브랜드·시장→유사 제목 묶음 (화면·파일 공유)
 core/stat_discovery.py      검색 근거가 있는 통계 자료 후보, 캐시·저장·검증
 core/materials.py           종류별 표 행·한 줄 요약·정렬, 뉴스 검색어 후보
 core/utm.py                 UTM 파싱·마스킹·브랜드별 파라미터 문자 구조 추정
@@ -26,7 +26,7 @@ core/capture_reader.py      검색 광고 영역 Gemini 보완 판독 (검증·�
 core/scrapers/              search_history(검색 추이·공동 비교), naver_ad_api(검색량), naver_api(뉴스),
                             naver_serp(검색 화면 관측), brand_site(공식 페이지), ad_library(Meta·Instagram), youtube
 core/evidence_store.py      원본 저장(내용 해시), 공식 페이지 캡처
-core/exporters/facts_report.py   HTML·Excel·브랜드별 ZIP (v4/v5 표: project_tables, 이전 형식: report_tables)
+core/exporters/facts_report.py   HTML·Excel·브랜드별 ZIP (v4/v5/v6 표: project_tables, 이전 형식: report_tables)
 core/exporters/visual_report.py  SVG 차트·이미지 카드·원본 전환을 포함한 독립 HTML
 core/exporters/artifact_store.py 산출물 저장·LRU·다운로드 요청 기록
 core/retention.py           사용량·정리·보유 상태·원본 보호
@@ -48,8 +48,8 @@ config/theme.py             색상 토큰, 전역 CSS, Workspace CSS
 ## 2. 데이터 흐름
 
 1. 설정 저장: 화면 입력 → `projects.to_storage()` → `analysis_session.inputs_json` (v4)
-2. 수집: `project_jobs.submit(project, sources, force, options)` → 작업마다 입력 사본 저장 → `project_sources.collect()` → `projects.normalize()`(뉴스 URL 통합·상태 계산) → `function_run`(source별 결과, `schema_version=5`)
-3. 표시: `projects.histories()`(v2/v3/v4/v5 읽기) → 종류별 최근 성공 또는 사용자가 고른 이전 결과 → `project_view`·`materials`·`result_insights`로 계산 → 화면
+2. 수집: `project_jobs.submit(project, sources, force, options)` → 작업마다 입력 사본 저장 → `project_sources.collect()` → `projects.normalize()`(뉴스 URL 통합·상태 계산) → `function_run`(source별 결과, `schema_version=6`)
+3. 표시: `projects.histories()`(v2/v3/v4/v5/v6 읽기) → 종류별 최근 성공 또는 사용자가 고른 이전 결과 → `project_view`·`materials`·`result_insights`로 계산 → 화면
 4. 다운로드: `projects.selection_result()`(선택 ∩ 뉴스 필터, 비교 요약·UTM 포함) → `facts_report`
 
 ## 3. 바꿀 때 함께 확인할 것
@@ -94,8 +94,10 @@ config/theme.py             색상 토큰, 전역 CSS, Workspace CSS
 - `ui/project_setup.py`: 신규 전용 4단계 폼. 각 단계 제출 시 초안을 갱신한다. 브랜드·범위 변경은 명시적 교체, 기존 편집은 `project_workspace._config`를 유지한다.
 - `core/project_discovery.py`: 검색 grounding → 구조화 2회 요청, 검색 근거 URL 검증, 자사·경쟁사 홈페이지 SNS 연결 확인, 프로필 URL 정규화, 성공 캐시와 호출 잠금. 공식 여부는 자동 인증하지 않는다.
 - `core/analyzers/news_digest.py`: 최신 최대 30건/1,800자/15건 배치, 직접 인용·수치 부분 문자열 검증, 성공 캐시, 파생 결과 저장. 기존 수집 워커는 유지하며 뉴스 요약은 명시적 버튼 요청에만 실행한다.
-- `project_digest`는 수집 기록당 1개, 원본과 별도 저장한다. 백업 시 포함하고 복원 시 새 run_id에 연결한다. 결과 정리·프로젝트 삭제 시 함께 정리한다. 입력 v4를 유지하며 새 결과는 v5, 과거 수집 사본은 수정하지 않는다.
+- `project_digest`는 수집 기록당 1개, 원본과 별도 저장한다. 백업 시 포함하고 복원 시 새 run_id에 연결한다. 결과 정리·프로젝트 삭제 시 함께 정리한다. 입력 v4를 유지하며 새 결과는 v6, 과거 수집 사본은 수정하지 않는다.
 - `project_resource`는 프로젝트당 통계 후보 1개를 별도 저장한다. 브랜드·시장·모델·방식 지문이 맞을 때만 표시하며 백업 v4에 포함하고 삭제 시 함께 정리한다. 백업 v3도 읽는다.
 - 비교표는 화면에서 선택한 SNS 버전을 사용한다. 다른 시점 결과를 몰래 결합하지 않는다.
 - 회귀 검증: 성공 AI 프리필→수정→뒤로→저장, 무키 수동 생성, 성공 캐시/실패 재시도, 근거 없는 URL 거부, 뉴스 허위 수치/출처 거부, 버전·필터 변경, 선택 다운로드, 요약 백업·복원.
 - 유료 실호출 없이 모의 응답으로 검증한다. Gemini 계정별 검색 도구 지원·실제 제안 품질·비용은 별도 승인된 실계정 검증 대상이다.
+
+- HTML 미리보기: `image_preview.compress`로 저장 원본을 압축하며 AI·외부 요청 없이 생성한다. Meta·YouTube 수집 시 실제 응답의 썸네일을 별도 저장한다. 검색 문구 필터는 `project_view.search_ad_rows`를 화면·파일에서 공유하며 수집 당시 입력 사본을 쓴다. 상세 원문은 Excel/JSON에 남긴다.

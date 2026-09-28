@@ -142,3 +142,33 @@ def search_status_rows(rows, p, observed_only=True):
             output.append({"검색어": r.get("keyword"), "브랜드": st.get("name", bid), "노출 상태": st["state"], "근거": st.get("evidence"),
                            "수집 환경": r.get("environment"), "수집 시각": (r.get("observed_at") or "")[:16].replace("T", " ")})
     return output
+
+
+def search_ad_rows(records, inputs):
+    """검색어와 무관하게 광고별 공식 도메인을 확인한다. 수집 당시 입력을 우선한다."""
+    from core.project_sources import official_targets, _domain_match
+    versions = {v.get("run_id"): v.get("inputs", {}) for v in inputs.get("versions", [])}
+    output = []
+    for row in records:
+        if row.get("kind") != "검색 화면": continue
+        run_id = row.get("selection_id", "").split("/", 1)[0]
+        snapshot = versions.get(run_id, inputs)
+        brands = snapshot.get("brands", [])
+        direct = [{**ad, "method": ad.get("method") or "페이지 직접 추출"} for ad in row.get("ads", [])]
+        ai = [{"area": ad.get("area"), "text": " ".join(x for x in (ad.get("advertiser_visible"), ad.get("copy_visible")) if x),
+               "display_url": ad.get("display_url_visible"), "links": [], "confidence": ad.get("confidence") or "미제공",
+               "method": (row.get("ai_read") or {}).get("method") or "AI 이미지 판독"}
+              for ad in (row.get("ai_read") or {}).get("ads", [])]
+        for ad in direct + ai:
+            matched = []
+            for brand in brands:
+                targets = official_targets(brand)
+                if any(_domain_match(url, targets) for url in [ad.get("display_url"), *(ad.get("links") or [])]):
+                    matched.append(brand["name"])
+            if not matched: continue
+            output.append({"검색어": row.get("keyword"), "브랜드": ", ".join(matched),
+                           "영역": {"powerlink": "파워링크", "brand_search": "브랜드검색"}.get(ad.get("area"), ad.get("area")),
+                           "광고 문구": ad.get("text") or ad.get("title"), "표시 URL": ad.get("display_url"),
+                           "링크": "\n".join(ad.get("links") or []), "판독 방식": ad["method"],
+                           "신뢰도": ad.get("confidence") or "직접 추출"})
+    return output

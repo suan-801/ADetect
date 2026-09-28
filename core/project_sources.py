@@ -1,4 +1,4 @@
-"""프로젝트 흐름의 자료 종류별 수집 (결과 schema_version=5).
+"""프로젝트 흐름의 자료 종류별 수집 (결과 schema_version=6).
 
 - 비교에 필요한 자료(검색 추이·검색량·SNS)는 브랜드 단위로, 추가 자료(공식 페이지·Meta 광고·검색 화면)는
   사용자가 고른 브랜드만 수집한다. 선택하지 않은 자료 종류는 호출하지 않는다.
@@ -48,7 +48,10 @@ def _domain_match(value, targets):
     if not value:
         return None
     host = _host(value)
-    path = urlsplit(value if "://" in value else "https://" + value).path.strip("/").split("/")[0].lower()
+    try:
+        path = urlsplit(value if "://" in value else "https://" + value).path.strip("/").split("/")[0].lower()
+    except ValueError:
+        return None
     for t_host, t_path in targets:
         same = host == t_host or host.endswith("." + t_host) or host.removeprefix("m.") == t_host.removeprefix("m.")
         if same and (t_path is None or path == t_path):
@@ -164,7 +167,7 @@ def _sample_observation(keyword):
 
 
 def collect(source, p, options=None):
-    """자료 종류 하나를 수집해 v5 결과로 반환한다. p는 projects.project_inputs() 결과."""
+    """자료 종류 하나를 수집해 v6 결과로 반환한다. p는 projects.project_inputs() 결과."""
     from core.evidence_store import save_bytes
     options = options or {}
     paid_enabled = p.get("paid_enabled", True)
@@ -323,23 +326,43 @@ def _social(source, brand, account):
             raise ValueError(data.get("message") or ("채널을 찾을 수 없음" if data.get("status") == "channel_not_found" else "YouTube 조회 실패"))
         rows = [_rec("YouTube", brand, data["source_url"], "공식 채널", subscribers=data.get("subscribers"), videos=data.get("videos"), observed_at=now,
                      note="YouTube 구독자 수는 API가 반올림한 값을 제공합니다.")]
-        rows += [_rec("YouTube 게시물", brand, "https://www.youtube.com/watch?v=" + str(v.get("video_id")), v["title"], published_at=v.get("published_at")) for v in data.get("recent_content", [])]
+        for v in data.get("recent_content", []):
+            if not v.get("video_id"): continue
+            assets, warnings = _thumbnail(v.get("thumbnail_url"))
+            rows.append(_rec("YouTube 게시물", brand, "https://www.youtube.com/watch?v=" + str(v["video_id"]), v["title"],
+                             published_at=v.get("published_at"), format="video", assets=assets,
+                             thumbnail_url=v.get("thumbnail_url"), warnings=warnings))
         return {"records": rows}
     from core.scrapers.ad_library import fetch_meta_ads_detail
     from core.evidence_store import fetch_asset
     rows = []
     for ad in fetch_meta_ads_detail(brand["name"], page_override=account):
         checkpoint(brand["name"] + " · 광고 원본 저장 중")
-        assets = []
+        assets, warnings = _thumbnail(ad.get("thumbnail_url"))
         if ad.get("image_url") and not settings.SAMPLE_MODE:
             try:
-                assets.append(fetch_asset(ad["image_url"]))
+                if not any(a.get("source_url") == ad["image_url"] for a in assets):
+                    assets.append(fetch_asset(ad["image_url"]))
             except Exception:
-                pass
+                warnings.append("광고 원본 저장 실패 · 광고 원문에서 확인하세요.")
         rows.append(_rec("광고", brand, "https://www.facebook.com/ads/library/?id=" + str(ad["ad_id"]), (ad.get("headline") or "") + "\n" + (ad.get("body") or ""),
                          external_id=str(ad["ad_id"]), landing_url=ad.get("landing_url"), format=ad.get("format"), cta=ad.get("cta"),
-                         start_date=ad.get("ad_delivery_start_time"), running_days=ad.get("ad_running_days"), placements=ad.get("publisher_platforms"), assets=assets))
+                         start_date=ad.get("ad_delivery_start_time"), running_days=ad.get("ad_running_days"), placements=ad.get("publisher_platforms"),
+                         assets=assets, thumbnail_url=ad.get("thumbnail_url"), warnings=warnings))
     return {"records": rows}
+
+
+def _thumbnail(url):
+    """수집 응답에 실제 포함된 미리보기만 저장한다. AI·추가 API 호출 없음."""
+    if not url or settings.SAMPLE_MODE: return [], []
+    from core.evidence_store import fetch_asset
+    try:
+        asset = fetch_asset(url, maximum=6*1024**2)
+        if not asset["filename"].lower().endswith((".png", ".jpg", ".webp", ".gif")):
+            return [], ["썸네일 응답이 이미지가 아닙니다."]
+        return [{**asset, "role": "썸네일"}], []
+    except Exception:
+        return [], ["썸네일 저장 실패 · 원문에서 확인하세요."]
 
 
 def utm_rows(p, records):

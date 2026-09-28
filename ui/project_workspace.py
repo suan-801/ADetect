@@ -128,6 +128,7 @@ def _config(project=None):
     st.caption(MARKET_HELP + " 브랜드 검색량 합계에는 포함하지 않습니다.")
 
     st.subheader("뉴스 검색 설정")
+    st.caption("브랜드 뉴스와 시장 뉴스를 함께 보려면 시장 검색어(예: 시승 시장, 자동차 제도 변경)를 추가하세요. 수집한 기사는 주제 → 브랜드·시장 → 제목 순으로 정리합니다.")
     news = words(st.text_input(f"뉴스 검색어 (최대 {projects.MAX_NEWS}개)", placeholder=EXAMPLE["news"], key="project_news",
                                help="이 칸의 검색어로만 뉴스를 요청합니다. 비어 있으면 뉴스를 수집하지 않습니다."))
     left, right = st.columns([1, 3])
@@ -423,9 +424,11 @@ def _trend_chart(series, start=None, end=None, height=240):
 
 
 def _trend(item, p):
-    from core.result_insights import trend_facts
-    def facts(series):
+    from core.result_insights import trend_facts, annual_extremes
+    def facts(series, annual=False):
+        if annual: st.dataframe(annual_extremes(series), hide_index=True)
         for f in trend_facts(series):
+            if annual and f["항목"] in ("최고", "최저", "변동 없음"): continue
             st.markdown(f"**{f['항목']}** · {f['관측 사실']}")
     view = project_view.trend_view(item, p)
     if view["kind"] == "none":
@@ -447,8 +450,8 @@ def _trend(item, p):
     st.caption(f"{compare['start']} ~ {compare['end']} 월간 · 한 요청 안의 전체 최고 월=100인 상대지수(검색 횟수 아님) · 빠진 달은 0이 아님"
                + (" · 응답 없음: " + ", ".join(missing) if missing else "") + (" · SAMPLE" if compare.get("sample") else ""))
     for series in compare["series"]:
-        st.markdown("**" + series["name"] + " · 주요 관측값**")
-        facts({**series, "start": compare["start"], "end": compare["end"]})
+        st.markdown("**" + series["name"] + " · 연도별 최저·최고**")
+        facts({**series, "start": compare["start"], "end": compare["end"]}, annual=True)
     with st.expander("비교 구성과 월별 평균"):
         st.dataframe([{"브랜드": s["name"], "검색어 묶음": ", ".join(s["terms"]), "제공 월수": len(s["rows"])} for s in compare["series"]], hide_index=True)
         season = compare.get("seasonality", {})
@@ -506,20 +509,21 @@ def _details(rows, p, token, selection):
             _editor(group, token + kind, selection)
 
 
-def _search_area(rows, item):
+def _search_area(rows, item, inputs):
     captures = [r for r in rows if r["kind"] == "검색 화면"]
     if not captures:
         _status_line(item, "search_capture") if item else st.caption("검색 화면 · 미수집")
         return
-    st.caption("네이버 PC 검색 결과를 한 번 관측한 기록입니다. 첫 화면 캡처와 광고 영역 확대 캡처, 페이지에서 직접 읽은 광고 문구·링크를 보여줍니다. "
-               "'이번 화면에서 미관측'은 미운영을 뜻하지 않으며, 캡처 실패·차단·영역 식별 실패는 '판독 불가'입니다. 광고를 클릭해 랜딩을 확인하지 않습니다.")
+    st.caption("공식 도메인이 일치한 자사·경쟁사 광고 문구만 표시합니다. 일반 검색어에도 같은 기준을 적용하며 광고주를 추측하지 않습니다. "
+               "한 번의 PC 화면 관측입니다. 캡처는 전체 화면이며, 전체 광고 원문·판독 상태는 Excel에 보관합니다.")
     observed = project_view.search_status_rows(captures, None)
     if observed:
         st.dataframe(observed, hide_index=True)
     else:
         st.caption("선택한 검색 화면에서 브랜드가 확정된 광고 관측 없음 · 전체 판독 상태는 원본 데이터에 보관합니다.")
     for r in captures:
-        if not r.get("ads") and not (r.get("ai_read") or {}).get("ads"):
+        ads = project_view.search_ad_rows([r], inputs)
+        if not ads:
             continue
         with st.expander(f"{r.get('keyword')} · {r.get('environment', '')} · {(r.get('observed_at') or '')[:16].replace('T', ' ')}"):
             images = [a for a in r.get("assets", []) if a.get("filename", "").lower().endswith(IMAGE_EXT)]
@@ -533,11 +537,7 @@ def _search_area(rows, item):
                         st.image(data, caption=asset.get("role", "캡처"), width="stretch")
             if not images:
                 st.caption("저장된 캡처 이미지 없음" + (" (SAMPLE)" if r.get("sample") else ""))
-            ads = [{"영역": {"powerlink": "파워링크", "brand_search": "브랜드검색"}.get(a["area"], a["area"]), "광고 문구": a.get("text"), "표시 URL": a.get("display_url"),
-                    "링크": (a.get("links") or [None])[0], "판독 방식": a.get("method")} for a in r.get("ads", [])]
             ai = r.get("ai_read") or {}
-            ads += [{"영역": a["area"], "광고 문구": " ".join(x for x in (a.get("advertiser_visible"), a.get("copy_visible")) if x),
-                     "표시 URL": a.get("display_url_visible"), "링크": None, "판독 방식": f"AI 판독 · 신뢰도 {a['confidence']}"} for a in ai.get("ads", [])]
             if ads:
                 st.dataframe(ads, hide_index=True, column_config={"링크": st.column_config.LinkColumn()})
             if ai.get("state") in ("실패",):
@@ -554,11 +554,8 @@ def _utm(p, rows):
     groups = utm.structure_rows(data)
     st.caption("URL을 방문하지 않고 주소만 분석합니다. 추적 파라미터만으로 실제 집행 매체·성과·전환을 확정하지 않습니다. 민감한 값은 가립니다.")
     if groups:
-        st.caption("브랜드·UTM 항목별 관측값과 문자 구조 추정입니다. source·medium·content를 합치지 않으며 토큰의 의미를 추정하지 않습니다.")
-        st.dataframe([{k: v for k, v in r.items() if k in ("브랜드", "UTM 항목", "관측값", "추정 구조", "근거 URL 수")} for r in groups], hide_index=True)
-    with st.expander("UTM 원본 URL과 파라미터"):
-        st.dataframe(utm.public(data), hide_index=True)
-        st.dataframe(groups, hide_index=True)
+        st.caption("브랜드별 UTM 항목과 관측값입니다. 전체 URL·문자 구조·표본 근거는 Excel에서 확인할 수 있습니다.")
+        st.dataframe(utm.display_structures(groups), hide_index=True)
     return utm.public(data), groups
 
 
@@ -568,16 +565,25 @@ def _news_sections(rows):
     sections = news_sections(rows)
     if not sections: return
     _section("뉴스 주제별 요약")
-    st.caption("선택한 기사를 제목의 주제로 묶고 유사 기사에는 대표 발췌를 표시합니다. 호재·악재를 자동 판정하지 않습니다.")
+    st.caption("주제 → 브랜드·시장 → 최신 기사 제목 순으로 펼쳐보세요. 시장·기타는 브랜드 직접 언급이 없는 기사입니다. 발췌문은 Excel에 보관합니다.")
     for section in sections:
-        with st.expander(f"{section['title']} · {section['count']}건", expanded=len(sections) <= 4):
-            for group in section["groups"]:
-                st.markdown("**" + group["title"] + "**")
-                st.write(group["excerpt"] or "발췌 미제공")
-                with st.expander(f"출처 {len(group['articles'])}건 · 제목 유사 기사"):
-                    for row in group["articles"]:
-                        st.caption(row.get("published_at") or "발행일 미제공")
-                        st.markdown(link(row.get("source_url"), row.get("title") or group["title"]), unsafe_allow_html=True)
+        with st.expander(f"{section['title']} · {len(section['groups'])}개 주제 / 기사 {section['count']}건"):
+            for subject in section["subjects"]:
+                with st.expander(f"{subject['title']} · {len(subject['groups'])}개 주제 / 기사 {subject['count']}건"):
+                    def headlines(groups):
+                        for group in groups:
+                            row, *others = group["articles"]
+                            st.markdown(link(row.get("source_url"), group["title"]), unsafe_allow_html=True)
+                            st.caption((row.get("published_at") or "발행일 미제공")[:10])
+                            if others:
+                                with st.expander(f"유사 기사 {len(others)}건 더 보기"):
+                                    for r in others:
+                                        st.markdown(link(r.get("source_url"), r.get("title") or group["title"]), unsafe_allow_html=True)
+                                        st.caption((r.get("published_at") or "발행일 미제공")[:10])
+                    headlines(subject["groups"][:5])
+                    if len(subject["groups"]) > 5:
+                        with st.expander(f"나머지 제목 {len(subject['groups'])-5}개 더 보기"):
+                            headlines(subject["groups"][5:])
 
 
 def _ad_cards(rows, token):
@@ -595,10 +601,11 @@ def _ad_cards(rows, token):
         for col, row in zip(st.columns(3), ads[start:min(start+3, page*12)]):
             with col:
                 with st.container(border=True):
-                    image = next((a for a in row.get("assets", []) if a.get("filename", "").lower().endswith(IMAGE_EXT)), None)
+                    assets = sorted(row.get("assets", []), key=lambda a: a.get("role") != "썸네일")
+                    image = next((a for a in assets if a.get("filename", "").lower().endswith(IMAGE_EXT)), None)
                     data = _image(image["filename"], image.get("sha256", "")) if image else None
                     if data: st.image(data, width="stretch")
-                    else: st.caption("저장 이미지 없음 · 광고 원문 확인")
+                    else: st.caption("영상 썸네일 없음 · 재수집 또는 원문 확인" if row.get("format") == "video" else "저장 이미지 없음 · 광고 원문 확인")
                     st.markdown("**" + row.get("brand", "") + "**")
                     st.caption(" · ".join(str(v) for v in (row.get("format"), row.get("start_date"), row.get("cta")) if v))
                     st.write(row.get("text", "")[:500])
@@ -712,7 +719,8 @@ def _result(project, history):
     _ad_cards(selected_rows, token)
 
     _section("검색 화면과 광고 관측")
-    _search_area(selected_rows, by.get("search_capture"))
+    search_item = by.get("search_capture")
+    _search_area(selected_rows, search_item, search_item["result"].get("inputs", {}) if search_item else {})
 
     _section("UTM 구조")
     utm_data, utm_groups = _utm(p, [r for r in rows if r["selection_id"] in selection])
