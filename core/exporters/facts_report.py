@@ -195,7 +195,7 @@ def project_tables(result):
         "18_수집상태": [{"대상": pt.get("label"), "상태": pt.get("state"), "안내": pt.get("message", "")} for pt in parts.values()],
         "19_이전수집대비": [{k: v for k, v in c.items() if k != "자료ID"} for c in result.get("changes", [])],
         "21_검색추이주요사실": all_trend_facts(parts),
-        "22_뉴스주제묶음": [{"대구분": s["title"], "소구분": subject["title"], "대표 제목": g["title"], "대표 발췌": g["excerpt"], "유사 기사 수": len(g["articles"]), "출처": "\n".join(r.get("source_url", "") for r in g["articles"])} for s in news_sections(by_kind("뉴스")) for subject in s["subjects"] for g in subject["groups"]],
+        "22_뉴스주제묶음": [{"대구분": s["title"], "소구분": subject["title"], "언급 브랜드": ", ".join(g["brands"]) or "없음", "대표 제목": g["title"], "대표 발췌": g["excerpt"], "유사 기사 수": len(g["articles"]), "출처": "\n".join(r.get("source_url", "") for r in g["articles"])} for s in news_sections(by_kind("뉴스")) for subject in s["subjects"] for g in subject["groups"]],
         "23_맞춤통계자료": result.get("stat_resources", []),
         "24_검색관측전체상태": search_status_rows(records, None, observed_only=False),
         "25_브랜드연도별최저최고": [{"브랜드": s["name"], **r} for s in (compare or {}).get("series", [])

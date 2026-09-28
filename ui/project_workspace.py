@@ -539,7 +539,8 @@ def _search_area(rows, item, inputs):
                 st.caption("저장된 캡처 이미지 없음" + (" (SAMPLE)" if r.get("sample") else ""))
             ai = r.get("ai_read") or {}
             if ads:
-                st.dataframe(ads, hide_index=True, column_config={"링크": st.column_config.LinkColumn()})
+                # 네이버 광고 이동 주소는 길어 화면에서는 뺀다. Excel에는 링크를 유지한다.
+                st.dataframe([{k: v for k, v in a.items() if k != "링크"} for a in ads], hide_index=True)
             if ai.get("state") in ("실패",):
                 st.caption("AI 보완 판독 실패 — 캡처와 직접 추출 결과는 그대로 사용할 수 있습니다.")
             st.markdown(f"[원문 검색 결과 열기]({r['source_url']})")
@@ -560,25 +561,26 @@ def _utm(p, rows):
 
 
 def _news_sections(rows):
-    from core.result_insights import news_sections
+    from core.result_insights import news_sections, headline, MULTI_BRAND
     from core.exporters.visual_report import link
     sections = news_sections(rows)
     if not sections: return
     _section("뉴스 주제별 요약")
-    st.caption("주제 → 브랜드·시장 → 최신 기사 제목 순으로 펼쳐보세요. 시장·기타는 브랜드 직접 언급이 없는 기사입니다. 발췌문은 Excel에 보관합니다.")
+    st.caption("주제 → 브랜드(여러 브랜드 동시 언급·시장·기타) → 최신 기사 제목 순으로 펼쳐보세요. 주제는 제목에 쓰인 표현으로만 나눕니다. "
+               "시장·기타는 브랜드 직접 언급이 없는 기사입니다. 발췌문은 Excel에 보관합니다.")
     for section in sections:
         with st.expander(f"{section['title']} · {len(section['groups'])}개 주제 / 기사 {section['count']}건"):
             for subject in section["subjects"]:
                 with st.expander(f"{subject['title']} · {len(subject['groups'])}개 주제 / 기사 {subject['count']}건"):
-                    def headlines(groups):
+                    def headlines(groups, multi=subject["title"] == MULTI_BRAND):
                         for group in groups:
                             row, *others = group["articles"]
                             st.markdown(link(row.get("source_url"), group["title"]), unsafe_allow_html=True)
-                            st.caption((row.get("published_at") or "발행일 미제공")[:10])
+                            st.caption((row.get("published_at") or "발행일 미제공")[:10] + (" · " + ", ".join(group["brands"]) if multi else ""))
                             if others:
                                 with st.expander(f"유사 기사 {len(others)}건 더 보기"):
                                     for r in others:
-                                        st.markdown(link(r.get("source_url"), r.get("title") or group["title"]), unsafe_allow_html=True)
+                                        st.markdown(link(r.get("source_url"), headline(r) or group["title"]), unsafe_allow_html=True)
                                         st.caption((r.get("published_at") or "발행일 미제공")[:10])
                     headlines(subject["groups"][:5])
                     if len(subject["groups"]) > 5:

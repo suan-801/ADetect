@@ -114,3 +114,64 @@ def test_previous_results_still_use_readable_export():
     for version in (4, 5, 6):
         markup = facts_report.report_html({}, {"schema_version": version, "records": [], "parts": {}, "inputs": {}})
         assert "최상단으로" in markup
+
+
+def test_news_topics_multi_brand_subject_and_unescaped_titles():
+    def article(i, title, brands):
+        return {"id": str(i), "kind": "뉴스", "title": title, "text": title, "found_brands": brands, "published_at": f"2026-09-{10+i:02d}",
+                "source_url": f"https://news.example/{i}"}
+    rows = [article(1, "[CAR 브리프] A·B·C 소식", ["A", "B"]),
+            article(2, "[시승기] A 신모델 &quot;조용하다&quot;", ["A"]),
+            article(3, "A, 찾아가는 시승 운영", ["A"]),
+            article(4, "A 7월 3,030대 판매", ["A"]),
+            article(5, "A, 고객 감사 콘서트 개최", ["B", "A"]),
+            article(6, "시승 시장 제도 변경", []),
+            article(7, "A 공장 견학", ["A"])]
+    before = copy.deepcopy(rows)
+    sections = {s["title"]: s for s in news_sections(rows)}
+    assert list(sections) == ["업계 소식 모음", "리뷰·사용기", "체험·시승", "실적·수주·투자 보도", "행사·캠페인", "기타 관련 보도"]
+    assert sections["리뷰·사용기"]["groups"][0]["title"] == '[시승기] A 신모델 "조용하다"' and rows == before
+    assert [s["title"] for s in sections["체험·시승"]["subjects"]] == ["A", "시장·기타"]
+    assert sections["행사·캠페인"]["subjects"][0]["title"] == "여러 브랜드 동시 언급"
+    markup = facts_report.report_html({}, {"schema_version": 6, "records": rows, "inputs": {}, "parts": {}})
+    assert "&amp;quot;" not in markup and "· A, B</span>" in markup
+    grouped = facts_report.tables_for({"schema_version": 6, "records": rows, "inputs": {}, "parts": {}})["22_뉴스주제묶음"]
+    assert {r["언급 브랜드"] for r in grouped} >= {"A, B", "없음"}
+
+
+def test_index_values_are_rounded_only_for_display():
+    series = {"name": "A", "start": "2024-01-01", "end": "2024-03-31", "rows": [
+        {"date": "2024-01-01", "search_index": 1.68809}, {"date": "2024-02-01", "search_index": 11.3637},
+        {"date": "2024-03-01", "search_index": 11.3637}]}
+    assert annual_extremes(series)[0] == {"연도": "2024", "최저": "1월 · 지수 1.69", "최고": "2월, 3월 · 지수 11.36"}
+    rise = next(f for f in trend_facts_of(series) if f["항목"] == "최대 전월 상승")["관측 사실"]
+    assert "1.69 → 11.36" in rise
+
+
+def trend_facts_of(series):
+    from core.result_insights import trend_facts
+    return trend_facts(series)
+
+
+def test_search_ad_table_hides_click_links_but_excel_keeps_them():
+    row = {"kind": "검색 화면", "keyword": "시승이벤트", "selection_id": "run/row",
+           "ads": [{"area": "powerlink", "text": "A 광고", "display_url": "a.example", "links": ["https://ader.naver.com/v1/long-tracking"]}]}
+    inputs = {"brands": [{"id": "own", "name": "A", "sources": {"official_urls": ["https://a.example"]}}]}
+    result = {"schema_version": 6, "records": [row], "inputs": inputs, "parts": {}}
+    assert facts_report.tables_for(result)["09_검색광고문구"][0]["링크"] == "https://ader.naver.com/v1/long-tracking"
+    markup = facts_report.report_html({}, result)
+    assert "A 광고" in markup and "ader.naver.com" not in markup
+
+
+def test_news_topics_are_industry_neutral_for_non_car_brands():
+    titles = [("B 체험단 모집…신제품 써보니", ["B"]), ("K뷰티 3,000대 1 경쟁률 오디션", []),
+              ("올리브영 세일 최대 70%", []), ("B, 파리 팝업스토어 열어", ["B"]), ("C 7월 1만대 판매 돌파", ["C"])]
+    rows = [{"kind": "뉴스", "title": t, "text": t, "found_brands": b, "published_at": "2026-09-01",
+             "source_url": f"https://news.example/{i}"} for i, (t, b) in enumerate(titles)]
+    topic = {g["title"]: s["title"] for s in news_sections(rows) for g in s["groups"]}
+    assert topic["B 체험단 모집…신제품 써보니"] == "리뷰·사용기"
+    assert topic["K뷰티 3,000대 1 경쟁률 오디션"] == "기타 관련 보도"
+    assert topic["올리브영 세일 최대 70%"] == "프로모션·혜택"
+    assert topic["B, 파리 팝업스토어 열어"] == "행사·캠페인"
+    assert topic["C 7월 1만대 판매 돌파"] == "실적·수주·투자 보도"
+    assert not any("시승" in s["title"] and s["title"] != "체험·시승" for s in news_sections(rows))

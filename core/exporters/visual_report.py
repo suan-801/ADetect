@@ -7,7 +7,7 @@ from datetime import date
 from urllib.parse import urlsplit
 from config.theme import COLORS
 from core.evidence_store import read_bytes
-from core.result_insights import monthly_values, trend_facts, news_sections, annual_extremes
+from core.result_insights import monthly_values, trend_facts, news_sections, annual_extremes, headline, MULTI_BRAND
 
 
 def esc(value):
@@ -139,8 +139,10 @@ def news_html(rows):
             groups = []
             for group in subject["groups"]:
                 representative, *others = group["articles"]
-                groups.append('<li><div class="news-headline">' + link(representative.get("source_url"), group["title"]) + '<time>' + esc((representative.get("published_at") or "날짜 미제공")[:10]) + '</time></div>' +
-                              ('<details><summary>유사 기사 ' + str(len(others)) + '건 더 보기</summary><ul>' + ''.join('<li>' + link(r.get("source_url"), r.get("title") or group["title"]) + ' <span class="muted">' + esc((r.get("published_at") or '')[:10]) + '</span></li>' for r in others) + '</ul></details>' if others else '') + '</li>')
+                # 여러 브랜드 소구분에서는 어떤 브랜드가 함께 언급됐는지 제목 옆에 표시한다.
+                brands = ' <span class="muted">· ' + esc(', '.join(group["brands"])) + '</span>' if subject["title"] == MULTI_BRAND else ''
+                groups.append('<li><div class="news-headline"><span>' + link(representative.get("source_url"), group["title"]) + brands + '</span><time>' + esc((representative.get("published_at") or "날짜 미제공")[:10]) + '</time></div>' +
+                              ('<details><summary>유사 기사 ' + str(len(others)) + '건 더 보기</summary><ul>' + ''.join('<li>' + link(r.get("source_url"), headline(r) or group["title"]) + ' <span class="muted">' + esc((r.get("published_at") or '')[:10]) + '</span></li>' for r in others) + '</ul></details>' if others else '') + '</li>')
             # 첫 다섯 개만 먼저 읽고 필요하면 나머지를 펼친다. 모든 원문은 보존한다.
             content = '<ul class="news-list">' + ''.join(groups[:5]) + '</ul>'
             if len(groups) > 5:
@@ -197,12 +199,13 @@ def report(session, result, tables):
     section("market", "시장 검색어 추이", ''.join(market))
     news = [r for r in records if r["kind"] == "뉴스"]
     if news:
-        section("news", "뉴스 주제별 요약", '<p class="muted">주제 → 브랜드·시장 → 최신 기사 제목 순으로 펼쳐보세요. 비슷한 제목은 묶고 발췌문은 Excel에 담았습니다. 시장·기타는 브랜드 직접 언급이 없는 기사이며, 시장 전체를 대표하지 않습니다.</p>' + news_html(news) + ('<details><summary>AI 선정 핵심 근거</summary>' + table(result.get("news_digest", [])) + '</details>' if result.get("news_digest") else ''))
+        section("news", "뉴스 주제별 요약", '<p class="muted">주제 → 브랜드(여러 브랜드 동시 언급·시장·기타) → 최신 기사 제목 순으로 펼쳐보세요. 주제는 제목에 쓰인 표현으로만 나눕니다. 비슷한 제목은 묶고 발췌문은 Excel에 담았습니다. 시장·기타는 브랜드 직접 언급이 없는 기사이며, 시장 전체를 대표하지 않습니다.</p>' + news_html(news) + ('<details><summary>AI 선정 핵심 근거</summary>' + table(result.get("news_digest", [])) + '</details>' if result.get("news_digest") else ''))
     section("ads", "광고 소재", '<p class="muted">수집된 광고 표본 · 브랜드별로 펼쳐 이미지·문구·랜딩 확인</p>' + gallery([r for r in records if r["kind"] == "광고"], images) if any(r["kind"] == "광고" for r in records) else '')
     captures = [r for r in records if r["kind"] == "검색 화면"]
     if captures:
         from core.project_view import search_ad_rows
-        filtered = tables.get("09_검색광고문구", [])
+        # 네이버 광고 이동 주소는 길고 읽을 수 없어 HTML에서는 뺀다. Excel에는 링크를 유지한다.
+        filtered = [{k: v for k, v in r.items() if k != "링크"} for r in tables.get("09_검색광고문구", [])]
         section("search", "검색 화면 관측", '<p class="muted">공식 도메인이 일치한 자사·경쟁사 광고만 표시합니다. 일반 검색어도 같은 기준을 적용합니다. 전체 광고 원문·판독 상태는 Excel에 보관합니다.</p>' + table(tables.get("08_검색화면광고관측", [])) + (table(filtered) if filtered else '<p class="muted">조건에 맞는 광고 문구 미관측</p>') + ''.join('<details><summary>' + esc(r.get("keyword")) + ' · 저장 캡처 (전체 화면)</summary>' + images.render(r) + '</details>' for r in captures if search_ad_rows([r], result.get("inputs", {}))))
     section("utm", "브랜드별 UTM 구조", utm_summary(tables.get("12_브랜드별UTM구조", [])))
     media = [r for r in records if r["kind"] in ("홈페이지", "YouTube 게시물")]
