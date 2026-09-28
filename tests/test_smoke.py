@@ -293,7 +293,7 @@ def test_result_tab_has_comparison_trend_and_no_review_classification():
     collect(at, pid, ("trend", "volume", "news", "search_capture"))
     assert not at.exception
     sections = [m.value for m in at.markdown if "adetect-section" in (m.value or "")]
-    order = ["브랜드 비교 요약", "검색 추이", "뉴스 핵심 내용·수치 요약", "종류별 상세 자료", "검색 화면과 광고 관측", "UTM 구조", "다운로드", "추가 정보를 찾아보세요"]
+    order = ["브랜드 비교 요약", "검색 추이", "뉴스 핵심 내용·수치 요약", "뉴스 주제별 요약", "검색 화면과 광고 관측", "UTM 구조", "추가 정보를 찾아보세요", "다운로드"]
     assert [next(i for i, v in enumerate(sections) if name in v) for name in order] == sorted(range(len(order)))
     assert not any(m.label in ("포함", "확인 필요", "제외") for m in at.metric)
     assert not any("확인 상태" in str(d.value.columns.tolist()) for d in at.dataframe)

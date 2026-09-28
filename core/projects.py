@@ -9,7 +9,7 @@ from urllib.parse import urlsplit, urlunsplit, parse_qsl, urlencode
 from database.db import get_conn, create_session, save_session_inputs, save_function_run, list_function_runs
 
 SOURCES = {
-    "trend": ("검색 관심도 추이", "자사·경쟁사 검색어 묶음을 한 요청으로 비교하는 완료된 36개월 상대지수", "market"),
+    "trend": ("검색 관심도 추이", "3년 전 1월부터 직전 완료 월까지 자사·경쟁사 묶음을 한 요청으로 비교", "market"),
     "volume": ("월간 검색량", "브랜드별 검색어 묶음의 조회 시점 PC·모바일 검색량과 연관 검색어", "market"),
     "news": ("관련 뉴스", "뉴스 검색어별 최신 기사 제목·발췌·발행일·원문 링크", "market"),
     "website": ("공식 페이지 자료", "입력한 공식 URL의 텍스트·링크·화면 캡처", "brand"),
@@ -21,6 +21,7 @@ SOURCES = {
 # 프로젝트 입력 v4: 브랜드별 검색어 묶음·계정(brands), 시장 관심 검색어, 뉴스 전용 필터.
 # 이전 필드는 과거 프로젝트·수집 당시 입력 사본을 읽기 위해 계속 허용한다.
 INPUT_VERSION = 4
+RESULT_VERSION = 5
 MAX_COMPETITORS = 4      # 데이터랩 한 요청의 최대 5개 주제 = 자사 1 + 경쟁사 4
 MAX_TERMS = 20           # 데이터랩 주제 하나의 최대 검색어 수
 MAX_MARKET = 10
@@ -37,6 +38,7 @@ def now():
 
 
 def schema(conn):
+    conn.execute("CREATE TABLE IF NOT EXISTS project_resource (project_id TEXT PRIMARY KEY, fingerprint TEXT NOT NULL, data TEXT NOT NULL)")
     conn.execute("CREATE TABLE IF NOT EXISTS project_digest (run_id TEXT PRIMARY KEY, fingerprint TEXT NOT NULL, data TEXT NOT NULL)")
     conn.execute("CREATE TABLE IF NOT EXISTS project (id TEXT PRIMARY KEY, name TEXT NOT NULL, archived INTEGER DEFAULT 0, updated TEXT NOT NULL)")
     conn.execute("CREATE TABLE IF NOT EXISTS project_review (run_id TEXT NOT NULL, record_id TEXT NOT NULL, state TEXT NOT NULL, PRIMARY KEY(run_id,record_id))")
@@ -233,7 +235,7 @@ def normalize(result, source, inputs):
         status="완료" if rows or has_series else "결과 없음"
     elif any(s in ("완료","부분 완료") for s in states): status="부분 완료"
     else: status="실패"
-    version=4 if inputs.get("input_version")==INPUT_VERSION else 3
+    version=RESULT_VERSION if inputs.get("input_version")==INPUT_VERSION else 3
     result.update(schema_version=version, source=source, status=status, inputs={k:copy.deepcopy(inputs[k]) for k in INPUTS if k in inputs})
     return result
 
@@ -326,7 +328,7 @@ def selection_result(project, snapshots, selected_ids, news_filter=None, extra=N
         changes += [c for c in item["result"].get("changes",[]) if c.get("자료ID") in chosen_ids]
     dates=collection_dates(snapshots)
     p=project_inputs(project)
-    return {"schema_version":4,"status":"선택 자료","collected_at":now(),"records":rows,"parts":parts,"changes":changes,
+    return {"schema_version":RESULT_VERSION,"status":"선택 자료","collected_at":now(),"records":rows,"parts":parts,"changes":changes,
             "news_filter":copy.deepcopy(news_filter),"hidden_by_news_filter":hidden,**(extra or {}),
             "inputs":{"project":project["name"],"brand_name":p["brand_name"],"brands":copy.deepcopy(p["brands"]),
                       "market_keywords":p.get("market_keywords",[]),"news_keywords":p.get("news_keywords",[]),
@@ -414,6 +416,7 @@ def delete(pid, confirm_name):
             conn.execute("DELETE FROM project_review WHERE run_id=? OR run_id LIKE ?",(rid,rid+":%"))
             conn.execute("DELETE FROM project_digest WHERE run_id=? OR run_id LIKE ?", (rid,rid+":%"))
         conn.execute("DELETE FROM project_export WHERE project_id=?",(pid,))
+        conn.execute("DELETE FROM project_resource WHERE project_id=?",(pid,))
         conn.execute("DELETE FROM project_task WHERE project_id=?",(pid,))
         conn.execute("DELETE FROM function_run WHERE session_id=?",(pid,))
         conn.execute("DELETE FROM project WHERE id=?",(pid,))

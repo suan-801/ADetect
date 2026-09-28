@@ -2,6 +2,8 @@
 import html
 import base64
 import json
+import re
+import hashlib
 from io import BytesIO
 from urllib.parse import urlsplit, urlunsplit, parse_qsl, urlencode
 from zipfile import ZipFile, ZIP_DEFLATED
@@ -149,6 +151,8 @@ def project_tables(result):
     """v4 선택 결과의 표. 요약·비교 → 상세 → 수집 조건 순서. 내부 ID는 싣지 않는다(JSON에는 유지)."""
     from core.materials import table_row, prioritized
     from core.project_view import volume_totals, search_status_rows
+    from core.result_insights import all_trend_facts, news_sections
+    from core import utm
     records = prioritized(result.get("records", []))
     parts = result.get("parts", {})
     brands = result.get("inputs", {}).get("brands", [])
@@ -177,25 +181,29 @@ def project_tables(result):
         "05_검색어별검색량": [clean(table_row(r, True)) for r in by_kind("검색량")],
         "06_연관검색어": [clean(table_row(r, True)) for r in by_kind("연관 검색어")],
         "20_뉴스핵심근거": result.get("news_digest", []),
-        "07_뉴스": [clean(table_row(r, True)) for r in by_kind("뉴스")],
+        "07_뉴스": [clean(table_row(r, True)) | {"원문": r.get("text", "")} for r in by_kind("뉴스")],
         "08_검색화면광고관측": search_status_rows(records, None),
         "09_검색광고문구": ads,
-        "10_Meta광고": [clean(table_row(r, True)) for r in by_kind("광고")],
-        "11_UTM구조": result.get("utm", []),
-        "12_UTM캠페인조합": result.get("utm_groups", []),
+        "10_Meta광고": [clean(table_row(r, True)) | {"전체 문구": r.get("text", "")} for r in by_kind("광고")],
+        "11_UTM구조": [r for r in result.get("utm", []) if utm.has_values(r)],
+        "12_브랜드별UTM구조": result.get("utm_structures") or utm.structure_rows(result.get("utm", [])),
         "13_SNS계정": [clean(table_row(r, True)) for r in by_kind("Instagram", "YouTube")],
-        "14_SNS게시물": [clean(table_row(r, True)) for r in by_kind("Instagram 게시물", "YouTube 게시물")],
+        "14_SNS게시물": [clean(table_row(r, True)) | {"원문": r.get("text", "")} for r in by_kind("Instagram 게시물", "YouTube 게시물")],
         "15_공식페이지": [clean(table_row(r, True)) | {"원문": r["text"]} for r in by_kind("홈페이지")],
-        "16_원본파일": [{"종류": r["kind"], "브랜드": r.get("brand"), "파일": a["filename"], "역할": a.get("role"), "출처": a.get("source_url") or r["source_url"]} for r in records for a in r.get("assets", [])],
+        "16_원본파일": [{"종류": r["kind"], "브랜드": r.get("brand"), "파일": a["filename"], "ZIP 경로": path, "역할": a.get("role"), "출처": a.get("source_url") or r["source_url"]} for r, a, path in asset_entries(records)],
         "17_수집조건": collection_info_v4(result),
         "18_수집상태": [{"대상": pt.get("label"), "상태": pt.get("state"), "안내": pt.get("message", "")} for pt in parts.values()],
         "19_이전수집대비": [{k: v for k, v in c.items() if k != "자료ID"} for c in result.get("changes", [])],
+        "21_검색추이주요사실": all_trend_facts(parts),
+        "22_뉴스주제묶음": [{"섹션": s["title"], "대표 제목": g["title"], "대표 발췌": g["excerpt"], "유사 기사 수": len(g["articles"]), "출처": "\n".join(r.get("source_url", "") for r in g["articles"])} for s in news_sections(by_kind("뉴스")) for g in s["groups"]],
+        "23_맞춤통계자료": result.get("stat_resources", []),
+        "24_검색관측전체상태": search_status_rows(records, None, observed_only=False),
     }
     return {k: v for k, v in tables.items() if v or k == "17_수집조건"}
 
 
 def tables_for(result):
-    return project_tables(result) if result.get("schema_version") == 4 else report_tables(result)
+    return project_tables(result) if result.get("schema_version") in (4, 5) else report_tables(result)
 
 
 def scalar(value):
@@ -228,6 +236,9 @@ def excel(result):
 
 
 def report_html(session,result):
+    if result.get("schema_version") in (4, 5):
+        from core.exporters.visual_report import report
+        return report(session, result, project_tables(result))
     esc=lambda v:html.escape(str(scalar(v) if v is not None else "미제공"))
     def cell(value):
         if isinstance(value,str) and value.startswith(("https://","http://")):
@@ -262,6 +273,26 @@ def combined(session):
             "sample_sources":list({v for r in results for v in r.get("sample_sources",[])}),"summary":session.get("synthesis_result",{}).get("summary")}
 
 
+def safe_component(value):
+    name = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", str(value or "공통"))[:70].strip(" .") or "공통"
+    if name.split(".")[0].upper() in {"CON", "PRN", "AUX", "NUL", *[f"{p}{i}" for p in ("COM", "LPT") for i in range(1,10)]}:
+        name = "_" + name
+    return name
+
+
+def asset_entries(records):
+    names = sorted({str(r.get("brand") or "공통") for r in records})
+    folders = {}
+    for name in names:
+        safe = safe_component(name)
+        collisions = [n for n in names if safe_component(n).casefold() == safe.casefold()]
+        folders[name] = safe + ("_" + hashlib.sha256(name.encode()).hexdigest()[:8] if len(collisions) > 1 else "")
+    for row in records:
+        for asset in row.get("assets", []):
+            path = "originals/" + folders[str(row.get("brand") or "공통")] + "/" + safe_component(row.get("kind")) + "/" + safe_component(asset["filename"])
+            yield row, asset, path
+
+
 def package(session,result):
     output=BytesIO()
     omitted=[]
@@ -273,15 +304,21 @@ def package(session,result):
         archive.writestr("자료.xlsx",excel(result))
         seen=set()
         total=0
-        for row in result.get("records",[]):
-            for asset in row.get("assets",[]):
-                if asset["filename"] in seen: continue
-                seen.add(asset["filename"])
-                data=read_bytes(asset)
-                if data is None or total+len(data)>250*1024**2:
-                    omitted.append(asset["filename"]+" — 파일 없음 또는 ZIP 250MB 원본 한도")
-                    continue
+        manifest = []
+        for row, asset, path in asset_entries(result.get("records", [])):
+            if path in seen: continue
+            seen.add(path)
+            data=read_bytes(asset)
+            state = "포함"
+            if data is None:
+                state = "파일 없음 또는 무결성 확인 실패"
+            elif total+len(data)>250*1024**2:
+                state = "ZIP 250MB 원본 한도"
+            else:
                 total+=len(data)
-                archive.writestr("originals/"+asset["filename"],data)
+                archive.writestr(path,data)
+            if state != "포함": omitted.append(path + " — " + state)
+            manifest.append({"브랜드": row.get("brand"), "종류": row.get("kind"), "파일": asset["filename"], "ZIP 경로": path, "상태": state})
+        archive.writestr("원본_경로목록.json", json.dumps(manifest, ensure_ascii=False, indent=2))
         archive.writestr("원본_보관안내.txt","\n".join(omitted) or "자료 목록의 저장된 원본 파일을 모두 포함했습니다. 원격 링크만 있는 파일은 포함되지 않습니다.")
     return output.getvalue()

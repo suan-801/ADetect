@@ -1,4 +1,4 @@
-"""프로젝트 흐름의 자료 종류별 수집 (결과 schema_version=4).
+"""프로젝트 흐름의 자료 종류별 수집 (결과 schema_version=5).
 
 - 비교에 필요한 자료(검색 추이·검색량·SNS)는 브랜드 단위로, 추가 자료(공식 페이지·Meta 광고·검색 화면)는
   사용자가 고른 브랜드만 수집한다. 선택하지 않은 자료 종류는 호출하지 않는다.
@@ -164,7 +164,7 @@ def _sample_observation(keyword):
 
 
 def collect(source, p, options=None):
-    """자료 종류 하나를 수집해 v4 결과로 반환한다. p는 projects.project_inputs() 결과."""
+    """자료 종류 하나를 수집해 v5 결과로 반환한다. p는 projects.project_inputs() 결과."""
     from core.evidence_store import save_bytes
     options = options or {}
     paid_enabled = p.get("paid_enabled", True)
@@ -297,7 +297,7 @@ def collect(source, p, options=None):
     else:
         raise ValueError("알 수 없는 자료 종류")
     records = [r for part in run.parts.values() for r in part.get("records", [])]
-    result = {"schema_version": 4, "source": source, "parts": run.parts, "records": records,
+    result = {"schema_version": projects.RESULT_VERSION, "source": source, "parts": run.parts, "records": records,
               "errors": [pt["label"] + ": " + pt.get("message", "") for pt in run.parts.values() if pt["state"] not in ("완료",)],
               "sample_sources": ["SAMPLE"] if settings.SAMPLE_MODE else [], "collected_at": datetime.now(timezone.utc).isoformat(),
               "options": {"brands": [b["id"] for b in scoped] if source not in ("trend", "volume", "news") else [b["id"] for b in p["brands"]],
@@ -353,7 +353,8 @@ def utm_rows(p, records):
         if r.get("kind") == "검색 화면":
             for ad in r.get("ads", []):
                 for link in ad.get("links", [])[:3]:
-                    rows.append(utm.parse(link, "검색어 " + r.get("keyword", ""), "네이버 검색 광고 링크"))
+                    matched = [b["name"] for b in p["brands"] if _domain_match(link, official_targets(b))]
+                    rows.append(utm.parse(link, ", ".join(matched) or "브랜드 미확정", "네이버 검색 광고 · " + r.get("keyword", "")))
     for b in p["brands"]:
         src = b.get("sources", {})
         if src.get("detail_url"):
@@ -363,6 +364,6 @@ def utm_rows(p, records):
     seen, output = set(), []
     for row in rows:
         key = (row["브랜드"], row["원본 URL"])
-        if key not in seen:
+        if key not in seen and utm.has_values(row):
             seen.add(key); output.append(row)
     return output

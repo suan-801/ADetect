@@ -39,6 +39,7 @@ def render(brand_fields, reset):
             brand = st.text_input("브랜드명 *", value=p["brands"][0]["name"])
             topic = st.text_input("조사 범위 (선택)", value=p.get("campaign", p.get("category", "")), placeholder="비워두면 브랜드 전체 · 예: 리하우스 사업, TM 채용")
             ai = st.checkbox("AI로 설정 초안 제안받기 (Gemini · 유료 호출 가능)", value=True)
+            st.caption("1차 검색 범위: 공식 홈페이지 · Instagram 공식 프로필 · YouTube 공식 채널 · 검색어 · 경쟁사 후보")
             replace = st.checkbox("이미 작성한 초안을 새 제안으로 교체", value=False) if p.get("setup_requested") else False
             submitted = st.form_submit_button("초안 준비하고 다음", type="primary")
         if submitted:

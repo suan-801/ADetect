@@ -14,12 +14,12 @@ def test_datalab_sends_aliases_as_one_group(monkeypatch):
         return Response()
     monkeypatch.setattr(settings, "NAVER_DATALAB_MOCK", False)
     monkeypatch.setattr(search_history.requests, "post", post)
-    result = search_history.fetch_history.__wrapped__("브랜드 묶음", keywords=["한샘", "한셈"])
+    result = search_history.fetch_history("브랜드 묶음", keywords=["한샘", "한셈"])
     assert calls[0]["keywordGroups"] == [{"groupName": "브랜드 묶음", "keywords": ["한샘", "한셈"]}]
     assert result["grouped"] and result["keywords"] == ["한샘", "한셈"]
     import pytest
     with pytest.raises(ValueError):
-        search_history.fetch_history.__wrapped__("too many", keywords=[str(n) for n in range(21)])
+        search_history.fetch_history("too many", keywords=[str(n) for n in range(21)])
 
 
 def test_news_only_does_not_call_trend_or_volume(monkeypatch):

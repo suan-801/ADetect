@@ -74,7 +74,7 @@ def execute(project,attempts,event,force,retry,options=None):
             except jobs.AnalysisCancelled:
                 finish(tid,"중단")
             except Exception as exc:
-                value={"schema_version":4,"source":source,"status":"실패","records":[],"parts":{},"inputs":projects.to_storage(inputs),"errors":[error_message(exc)],"collected_at":projects.now()}
+                value={"schema_version":projects.RESULT_VERSION,"source":source,"status":"실패","records":[],"parts":{},"inputs":projects.to_storage(inputs),"errors":[error_message(exc)],"collected_at":projects.now()}
                 rid=save_function_run(project["id"],source,"실패",value)
                 finish(tid,"실패",rid)
     finally:

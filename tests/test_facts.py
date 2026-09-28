@@ -7,7 +7,7 @@ from core.scrapers.search_history import period_bounds,summarize_history
 
 
 def test_calendar_month_bounds_and_missing_data():
-    assert period_bounds(today=date(2026,9,26))==("2023-09-01","2026-08-31")
+    assert period_bounds(today=date(2026,9,26))==("2023-01-01","2026-08-31")
     assert period_bounds(today=date(2024,3,5))[1]=="2024-02-29"
     data={"start":"2023-01-01","end":"2025-12-31","rows":[{"date":"2023-01-01","search_index":0},{"date":"2023-02-01","search_index":20}]}
     result=summarize_history(data)
@@ -79,6 +79,7 @@ def test_fact_package_contains_originals_and_safe_excel(tmp_path,monkeypatch):
     row={"id":"a","kind":"광고","brand":"A","source_url":"https://example.com","text":"=1+1","collected_at":"now","assets":[asset]}
     data=package({"brand_name":"A"},{"records":[row],"parts":{}})
     with ZipFile(BytesIO(data)) as z:
-        assert z.read("originals/"+asset["filename"])==b"image test"
+        entry = next(name for name in z.namelist() if name.startswith("originals/") and name.endswith(asset["filename"]))
+        assert z.read(entry)==b"image test"
         wb=load_workbook(BytesIO(z.read("자료.xlsx")))
         assert wb["02_자료목록"]["G2"].data_type=="s"

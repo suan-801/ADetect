@@ -408,7 +408,25 @@ def _status_line(item, source):
         st.caption(" · ".join(bad))
 
 
+def _trend_chart(series, start=None, end=None, height=240):
+    from core.result_insights import monthly_values
+    frame = pd.DataFrame({s.get("name") or s.get("keyword", "검색어"): pd.Series(monthly_values(s), dtype=float) for s in series})
+    if frame.empty:
+        st.caption("제공된 월별 검색지수가 없습니다.")
+        return
+    if start and end:
+        frame = frame.reindex(pd.period_range(start[:7], end[:7], freq="M").astype(str))
+    else:
+        frame = frame.reindex(pd.period_range(frame.index.min(), frame.index.max(), freq="M").astype(str))
+    frame.index.name = "월"
+    st.line_chart(frame, height=height)
+
+
 def _trend(item, p):
+    from core.result_insights import trend_facts
+    def facts(series):
+        for f in trend_facts(series):
+            st.markdown(f"**{f['항목']}** · {f['관측 사실']}")
     view = project_view.trend_view(item, p)
     if view["kind"] == "none":
         st.caption("검색 추이 · 미수집")
@@ -418,17 +436,19 @@ def _trend(item, p):
         if view["series"]:
             chosen = st.selectbox("검색어", [x["keyword"] for x in view["series"]], key="legacy_trend_topic")
             s = next(x for x in view["series"] if x["keyword"] == chosen)
-            st.line_chart(pd.DataFrame([{"월": r["date"][:7], "상대지수": r["search_index"]} for r in s["rows"]]).set_index("월"), height=220)
+            _trend_chart([s], s.get("start"), s.get("end"), height=220)
+            facts(s)
         return
     compare = view["compare"]
     if view["stale"]:
         st.warning("프로젝트의 비교 브랜드 또는 검색어 묶음이 바뀌었습니다. 아래 차트는 수집 당시 구성이며, 새 구성으로 비교하려면 검색 추이를 다시 수집하세요.")
-    frame = pd.DataFrame([{"월": r["date"][:7], "브랜드": s["name"], "상대지수": r["search_index"]} for s in compare["series"] for r in s["rows"]])
-    if not frame.empty:
-        st.line_chart(frame.pivot_table(index="월", columns="브랜드", values="상대지수"), height=280)
+    _trend_chart(compare["series"], compare["start"], compare["end"], height=280)
     missing = [s["name"] for s in compare["series"] if not s.get("provided")]
     st.caption(f"{compare['start']} ~ {compare['end']} 월간 · 한 요청 안의 전체 최고 월=100인 상대지수(검색 횟수 아님) · 빠진 달은 0이 아님"
                + (" · 응답 없음: " + ", ".join(missing) if missing else "") + (" · SAMPLE" if compare.get("sample") else ""))
+    for series in compare["series"]:
+        st.markdown("**" + series["name"] + " · 주요 관측값**")
+        facts({**series, "start": compare["start"], "end": compare["end"]})
     with st.expander("비교 구성과 월별 평균"):
         st.dataframe([{"브랜드": s["name"], "검색어 묶음": ", ".join(s["terms"]), "제공 월수": len(s["rows"])} for s in compare["series"]], hide_index=True)
         season = compare.get("seasonality", {})
@@ -439,8 +459,9 @@ def _trend(item, p):
         with st.expander("시장 관심 검색어 추이 (검색어별 별도 기준)"):
             chosen = st.selectbox("검색어", [x["keyword"] for x in view["market"]], key="market_trend_topic")
             s = next(x for x in view["market"] if x["keyword"] == chosen)
-            st.line_chart(pd.DataFrame([{"월": r["date"][:7], "상대지수": r["search_index"]} for r in s["rows"]]).set_index("월"), height=200)
+            _trend_chart([s], s.get("start"), s.get("end"), height=200)
             st.caption("이 검색어만의 최고 월=100. 브랜드 비교 차트와 크기를 비교할 수 없습니다.")
+            facts(s)
 
 
 def _editor(rows, token, selection):
@@ -492,8 +513,14 @@ def _search_area(rows, item):
         return
     st.caption("네이버 PC 검색 결과를 한 번 관측한 기록입니다. 첫 화면 캡처와 광고 영역 확대 캡처, 페이지에서 직접 읽은 광고 문구·링크를 보여줍니다. "
                "'이번 화면에서 미관측'은 미운영을 뜻하지 않으며, 캡처 실패·차단·영역 식별 실패는 '판독 불가'입니다. 광고를 클릭해 랜딩을 확인하지 않습니다.")
-    st.dataframe(project_view.search_status_rows(captures, None), hide_index=True)
+    observed = project_view.search_status_rows(captures, None)
+    if observed:
+        st.dataframe(observed, hide_index=True)
+    else:
+        st.caption("선택한 검색 화면에서 브랜드가 확정된 광고 관측 없음 · 전체 판독 상태는 원본 데이터에 보관합니다.")
     for r in captures:
+        if not r.get("ads") and not (r.get("ai_read") or {}).get("ads"):
+            continue
         with st.expander(f"{r.get('keyword')} · {r.get('environment', '')} · {(r.get('observed_at') or '')[:16].replace('T', ' ')}"):
             images = [a for a in r.get("assets", []) if a.get("filename", "").lower().endswith(IMAGE_EXT)]
             cols = st.columns(max(len(images), 1))
@@ -522,15 +549,91 @@ def _utm(p, rows):
     from core import utm
     data = project_sources.utm_rows(p, rows)
     if not data:
-        st.caption("분석할 URL 없음 — Meta 광고·검색 화면을 수집하거나 프로젝트 설정에서 캠페인 상세 URL·UTM 분석 대상 URL을 입력하세요.")
+        st.caption("값이 있는 UTM 미관측 · UTM 값이 하나 이상 있는 URL만 표시합니다.")
         return [], []
-    groups = utm.campaign_groups(data)
+    groups = utm.structure_rows(data)
     st.caption("URL을 방문하지 않고 주소만 분석합니다. 추적 파라미터만으로 실제 집행 매체·성과·전환을 확정하지 않습니다. 민감한 값은 가립니다.")
-    st.dataframe(utm.public(data), hide_index=True)
     if groups:
-        st.caption("같은 캠페인명에서 관측된 source / medium / content 조합")
+        st.caption("브랜드·UTM 항목별 관측값과 문자 구조 추정입니다. source·medium·content를 합치지 않으며 토큰의 의미를 추정하지 않습니다.")
+        st.dataframe([{k: v for k, v in r.items() if k in ("브랜드", "UTM 항목", "관측값", "추정 구조", "근거 URL 수")} for r in groups], hide_index=True)
+    with st.expander("UTM 원본 URL과 파라미터"):
+        st.dataframe(utm.public(data), hide_index=True)
         st.dataframe(groups, hide_index=True)
     return utm.public(data), groups
+
+
+def _news_sections(rows):
+    from core.result_insights import news_sections
+    from core.exporters.visual_report import link
+    sections = news_sections(rows)
+    if not sections: return
+    _section("뉴스 주제별 요약")
+    st.caption("선택한 기사를 제목의 주제로 묶고 유사 기사에는 대표 발췌를 표시합니다. 호재·악재를 자동 판정하지 않습니다.")
+    for section in sections:
+        with st.expander(f"{section['title']} · {section['count']}건", expanded=len(sections) <= 4):
+            for group in section["groups"]:
+                st.markdown("**" + group["title"] + "**")
+                st.write(group["excerpt"] or "발췌 미제공")
+                with st.expander(f"출처 {len(group['articles'])}건 · 제목 유사 기사"):
+                    for row in group["articles"]:
+                        st.caption(row.get("published_at") or "발행일 미제공")
+                        st.markdown(link(row.get("source_url"), row.get("title") or group["title"]), unsafe_allow_html=True)
+
+
+def _ad_cards(rows, token):
+    from core.exporters.visual_report import link
+    ads = [r for r in rows if r["kind"] == "광고"]
+    if not ads: return
+    _section("광고 소재")
+    st.caption(summary("광고", ads))
+    brands = list(dict.fromkeys(r.get("brand", "") for r in ads))
+    chosen = st.selectbox("광고 브랜드", ["전체", *brands], key="ad_brand_" + token)
+    if chosen != "전체": ads = [r for r in ads if r.get("brand") == chosen]
+    pages = max(1, (len(ads)+11)//12)
+    page = st.selectbox("광고 페이지", range(1, pages+1), key="ad_page_" + token + chosen) if pages > 1 else 1
+    for start in range((page-1)*12, min(page*12, len(ads)), 3):
+        for col, row in zip(st.columns(3), ads[start:min(start+3, page*12)]):
+            with col:
+                with st.container(border=True):
+                    image = next((a for a in row.get("assets", []) if a.get("filename", "").lower().endswith(IMAGE_EXT)), None)
+                    data = _image(image["filename"], image.get("sha256", "")) if image else None
+                    if data: st.image(data, width="stretch")
+                    else: st.caption("저장 이미지 없음 · 광고 원문 확인")
+                    st.markdown("**" + row.get("brand", "") + "**")
+                    st.caption(" · ".join(str(v) for v in (row.get("format"), row.get("start_date"), row.get("cta")) if v))
+                    st.write(row.get("text", "")[:500])
+                    if len(row.get("text", "")) > 500:
+                        with st.expander("전체 문구"): st.write(row["text"])
+                    st.markdown(link(row.get("source_url"), "광고 원문") + " &nbsp; " + link(row.get("landing_url"), "랜딩 페이지 ↗"), unsafe_allow_html=True)
+
+
+def _stat_resources(project, p):
+    from core import stat_discovery
+    _section("추가 정보를 찾아보세요")
+    st.caption("브랜드·관심 시장에 맞는 통계와 산업 자료를 검색합니다. 버튼을 누르면 Gemini 검색 1회 + 정리 1회가 발생하며 성공 결과는 24시간 재사용합니다.")
+    saved = stat_discovery.load(project["id"], p)
+    if st.button("맞춤 통계 자료 찾기", key="stat_search_" + project["id"], disabled=not p.get("paid_enabled", True)):
+        with st.spinner("관련 통계 자료의 출처를 찾고 있습니다…"):
+            found = stat_discovery.generate(p)
+        if found.get("status") == "완료":
+            try:
+                stat_discovery.save(project["id"], p, found)
+                saved = found
+            except ValueError as exc:
+                capacity_error(exc, "stat_capacity")
+        else: st.warning(found.get("message", "검색 실패"))
+    if saved:
+        st.caption("AI 검색 기반 추천 후보 · 원문에서 조사 기간·지역·단위를 확인하세요. 검색일 " + saved.get("created", "")[:10])
+        for resource in saved.get("resources", []):
+            from core.exporters.visual_report import link
+            st.markdown(link(resource["출처"], resource["자료명"]), unsafe_allow_html=True)
+            st.write(resource["추천 이유 (AI)"])
+            with st.expander("검색 근거·신뢰도"):
+                st.write(resource["검색 근거"])
+                st.caption(resource["방식"] + " · " + resource["신뢰도"])
+    else:
+        st.caption("현재 브랜드·시장 조건으로 검색한 통계 자료 후보가 없습니다.")
+    return (saved or {}).get("resources", [])
 
 
 def _result(project, history):
@@ -569,7 +672,7 @@ def _result(project, history):
     comparison, notes = project_view.comparison_rows(p, snapshots, by.get("volume"))
     st.dataframe(comparison, hide_index=True)
     st.caption(" · ".join(notes + ["월간 검색량은 검색어 묶음의 정확히 일치한 표기만 더한 검색 횟수(고유 검색자 수 아님)이며 연관 검색어는 제외",
-                                   "검색 추이(36개월 상대지수)와 기간·단위가 다름"]))
+                                   "검색 추이(3년 전 1월~직전 월 상대지수)와 기간·단위가 다름"]))
 
     _section("검색 추이")
     _trend(by.get("trend"), p)
@@ -600,29 +703,29 @@ def _result(project, history):
         else:
             st.caption("현재 수집 버전·뉴스 필터에 맞는 저장 요약이 없습니다. 기존 뉴스 수집 없이 요약만 요청할 수 있습니다.")
 
-    _section("종류별 상세 자료")
     token = hashlib.sha256(scope.encode()).hexdigest()[:12]
-    _details(rows, p, token, selection)
+    with st.expander("원본 데이터·다운로드 선택"):
+        _details(rows, p, token, selection)
     st.session_state.download_selection = selection
+    selected_rows = [r for r in rows if r["selection_id"] in selection and projects.news_passes(r, p["news_filter"])]
+    _news_sections(selected_rows)
+    _ad_cards(selected_rows, token)
 
     _section("검색 화면과 광고 관측")
-    _search_area(rows, by.get("search_capture"))
+    _search_area(selected_rows, by.get("search_capture"))
 
     _section("UTM 구조")
     utm_data, utm_groups = _utm(p, [r for r in rows if r["selection_id"] in selection])
 
+    stat_resources = _stat_resources(project, p)
     _section("다운로드")
-    extra = {"comparison": comparison, "comparison_notes": notes, "utm": utm_data, "utm_groups": utm_groups}
+    extra = {"comparison": comparison, "comparison_notes": notes, "utm": utm_data, "utm_structures": utm_groups, "stat_resources": stat_resources}
     result = projects.selection_result(project, snapshots, selection, p["news_filter"], extra)
     st.caption(f"다운로드 대상 {len(result['records'])}건 (선택한 자료 중 뉴스 결과 좁히기를 통과한 자료)"
                + (f" · 수집일 혼합 {', '.join(dates)}" if len(dates) > 1 else "") + (" · SAMPLE 포함" if result.get("sample_sources") else ""))
     result["news_digest"] = news_digest.export_rows(digest, result["records"])
     _download(project, result)
 
-    _section("추가 정보를 찾아보세요")
-    st.caption("조사 주제에 맞는 공식 통계를 직접 찾아볼 수 있는 탐색 후보입니다. 실제 통계표의 존재·수치는 확인하지 않았습니다.")
-    st.dataframe(project_view.stat_candidates(p), hide_index=True)
-    st.markdown(" · ".join(f"[{name}]({url}) — {desc}" for name, url, desc in project_view.STAT_SOURCES))
 
 
 def _download(project, result):

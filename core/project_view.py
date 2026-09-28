@@ -130,27 +130,15 @@ def news_view(rows, news_filter):
     return sorted(shown, key=timestamp, reverse=True), hidden
 
 
-def search_status_rows(rows, p):
+def search_status_rows(rows, p, observed_only=True):
     """검색 화면 관측: 검색어 × 브랜드 광고 노출 상태."""
     output = []
     for r in rows:
         if r["kind"] != "검색 화면":
             continue
         for bid, st in (r.get("brand_status") or {}).items():
+            if observed_only and st["state"] != "관측 시 노출 확인":
+                continue
             output.append({"검색어": r.get("keyword"), "브랜드": st.get("name", bid), "노출 상태": st["state"], "근거": st.get("evidence"),
                            "수집 환경": r.get("environment"), "수집 시각": (r.get("observed_at") or "")[:16].replace("T", " ")})
     return output
-
-
-STAT_SOURCES = [
-    ("KOSIS 국가통계포털", "https://kosis.kr/", "인구·가구·산업·소비 관련 국가승인통계"),
-    ("한국은행 경제통계시스템(ECOS)", "https://ecos.bok.or.kr/", "소비·물가·가계·산업 경제지표"),
-    ("공공데이터포털", "https://www.data.go.kr/", "중앙부처·공공기관 공개 데이터"),
-]
-
-
-def stat_candidates(p):
-    """'추가 정보를 찾아보세요' — 탐색 후보. 실제 통계표 존재를 확인하지 않았으므로 수치·자료명을 만들지 않는다."""
-    topics = [t for t in [p.get("category"), p.get("campaign"), *p.get("market_keywords", [])] if t]
-    topics = list(dict.fromkeys(topics)) or [p["brand_name"]]
-    return [{"조사 주제": t, "지표 후보(탐색용)": f"{t} 관련 시장 규모·소비 지출·사업체 수", "검색 문구": f"{t} 통계", "확인할 것": "조사 기간·지역·단위·조사 대상"} for t in topics[:5]]

@@ -33,7 +33,7 @@ def test_brand_terms_go_as_one_group_and_brands_share_one_request(monkeypatch):
     monkeypatch.setattr(search_history.requests, "post", post)
     p = project()
     groups = [{"id": b["id"], "name": b["name"], "terms": b["terms"]} for b in p["brands"]]
-    data = search_history.fetch_comparison.__wrapped__(groups)
+    data = search_history.fetch_comparison(groups)
     assert len(calls) == 1, "자사·경쟁사는 한 요청"
     assert calls[0]["keywordGroups"] == [{"groupName": "한샘", "keywords": ["한샘", "한셈", "한샘리하우스"]},
                                          {"groupName": "리바트", "keywords": ["리바트", "현대리바트"]}]
@@ -45,7 +45,7 @@ def test_brand_terms_go_as_one_group_and_brands_share_one_request(monkeypatch):
 def test_comparison_limits_and_legacy_trend_not_merged():
     with pytest.raises(ValueError):
         from core.scrapers.search_history import fetch_comparison
-        fetch_comparison.__wrapped__([{"id": str(i), "name": str(i), "terms": ["x"]} for i in range(6)])
+        fetch_comparison([{"id": str(i), "name": str(i), "terms": ["x"]} for i in range(6)])
     p = project()
     legacy = {"result": {"parts": {"trend:한샘": {"series": {"keyword": "한샘", "rows": [{"date": "2026-01-01", "search_index": 50}]}}}}}
     assert project_view.trend_view(legacy, p)["kind"] == "legacy"
@@ -214,7 +214,7 @@ def test_selection_and_download_follow_the_same_filter():
     assert rid + "/n3" not in selected, "과거 수동 제외는 기본 다운로드에 되살리지 않음"
     result = projects.selection_result(projects.load(pid), snaps, selected, {"include": [], "exclude": ["채용"]})
     assert [r["id"] for r in result["records"]] == ["n2"] and result["hidden_by_news_filter"] == 1
-    assert all("review" not in r for r in result["records"]) and result["schema_version"] == 4
+    assert all("review" not in r for r in result["records"]) and result["schema_version"] == projects.RESULT_VERSION
     from core.exporters import facts_report
     tables = facts_report.tables_for(result)
     assert [r["제목"] for r in tables["07_뉴스"]] == ["한샘 리하우스"]

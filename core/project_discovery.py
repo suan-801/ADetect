@@ -37,6 +37,9 @@ PROMPT = """브랜드 시장조사 프로젝트의 입력 후보를 제안하세
 
 공개 웹에서 확인 가능한 후보만 제안하고, 확인하지 못한 값은 빈 문자열/배열로 두세요.
 공식 홈페이지·Instagram·YouTube·Meta 광고 페이지는 후보 URL일 뿐이며 확정하지 마세요.
+자사와 각 경쟁사의 Instagram 공식 프로필 및 YouTube 공식 채널도 홈페이지와 동등한 1차 검색 대상입니다.
+브랜드명 site:instagram.com, 브랜드명 site:youtube.com/@ 검색도 확인하세요.
+게시물·릴스·개별 영상 URL을 계정으로 넣지 말고, 근거가 없으면 빈 값으로 남기세요.
 브랜드의 표기 변형은 최대 10개, 경쟁사는 최대 4개, 시장 검색어와 뉴스 검색어는 각각 최대 5개만 제안하세요.
 경쟁사는 실제 브랜드명만 제안하고 임의로 '경쟁사 A' 같은 이름을 만들지 마세요.
 각 URL은 evidence_urls에 근거로 연결할 수 있을 때만 넣으세요.
@@ -44,7 +47,7 @@ JSON 스키마의 필드만 반환하세요. 전략·성과·타깃·검색량 �
 
 
 _LOCK = threading.Lock()
-VERSION = "grounded-draft-1"
+VERSION = "grounded-social-draft-2"
 
 
 def public_url(value):
@@ -99,11 +102,33 @@ def resolve_search_links(urls):
     return resolved
 
 
+def social_candidate(url, domain):
+    """Normalize observed profile URLs only; never derive an account from a brand name."""
+    if not public_url(url): return ""
+    u = urlsplit(url)
+    if u.hostname not in (domain, "www." + domain, "m." + domain): return ""
+    path = u.path.strip("/").split("/")
+    if domain == "instagram.com":
+        if len(path) != 1 or not path[0] or path[0] in ("accounts", "explore", "reel", "reels", "p", "stories", "direct"):
+            return ""
+        return "https://www.instagram.com/" + path[0] + "/"
+    if path[0].startswith("@") and len(path[0]) > 1:
+        return path[0]
+    if len(path) >= 2 and path[0] == "channel" and path[1].startswith("UC"):
+        return path[1]
+    return ""
+
+
 def site_links(data):
-    """Use the own-brand homepage's actual outgoing social links as additional candidates."""
-    own = data.get("own") or {}
+    for brand in [data.get("own"), *data.get("competitors", [])]:
+        if brand: _brand_site_links(brand)
+    return data
+
+
+def _brand_site_links(own):
+    """Use actual outgoing social links as additional candidates for each brand."""
     urls = own.get("homepage_candidates", [])
-    if not urls: return data
+    if not urls: return
     try:
         from core.scrapers.brand_site import fetch_public_html, TextParser
         page, final = fetch_public_html(urls[0])
@@ -114,19 +139,13 @@ def site_links(data):
             host = urlsplit(url).hostname or ""
             if not public_url(url): continue
             for field, domain in (("instagram_candidate", "instagram.com"), ("youtube_candidate", "youtube.com")):
-                path = urlsplit(url).path.strip("/")
-                if host not in (domain, "www." + domain) or not path: continue
-                if domain == "instagram.com" and ("/" in path or path in ("accounts", "explore", "reel", "p")): continue
-                candidate = url
-                if domain == "youtube.com":
-                    candidate = path if path.startswith("@") and "/" not in path else path[8:] if path.startswith("channel/UC") else ""
+                candidate = social_candidate(url, domain)
                 if candidate and not own.get(field):
                     own[field] = candidate
                     own["evidence_urls"] = list(dict.fromkeys(own.get("evidence_urls", []) + [final, url]))
         own["homepage_link_check"] = "연결 링크 확인 (공식 여부는 사용자 확인)"
     except Exception:
         own["homepage_link_check"] = "페이지 연결 링크 확인 실패 · 검색 후보만 제공"
-    return data
 
 
 def sanitize(parsed, evidence):
@@ -143,9 +162,10 @@ def sanitize(parsed, evidence):
                 b[key] = ""
             if key == "meta_page_candidate" and "view_all_page_id=" not in b[key]:
                 b[key] = ""
-            if key == "youtube_candidate" and b[key]:
-                path = urlsplit(b[key]).path.strip("/")
-                b[key] = path if path.startswith("@") else path[8:] if path.startswith("channel/UC") else ""
+            if key in ("instagram_candidate", "youtube_candidate") and b[key]:
+                b[key] = social_candidate(value, host)
+                if b[key] and value not in b["evidence_urls"]:
+                    b["evidence_urls"].append(value)
         b["evidence_urls"] = [u for u in b["evidence_urls"] if u in evidence][:8]
         b["terms"] = list(dict.fromkeys(b["terms"]))[:20]
     data["competitors"] = data["competitors"][:4]

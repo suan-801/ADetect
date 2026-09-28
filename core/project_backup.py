@@ -24,7 +24,8 @@ def make(pid):
         for h in histories:
             digest = conn.execute('SELECT fingerprint,data FROM project_digest WHERE run_id=?', (h['run_id'],)).fetchone()
             if digest: h['news_digest'] = dict(digest)
-    entries={'project.json':json.dumps({'schema_version':3,'project':project,'histories':histories,'exports':projects.exports(pid)},ensure_ascii=False).encode()}
+        resource = conn.execute('SELECT fingerprint,data FROM project_resource WHERE project_id=?', (pid,)).fetchone()
+    entries={'project.json':json.dumps({'schema_version':4,'project':project,'histories':histories,'exports':projects.exports(pid), 'stat_resources':dict(resource) if resource else None},ensure_ascii=False).encode()}
     missing=[]
     for h in histories:
         for row in h['result'].get('records',[]):
@@ -45,7 +46,7 @@ def make(pid):
             key='chunks/'+uuid.uuid4().hex
             chunks[key]=data[offset:offset+CHUNK]; names.append(key)
         filemap[name]={'chunks':names,'bytes':len(data),'sha256':hashlib.sha256(data).hexdigest()}
-    manifest={'schema_version':3,'backup_id':uuid.uuid4().hex,'files':filemap,'missing_assets':missing,'parts':len(chunks)}
+    manifest={'schema_version':4,'backup_id':uuid.uuid4().hex,'files':filemap,'missing_assets':missing,'parts':len(chunks)}
     packages=[]
     for idx,(key,data) in enumerate(chunks.items(),1):
         out=BytesIO()
@@ -76,7 +77,7 @@ def inspect(packages):
                 else:
                     if info.filename in chunks: raise ValueError('중복 패키지')
                     chunks[info.filename]=z.read(info)
-    if not manifest or manifest.get('schema_version')!=3 or len(chunks)!=manifest.get('parts'):
+    if not manifest or manifest.get('schema_version') not in (3,4) or len(chunks)!=manifest.get('parts'):
         raise ValueError('지원하지 않는 백업 버전 또는 패키지 누락')
     files={}
     for name,meta in manifest['files'].items():
@@ -86,7 +87,7 @@ def inspect(packages):
         check_secrets(content)
         files[name]=content
     payload=json.loads(files['project.json'])
-    if payload.get('schema_version')!=3 or not payload.get('project',{}).get('brand_name'): raise ValueError('프로젝트 정보 없음')
+    if payload.get('schema_version') not in (3,4) or not payload.get('project',{}).get('brand_name'): raise ValueError('프로젝트 정보 없음')
     if any(h.get('source') not in projects.SOURCES for h in payload.get('histories',[])): raise ValueError('알 수 없는 자료 종류')
     return payload,files,manifest
 
@@ -112,6 +113,9 @@ def restore(packages):
         projects.schema(conn)
         conn.execute("INSERT INTO analysis_session(id,brand_name,category,competitors_json,created_at,inputs_json) VALUES(?,?,?,?,?,?)",(pid,p['brand_name'],p.get('category',''),json.dumps(p.get('competitors',[])),timestamp,json.dumps({k:p[k] for k in projects.INPUTS if k in p},ensure_ascii=False)))
         conn.execute("INSERT INTO project(id,name,updated) VALUES(?,?,?)",(pid,p.get('name',p['brand_name'])+' (복원)',timestamp))
+        if payload.get('stat_resources'):
+            resource = payload['stat_resources']
+            conn.execute('INSERT INTO project_resource VALUES(?,?,?)', (pid,resource['fingerprint'],resource['data']))
         for h in payload['histories']:
             rid=uuid.uuid4().hex
             conn.execute("INSERT INTO function_run(id,session_id,function_type,status,result_json,created_at) VALUES(?,?,?,?,?,?)",(rid,pid,h['source'],h['result']['status'],json.dumps(h['result'],ensure_ascii=False),h['created']))
