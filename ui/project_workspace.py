@@ -272,6 +272,8 @@ def _set_sources(pid, p, paid, mode):
 
 
 def _collect(project, history):
+    from ui.research_analysis import brief_form
+    brief_form(project, projects.project_inputs(project))
     pid = project["id"]
     p = projects.project_inputs(project)
     tasks = project_jobs.tasks(pid)
@@ -394,8 +396,8 @@ def _image(filename, sha256):
     return read_bytes({"filename": filename, "sha256": sha256})
 
 
-def _section(title):
-    st.markdown(f"<div class='adetect-section'>{html.escape(title)}</div>", unsafe_allow_html=True)
+def _section(title, anchor=""):
+    st.markdown(f"<div class='adetect-section' id='{html.escape(anchor)}'>{html.escape(title)}</div>", unsafe_allow_html=True)
 
 
 def _status_line(item, source):
@@ -565,13 +567,13 @@ def _news_sections(rows):
     from core.exporters.visual_report import link
     sections = news_sections(rows)
     if not sections: return
-    _section("뉴스 주제별 요약")
+    _section("뉴스 주제별 요약", anchor="research-news")
     st.caption("주제 → 브랜드(여러 브랜드 동시 언급·시장·기타) → 최신 기사 제목 순으로 펼쳐보세요. 주제는 제목에 쓰인 표현으로만 나눕니다. "
                "시장·기타는 브랜드 직접 언급이 없는 기사입니다. 발췌문은 Excel에 보관합니다.")
     for section in sections:
-        with st.expander(f"{section['title']} · {len(section['groups'])}개 주제 / 기사 {section['count']}건"):
+        with st.expander(f"{section['title']} · {len(section['groups'])}개 대표 기사 / 원문 {section['count']}건"):
             for subject in section["subjects"]:
-                with st.expander(f"{subject['title']} · {len(subject['groups'])}개 주제 / 기사 {subject['count']}건"):
+                with st.expander(f"{subject['title']} · {len(subject['groups'])}개 대표 기사 / 원문 {subject['count']}건"):
                     def headlines(groups, multi=subject["title"] == MULTI_BRAND):
                         for group in groups:
                             row, *others = group["articles"]
@@ -592,7 +594,7 @@ def _ad_cards(rows, token):
     from core.exporters.visual_report import link
     ads = [r for r in rows if r["kind"] == "광고"]
     if not ads: return
-    _section("광고 소재")
+    _section("광고 소재", anchor="research-ads")
     st.caption(summary("광고", ads))
     brands = list(dict.fromkeys(r.get("brand", "") for r in ads))
     chosen = st.selectbox("광고 브랜드", ["전체", *brands], key="ad_brand_" + token)
@@ -677,21 +679,29 @@ def _result(project, history):
         st.session_state.download_selection = set(projects.default_selection(snapshots))
     selection = set(st.session_state.download_selection)
 
+    st.markdown('[검색 추이](#research-trend) · [뉴스](#research-news) · [광고 소재](#research-ads) · [AI 종합 분석](#ai-analysis) · [다운로드](#research-download)')
+    summary_slot = st.empty()
+    token = hashlib.sha256(scope.encode()).hexdigest()[:12]
+    with st.expander("원본 데이터·다운로드 선택"):
+        _details(rows, p, token, selection)
+    st.session_state.download_selection = selection
+    selected_rows = [r for r in rows if r["selection_id"] in selection and projects.news_passes(r, p["news_filter"])]
+    st.caption(f"현재 선택 {len(selected_rows)}건 · 요약·분석·다운로드에 같은 자료를 사용합니다.")
     _section("브랜드 비교 요약")
     comparison, notes = project_view.comparison_rows(p, snapshots, by.get("volume"))
     st.dataframe(comparison, hide_index=True)
     st.caption(" · ".join(notes + ["월간 검색량은 검색어 묶음의 정확히 일치한 표기만 더한 검색 횟수(고유 검색자 수 아님)이며 연관 검색어는 제외",
                                    "검색 추이(3년 전 1월~직전 월 상대지수)와 기간·단위가 다름"]))
 
-    _section("검색 추이")
+    _section("검색 추이", anchor="research-trend")
     _trend(by.get("trend"), p)
 
     from core.analyzers import news_digest
-    shown_news, _ = project_view.news_view(rows, p["news_filter"])
+    shown_news, _ = project_view.news_view(selected_rows, p["news_filter"])
     digest = None
     if shown_news and by.get("news"):
         _section("뉴스 핵심 내용·수치 요약")
-        st.caption("제목·발췌 기준 · 최신순 최대 30건 · 기사 원문 전체를 읽지 않습니다. 요약 버튼을 누를 때만 Gemini 호출이 발생합니다.")
+        st.caption("제목·발췌 기준 · 주제·브랜드·월별 대표 자료 최대 30건 · 기사 원문 전체를 읽지 않습니다. 요약 버튼을 누를 때만 Gemini 호출이 발생합니다.")
         digest = news_digest.load(by["news"]["run_id"], shown_news)
         if st.button("수집한 뉴스 요약하기", disabled=not p.get("paid_enabled", True) or bool(digest), key="news_digest_" + pid):
             with st.spinner("뉴스 발췌에서 근거를 정리하고 있습니다…"):
@@ -712,11 +722,6 @@ def _result(project, history):
         else:
             st.caption("현재 수집 버전·뉴스 필터에 맞는 저장 요약이 없습니다. 기존 뉴스 수집 없이 요약만 요청할 수 있습니다.")
 
-    token = hashlib.sha256(scope.encode()).hexdigest()[:12]
-    with st.expander("원본 데이터·다운로드 선택"):
-        _details(rows, p, token, selection)
-    st.session_state.download_selection = selection
-    selected_rows = [r for r in rows if r["selection_id"] in selection and projects.news_passes(r, p["news_filter"])]
     _news_sections(selected_rows)
     _ad_cards(selected_rows, token)
 
@@ -728,14 +733,23 @@ def _result(project, history):
     utm_data, utm_groups = _utm(p, [r for r in rows if r["selection_id"] in selection])
 
     stat_resources = _stat_resources(project, p)
-    _section("다운로드")
     extra = {"comparison": comparison, "comparison_notes": notes, "utm": utm_data, "utm_structures": utm_groups, "stat_resources": stat_resources}
     result = projects.selection_result(project, snapshots, selection, p["news_filter"], extra)
     st.caption(f"다운로드 대상 {len(result['records'])}건 (선택한 자료 중 뉴스 결과 좁히기를 통과한 자료)"
                + (f" · 수집일 혼합 {', '.join(dates)}" if len(dates) > 1 else "") + (" · SAMPLE 포함" if result.get("sample_sources") else ""))
     result["news_digest"] = news_digest.export_rows(digest, result["records"])
+    from ui.research_analysis import render as render_analysis
+    result["ai_analysis"] = render_analysis(project, p, result, summary_slot)
+    _section("다운로드", anchor="research-download")
     _download(project, result)
 
+
+
+def download_name(project, ext):
+    import re
+    from datetime import date
+    name = re.sub(r'[<>:"/\\|?*\x00-\x1f]', '_', project.get("name") or project.get("brand_name") or "ADetect")
+    return f"ADetect_{name[:80].rstrip('. ')}_{date.today().isoformat()}.{ext}"
 
 
 def _download(project, result):
@@ -757,7 +771,7 @@ def _download(project, result):
             saved = st.session_state.get("last_artifact_" + ext)
             data = st.session_state.get("artifact_" + saved[1]) if saved and saved[0] == signature else None
             if data:
-                st.download_button(ext.upper() + " 다운로드", data, file_name="ADetect." + ext, key="download_" + saved[1], on_click=artifact_store.record_download, args=(saved[1],))
+                st.download_button(ext.upper() + " 다운로드", data, file_name=download_name(project, ext), key="download_" + saved[1], on_click=artifact_store.record_download, args=(saved[1],))
             elif saved:
                 st.caption("선택·필터·수집 버전이 바뀌었습니다. 다시 생성해주세요.")
 

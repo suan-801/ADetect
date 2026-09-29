@@ -1,4 +1,4 @@
-"""프로젝트 흐름의 자료 종류별 수집 (결과 schema_version=6).
+"""프로젝트 흐름의 자료 종류별 수집 (결과 schema_version=7).
 
 - 비교에 필요한 자료(검색 추이·검색량·SNS)는 브랜드 단위로, 추가 자료(공식 페이지·Meta 광고·검색 화면)는
   사용자가 고른 브랜드만 수집한다. 선택하지 않은 자료 종류는 호출하지 않는다.
@@ -167,7 +167,7 @@ def _sample_observation(keyword):
 
 
 def collect(source, p, options=None):
-    """자료 종류 하나를 수집해 v6 결과로 반환한다. p는 projects.project_inputs() 결과."""
+    """자료 종류 하나를 수집해 v7 결과로 반환한다. p는 projects.project_inputs() 결과."""
     from core.evidence_store import save_bytes
     options = options or {}
     paid_enabled = p.get("paid_enabled", True)

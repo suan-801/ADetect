@@ -21,7 +21,7 @@ SOURCES = {
 # 프로젝트 입력 v4: 브랜드별 검색어 묶음·계정(brands), 시장 관심 검색어, 뉴스 전용 필터.
 # 이전 필드는 과거 프로젝트·수집 당시 입력 사본을 읽기 위해 계속 허용한다.
 INPUT_VERSION = 4
-RESULT_VERSION = 6
+RESULT_VERSION = 7
 MAX_COMPETITORS = 4      # 데이터랩 한 요청의 최대 5개 주제 = 자사 1 + 경쟁사 4
 MAX_TERMS = 20           # 데이터랩 주제 하나의 최대 검색어 수
 MAX_MARKET = 10
@@ -38,6 +38,7 @@ def now():
 
 
 def schema(conn):
+    conn.execute("CREATE TABLE IF NOT EXISTS project_analysis (project_id TEXT PRIMARY KEY, data TEXT NOT NULL)")
     conn.execute("CREATE TABLE IF NOT EXISTS project_resource (project_id TEXT PRIMARY KEY, fingerprint TEXT NOT NULL, data TEXT NOT NULL)")
     conn.execute("CREATE TABLE IF NOT EXISTS project_digest (run_id TEXT PRIMARY KEY, fingerprint TEXT NOT NULL, data TEXT NOT NULL)")
     conn.execute("CREATE TABLE IF NOT EXISTS project (id TEXT PRIMARY KEY, name TEXT NOT NULL, archived INTEGER DEFAULT 0, updated TEXT NOT NULL)")
@@ -417,6 +418,7 @@ def delete(pid, confirm_name):
             conn.execute("DELETE FROM project_digest WHERE run_id=? OR run_id LIKE ?", (rid,rid+":%"))
         conn.execute("DELETE FROM project_export WHERE project_id=?",(pid,))
         conn.execute("DELETE FROM project_resource WHERE project_id=?",(pid,))
+        conn.execute("DELETE FROM project_analysis WHERE project_id=?",(pid,))
         conn.execute("DELETE FROM project_task WHERE project_id=?",(pid,))
         conn.execute("DELETE FROM function_run WHERE session_id=?",(pid,))
         conn.execute("DELETE FROM project WHERE id=?",(pid,))

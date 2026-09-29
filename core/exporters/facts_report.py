@@ -153,6 +153,7 @@ def project_tables(result):
     from core.project_view import volume_totals, search_status_rows, search_ad_rows
     from core.result_insights import all_trend_facts, news_sections, annual_extremes
     from core import utm
+    from core.research_analysis import export_rows, BRIEF_FIELDS
     records = prioritized(result.get("records", []))
     parts = result.get("parts", {})
     brands = result.get("inputs", {}).get("brands", [])
@@ -201,12 +202,15 @@ def project_tables(result):
         "25_브랜드연도별최저최고": [{"브랜드": s["name"], **r} for s in (compare or {}).get("series", [])
                                for r in annual_extremes({**s, "start": compare["start"], "end": compare["end"]})],
         "26_검색광고원문": ads,
+        "27_AI종합분석": export_rows(result.get("ai_analysis")),
+        "28_AI분석조건": [{"항목": BRIEF_FIELDS.get(k, k), "값": v} for k, v in (result.get("ai_analysis") or {}).get("brief", {}).items()],
+        "29_AI추가확인": [{"구분": s["title"], "추가 확인": s["missing"]} for s in (result.get("ai_analysis") or {}).get("sections", []) if s.get("missing")],
     }
     return {k: v for k, v in tables.items() if v or k == "17_수집조건"}
 
 
 def tables_for(result):
-    return project_tables(result) if result.get("schema_version") in (4, 5, 6) else report_tables(result)
+    return project_tables(result) if result.get("schema_version") in (4, 5, 6, 7) else report_tables(result)
 
 
 def scalar(value):
@@ -239,7 +243,7 @@ def excel(result):
 
 
 def report_html(session,result):
-    if result.get("schema_version") in (4, 5, 6):
+    if result.get("schema_version") in (4, 5, 6, 7):
         from core.exporters.visual_report import report
         return report(session, result, project_tables(result))
     esc=lambda v:html.escape(str(scalar(v) if v is not None else "미제공"))

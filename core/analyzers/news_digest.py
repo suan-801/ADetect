@@ -8,7 +8,7 @@ from config import settings
 from core import projects, jobs
 from database.db import get_conn
 
-VERSION = "excerpt-1"
+VERSION = "balanced-excerpt-2"
 LOCK = threading.Lock()
 
 
@@ -27,9 +27,9 @@ class Digest(BaseModel):
 
 
 def inputs(rows):
-    from core.materials import timestamp
+    from core.research_analysis import balanced
     seen, output = set(), []
-    for row in sorted(rows, key=timestamp, reverse=True):
+    for row in balanced(rows, limit=30):
         if row.get("kind") != "뉴스" or row.get("sample"):
             continue
         identity = projects.canonical_url(row.get("source_url", ""))

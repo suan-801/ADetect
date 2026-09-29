@@ -92,7 +92,7 @@ def test_digest_batches_cache_and_sample_no_call(monkeypatch):
             calls.append(kwargs)
             return NS(text='{"highlights": []}')
     monkeypatch.setattr("core.analyzers.gemini_client.get_client", lambda: NS(models=Models()))
-    rows = [{**article(), "id": str(i), "source_url": f"https://news.example/{i}"} for i in range(40)]
+    rows = [{**article(), "id": str(i), "text": f"{i}개 기관의 서로 다른 조사 결과입니다.", "source_url": f"https://news.example/{i}"} for i in range(40)]
     assert news_digest.generate(rows)["processed"] == 30
     assert news_digest.generate(rows)["processed"] == 30 and len(calls) == 2
     assert news_digest.generate([{**article(), "sample": True}])["status"] == "대상 없음"
