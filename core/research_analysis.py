@@ -1,6 +1,7 @@
 """Evidence-bound research interpretation, separate from immutable collected facts."""
 import hashlib
 import json
+import re
 import threading
 from collections import defaultdict, deque
 from pydantic import BaseModel, Field
@@ -64,6 +65,29 @@ def balanced(rows, limit=60):
     return output
 
 
+def citation_only(text):
+    """'* **출처:** …' 같은 출처 표기 줄은 근거 문장이 아니다."""
+    return re.sub(r"[*\s]", "", str(text)).startswith("출처:")
+
+
+def grouped(evidence):
+    """Same answer segment linked to several sources → one row with all sources. Reads pre-grouping saves too."""
+    output, by = [], {}
+    for row in evidence or []:
+        text = str(row.get("text", "")).strip()
+        if not text or citation_only(text):
+            continue
+        if text not in by:
+            by[text] = {"text": text, "source": "", "sources": [], "date": row.get("date", "")}
+            output.append(by[text])
+        entry = by[text]
+        for source in row.get("sources") or [{"url": row.get("source", ""), "title": ""}]:
+            if source.get("url") and all(s["url"] != source["url"] for s in entry["sources"]):
+                entry["sources"].append({"url": source["url"], "title": source.get("title", "")})
+        entry["source"] = entry["sources"][0]["url"] if entry["sources"] else ""
+    return output
+
+
 def research_key(brief):
     return digest([VERSION, settings.GEMINI_MODEL, brief])
 
@@ -86,7 +110,7 @@ def packet(result, brief, research=None):
     for r in result.get("comparison", [])[:5]:
         add(json.dumps(r, ensure_ascii=False), "", "수집값 계산 · 브랜드 비교")
     if research and research.get("fingerprint") == research_key(brief):
-        for r in research.get("evidence", []):
+        for r in grouped(research.get("evidence", [])):
             add(r["text"], r["source"], "AI 웹 검색 근거 · 원문 미검증", r.get("date", ""))
     return {"brief": brief, "brands": [b.get("name") for b in result.get("inputs", {}).get("brands", [])],
             "evidence": evidence, "selected_count": len(rows), "included_count": len(evidence)}
@@ -255,9 +279,13 @@ def research(p, brief):
                 chunks = getattr(metadata, "grounding_chunks", None) or []
                 for support in getattr(metadata, "grounding_supports", None) or []:
                     text = getattr(getattr(support, "segment", None), "text", "")
+                    sources = []
                     for idx in getattr(support, "grounding_chunk_indices", None) or []:
-                        url = getattr(getattr(chunks[idx], "web", None), "uri", "") if 0 <= idx < len(chunks) else ""
-                        if text and public_url(url): evidence.append({"text": text[:1200], "source": url, "date": projects.now()[:10]})
+                        web = getattr(chunks[idx], "web", None) if 0 <= idx < len(chunks) else None
+                        url = getattr(web, "uri", "") or ""
+                        if public_url(url): sources.append({"url": url, "title": getattr(web, "title", "") or ""})
+                    if text and sources: evidence.append({"text": text[:1200], "sources": sources, "date": projects.now()[:10]})
+            evidence = grouped(evidence)
             if not evidence: return {"status": "실패", "message": "검색 문장과 연결된 출처를 확보하지 못했습니다.", "usage": usage(response)}
             return {"status": "완료", "evidence": evidence[:16], "usage": usage(response), "created": projects.now(),
                     "model": settings.GEMINI_MODEL, "fingerprint": research_key(brief)}

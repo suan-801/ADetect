@@ -1,6 +1,12 @@
 """Research brief and explicit, cached AI analysis controls."""
+import re
 import streamlit as st
 from core import research_analysis as analysis
+
+
+def _label(title):
+    # 링크 텍스트 안의 마크다운 문법 문자를 제거한다.
+    return re.sub(r"[\[\]()*_`\\<>]", "", str(title or "")).strip()[:60]
 
 
 def brief_form(project, p):
@@ -43,10 +49,11 @@ def render(project, p, result, summary_slot):
             analysis.save(pid, state)
             st.rerun()
         if current_research:
-            st.caption("저장된 검색 결과 · " + current_research["created"][:10] + " · 원문 수치 독립 검증 아님")
-            for row in current_research["evidence"]:
+            st.caption("저장된 검색 결과 · " + current_research["created"][:10] + " · AI 검색 요약 문장과 연결된 출처입니다. 출처 원문이 아니며 수치는 독립 검증되지 않았습니다.")
+            for row in analysis.grouped(current_research["evidence"]):
                 st.write(row["text"])
-                st.link_button("검색 근거", row["source"])
+                st.markdown("연결 출처 · " + " · ".join(
+                    f"[{_label(s['title']) or f'출처 {i}'}]({s['url'].replace('(', '%28').replace(')', '%29')})" for i, s in enumerate(row["sources"], 1)))
             if st.button("검색 결과 갱신 준비", key="reset_research_" + pid):
                 state.pop("research", None)
                 analysis.save(pid, state)

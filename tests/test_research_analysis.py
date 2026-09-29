@@ -81,6 +81,11 @@ def test_backup_analysis_export_and_delete():
     assert len(tables["27_AI종합분석"]) == 5
     html = facts_report.report_html({}, {**result(), "ai_analysis": analysis})
     assert "AI 핵심 결론" in html and "AI 종합 분석" in html and "<details open" not in html
+    from core.exporters.analysis_report import analysis_html
+    markup = analysis_html(analysis)
+    # 항목명과 내용을 분리하고, 근거는 번호로만 참조한 뒤 한 곳에 모은다.
+    assert "<dt>관측·기사 주장</dt><dd>" in markup and 'href="#ai-ref-1"' in markup and 'id="ai-ref-1"' in markup
+    assert markup.count("<blockquote>") == 0 and markup.count("근거 목록") == 1 and "\n\n" not in markup
     projects.delete(pid, "A")
     assert ra.load(pid) == {}
 
@@ -96,6 +101,24 @@ def test_market_research_accepts_only_supported_segments(monkeypatch):
     assert len(ra.packet(result(), {**BRIEF, "goal": "changed"}, r)["evidence"]) == 1
     metadata.grounding_supports = []
     assert ra.research({}, BRIEF)["status"] == "실패"
+
+
+def test_market_research_groups_repeated_segments(monkeypatch):
+    monkeypatch.setattr(settings, "GEMINI_API_KEY", "test")
+    monkeypatch.setattr(settings, "GEMINI_MOCK", False)
+    chunks = [NS(web=NS(uri=f"https://agency{i}.example/r", title=f"agency{i}.example")) for i in range(3)]
+    supports = [NS(segment=NS(text="구독 매출이 확대되었다는 문장입니다."), grounding_chunk_indices=[0, 1, 2]),
+                NS(segment=NS(text="* **출처:** 기관 보도자료"), grounding_chunk_indices=[0, 1]),
+                NS(segment=NS(text="구독 매출이 확대되었다는 문장입니다."), grounding_chunk_indices=[1])]
+    response = NS(candidates=[NS(grounding_metadata=NS(grounding_chunks=chunks, grounding_supports=supports))], usage_metadata=None)
+    monkeypatch.setattr("core.analyzers.gemini_client.get_client", lambda: NS(models=NS(generate_content=lambda **kw: response)))
+    r = ra.research({}, BRIEF)
+    assert len(r["evidence"]) == 1 and r["evidence"][0]["source"] == "https://agency0.example/r"
+    assert [s["title"] for s in r["evidence"][0]["sources"]] == ["agency0.example", "agency1.example", "agency2.example"]
+    # 묶기 전 저장 형식(문장×출처 한 줄씩)도 한 문장으로 읽는다.
+    old = [{"text": "같은 문장입니다 확인용", "source": u, "date": "2026-09-29"} for u in ("https://a.example", "https://b.example")]
+    old.append({"text": "* **출처:** 보도자료", "source": "https://a.example"})
+    assert [len(g["sources"]) for g in ra.grouped(old)] == [2]
 
 
 def test_quota_error_does_not_claim_balance_exhaustion():
